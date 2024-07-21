@@ -37,7 +37,7 @@ int main(int argc, char* argv[]) {
     }
 
     information_node_manager info_node_manager(server);
-    info_node_manager.add_information_node<UA_Int32>(server, "the.index", "the index", UA_TYPES_INT32, &index);
+    info_node_manager.add_information_node(server, "the.index", "the index", UA_TYPES_INT32, &index);
 
     /* Run the server loop */
     UA_StatusCode retval = UA_Server_run(server, &running);
