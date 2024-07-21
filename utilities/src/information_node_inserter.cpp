@@ -1,12 +1,12 @@
-#include "../include/information_node_manager.hpp"
+#include "../include/information_node_inserter.hpp"
 
-information_node_manager::information_node_manager() {
+information_node_inserter::information_node_inserter() {
 }
 
-information_node_manager::~information_node_manager() {
+information_node_inserter::~information_node_inserter() {
 }
 
-void information_node_manager::add_information_node(UA_Server* _server, std::string _node_id, std::string _browse_name, UA_UInt32 _type_index, void *_value) {
+void information_node_inserter::add_information_node(UA_Server* _server, std::string _node_id, std::string _browse_name, UA_UInt32 _type_index, void *_value) {
     /* Define the attribute and value of the variable node */
     UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
     UA_Variant_setScalar(&variable_attributes.value, _value, &UA_TYPES[_type_index]);

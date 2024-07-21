@@ -3,7 +3,7 @@
 #include <open62541/server_config_default.h>
 #include <signal.h>
 #include <stdio.h>
-#include "information_node_manager.hpp"
+#include "information_node_inserter.hpp"
 
 static volatile UA_Boolean running = true;
 static void stopHandler(int sig) {
@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
         return status;
     }
 
-    information_node_manager info_node_manager;
+    information_node_inserter info_node_manager;
     info_node_manager.add_information_node(server, "the.index", "the index", UA_TYPES_INT32, &index);
 
     /* Run the server loop */
