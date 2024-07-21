@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel.h>
-#include <stdlib.h>
 #include <string>
 
 static void usage(char *program) {
@@ -36,14 +35,12 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0; i < robot_count; i++) {
         UA_Variant value; /* Variants can hold scalar values and arrays of any type */
         UA_Variant_init(&value);
-        std::string index_str = "index_" + std::to_string(i);
-        char* index_str_c = const_cast<char*>(index_str.c_str());
-        status = UA_Client_readValueAttribute(clients[i], UA_NODEID_STRING(1, index_str_c), &value);
+        status = UA_Client_readValueAttribute(clients[i], UA_NODEID_STRING(1, "the.index"), &value);
         if(status == UA_STATUSCODE_GOOD &&
         UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_INT32])) {
             printf("the value is: %i\n", *(UA_Int32*)value.data);
         } else {
-            printf("Reading the value attribute of node %s failed\n", index_str_c);
+            printf("Reading the value attribute of node %lu failed\n", i);
         }
         UA_Variant_clear(&value);
     }

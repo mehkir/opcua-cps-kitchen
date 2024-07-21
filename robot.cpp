@@ -3,8 +3,6 @@
 #include <open62541/server_config_default.h>
 #include <signal.h>
 #include <stdio.h>
-#include <stdlib.h>
-#include <string>
 
 static volatile UA_Boolean running = true;
 static void stopHandler(int sig) {
@@ -40,18 +38,16 @@ int main(int argc, char* argv[]) {
     UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
     UA_Int32 index = atoi(argv[2]);
     UA_Variant_setScalar(&variable_attributes.value, &index, &UA_TYPES[UA_TYPES_INT32]);
-    std::string index_str = "index_" + std::to_string(index);
-    char* index_str_c = const_cast<char*>(index_str.c_str());
-    variable_attributes.description = UA_LOCALIZEDTEXT("en-US",index_str_c);
-    variable_attributes.displayName = UA_LOCALIZEDTEXT("en-US",index_str_c);
+    variable_attributes.description = UA_LOCALIZEDTEXT("en-US", "the index");
+    variable_attributes.displayName = UA_LOCALIZEDTEXT("en-US", "the index");
     variable_attributes.dataType = UA_TYPES[UA_TYPES_INT32].typeId;
     variable_attributes.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
 
     /* Define where the node shall be added with which browsename */
-    UA_NodeId requested_new_node_id = UA_NODEID_STRING(1, index_str_c);
+    UA_NodeId requested_new_node_id = UA_NODEID_STRING(1, "the.index");
     UA_NodeId parent_node_id = UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER);
     UA_NodeId reference_type_id = UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES);
-    UA_QualifiedName browse_name = UA_QUALIFIEDNAME(1, index_str_c);
+    UA_QualifiedName browse_name = UA_QUALIFIEDNAME(1, "the index");
     UA_NodeId type_definition = UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE);
 
     /* Add the variable node to the information model */
