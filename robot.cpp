@@ -36,7 +36,7 @@ int main(int argc, char* argv[]) {
         return status;
     }
 
-    information_node_manager info_node_manager(server);
+    information_node_manager info_node_manager;
     info_node_manager.add_information_node(server, "the.index", "the index", UA_TYPES_INT32, &index);
 
     /* Run the server loop */
