@@ -4,8 +4,7 @@
 #include <open62541/server.h>
 #include <string>
 
-class information_node_inserter
-{
+class information_node_inserter {
 private:
     /* data */
 public:
