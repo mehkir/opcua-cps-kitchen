@@ -10,6 +10,7 @@ private:
     std::vector<UA_Argument> input_arguments_;
     std::vector<UA_Argument> output_arguments_;
     bool is_method_node_added_;
+    UA_MethodAttributes method_attributes_;
 public:
     method_node_inserter();
     ~method_node_inserter();

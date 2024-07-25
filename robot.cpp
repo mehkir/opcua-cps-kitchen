@@ -12,7 +12,7 @@ static void stopHandler(int sig) {
 }
 
 static void usage(char *program) {
-    printf("Usage: %s index\n", program);
+    printf("Usage: %s port\n", program);
 }
 
 int main(int argc, char* argv[]) {
@@ -22,12 +22,12 @@ int main(int argc, char* argv[]) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_Server *server = UA_Server_new();
     UA_ServerConfig* server_config = UA_Server_getConfig(server);
-    UA_Int32 index = atoi(argv[1]);
+    UA_Int32 port = atoi(argv[1]);
     if (argc > 1) {
-        status = UA_ServerConfig_setMinimal(server_config, 4840+index, NULL);
+        status = UA_ServerConfig_setMinimal(server_config, port, NULL);
     } else {
         usage(argv[0]);
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Please provide a port and an index");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Please provide a port");
         return UA_STATUSCODE_BAD;
     }
     
@@ -36,8 +36,8 @@ int main(int argc, char* argv[]) {
         return status;
     }
 
-    information_node_inserter info_node_manager;
-    info_node_manager.add_information_node(server, "the.index", "the index", UA_TYPES_INT32, &index);
+    // information_node_inserter info_node_manager;
+    // info_node_manager.add_information_node(server, "the.index", "the index", UA_TYPES_INT32, &index);
 
     /* Run the server loop */
     UA_StatusCode retval = UA_Server_run(server, &running);
