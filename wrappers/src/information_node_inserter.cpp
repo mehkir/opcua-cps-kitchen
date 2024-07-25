@@ -6,7 +6,7 @@ information_node_inserter::information_node_inserter() {
 information_node_inserter::~information_node_inserter() {
 }
 
-void information_node_inserter::add_information_node(UA_Server* _server, std::string _node_id, std::string _browse_name, UA_UInt32 _type_index, void *_value) {
+UA_StatusCode information_node_inserter::add_information_node(UA_Server* _server, std::string _node_id, std::string _browse_name, UA_UInt32 _type_index, void* _value) {
     /* Define the attribute and value of the variable node */
     UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
     UA_Variant_setScalar(&variable_attributes.value, _value, &UA_TYPES[_type_index]);
@@ -23,7 +23,9 @@ void information_node_inserter::add_information_node(UA_Server* _server, std::st
     UA_NodeId type_definition = UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE);
 
     /* Add the variable node to the information model */
+    UA_StatusCode status_code =
     UA_Server_addVariableNode(_server, requested_new_node_id,
         parent_node_id, reference_type_id, browse_name,
         type_definition, variable_attributes, NULL, NULL);
+    return status_code;
 }
