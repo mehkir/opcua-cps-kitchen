@@ -3,20 +3,35 @@
 #include <open62541/server_config_default.h>
 #include <signal.h>
 #include <stdio.h>
+#include <set>
+#include "information_node_inserter.hpp"
+
+std::set<robot> acknowledged_robots;
+
+struct robot {
+    private:
+        UA_UInt32 robot_id_;
+    public:
+        robot(UA_UInt32 _robot_id) : robot_id_(_robot_id) {
+        }
+
+        ~robot() {
+        }
+};
 
 static volatile UA_Boolean running = true;
-static void stopHandler(int sig) {
+static void stop_handler(int sig) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "received ctrl-c");
     running = false;
 }
 
 static void usage(char *program) {
-    printf("Usage: %s port\n", program);
+    printf("Usage: %s port robot_count\n", program);
 }
 
 int main(int argc, char* argv[]) {
-    signal(SIGINT, stopHandler);
-    signal(SIGTERM, stopHandler);
+    signal(SIGINT, stop_handler);
+    signal(SIGTERM, stop_handler);
 
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_Server *server = UA_Server_new();
@@ -34,26 +49,9 @@ int main(int argc, char* argv[]) {
         return status;
     }
 
-    /* Define the attribute of the value_# variable node */
-    UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
-    UA_Int32 index = atoi(argv[2]);
-    UA_Variant_setScalar(&variable_attributes.value, &index, &UA_TYPES[UA_TYPES_INT32]);
-    variable_attributes.description = UA_LOCALIZEDTEXT("en-US", "the index");
-    variable_attributes.displayName = UA_LOCALIZEDTEXT("en-US", "the index");
-    variable_attributes.dataType = UA_TYPES[UA_TYPES_INT32].typeId;
-    variable_attributes.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
-
-    /* Define where the node shall be added with which browsename */
-    UA_NodeId requested_new_node_id = UA_NODEID_STRING(1, "the.index");
-    UA_NodeId parent_node_id = UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER);
-    UA_NodeId reference_type_id = UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES);
-    UA_QualifiedName browse_name = UA_QUALIFIEDNAME(1, "the index");
-    UA_NodeId type_definition = UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE);
-
-    /* Add the variable node to the information model */
-    UA_Server_addVariableNode(server, requested_new_node_id,
-        parent_node_id, reference_type_id, browse_name,
-        type_definition, variable_attributes, NULL, NULL);
+    UA_UInt64 clock_tick = 0;
+    information_node_inserter info_node_inserter;
+    info_node_inserter.add_information_node(server, "clock_tick", "the clock tick", UA_TYPES_UINT64, &clock_tick);
 
     /* Run the server loop */
     UA_StatusCode retval = UA_Server_run(server, &running);

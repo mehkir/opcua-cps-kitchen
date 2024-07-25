@@ -12,3 +12,7 @@ target_include_directories(controller PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOU
 add_executable(robot robot.cpp)
 target_link_libraries(robot PUBLIC wrappers_lib open62541)
 target_include_directories(robot PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
+
+add_executable(clock clock.cpp)
+target_link_libraries(clock PUBLIC wrappers_lib open62541)
+target_include_directories(clock PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
