@@ -23,16 +23,17 @@ receive_tick_ack (UA_Server *server,
         const UA_NodeId *object_id, void *object_context,
         size_t input_size, const UA_Variant *input,
         size_t output_size, UA_Variant *output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "receive_tick_ack called");
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Extract input arguments */
     UA_UInt16 port = *(UA_UInt16*)input[0].data;
     UA_UInt64 current_client_tick = *(UA_UInt64*)input[1].data;
     UA_UInt64 next_tick = *(UA_UInt64*)input[2].data;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Extracted inputs: port: %d, current_client_tick: %lu, next_tick: %lu", port, current_client_tick, next_tick);
     /* Check if the current tick of the client is equal to the current tick of the server */
     if (current_client_tick != clock_tick_) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "current tick of the client is not equal to the current tick of the server");
         UA_Boolean ack_received = false;
-        UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        // UA_Variant_setScalar(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         return UA_STATUSCODE_GOOD;
     }
     /* Determine the next smallest tick and if all clients sent their next ticks */
@@ -45,14 +46,19 @@ receive_tick_ack (UA_Server *server,
             }
         }
         currently_acknowledged_set.insert(port);
+        UA_Boolean ack_received = true;
+        // UA_Variant_setScalar(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Ack received from port: %d", port);
     } else {
         UA_Variant new_clock_tick;
         UA_Variant_setScalar(&new_clock_tick, &next_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
         currently_acknowledged_set.clear();
         clock_tick_ = next_clock_tick_;
         UA_Boolean ack_received = true;
-        UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        // UA_Variant_setScalar(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "clock_tick"), new_clock_tick);
+        UA_Variant_clear(&new_clock_tick);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "New clock tick is: %lu", clock_tick_);
     }
     return UA_STATUSCODE_GOOD;
 }

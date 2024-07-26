@@ -3,12 +3,16 @@
 #include <open62541/server_config_default.h>
 #include <open62541/client_config_default.h>
 #include <open62541/client_subscriptions.h>
+#include <open62541/client_highlevel_async.h>
 
 #include <signal.h>
 #include <stdio.h>
 
 #include "information_node_inserter.hpp"
 #include "node_value_subscriber.hpp"
+
+UA_Int64 current_clock_tick_ = 0;
+UA_Int64 next_clock_tick_ = 0;
 
 static volatile UA_Boolean running = true;
 static void stopHandler(int sig) {
@@ -23,18 +27,19 @@ static void usage(char *program) {
 static void
 clock_tick_notification_callback(UA_Client *client, UA_UInt32 subId, void *subContext,
                     UA_UInt32 monId, void *monContext, UA_DataValue *value) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "clock notification callback called");
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if(UA_Variant_hasScalarType(&value->value, &UA_TYPES[UA_TYPES_UINT64])) {
         UA_UInt64 new_clock_tick = *(UA_UInt64 *) value->value.data;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                    "New clock tick is: %u", new_clock_tick);
+                    "New clock tick is: %lu", new_clock_tick);
+        current_clock_tick_ = new_clock_tick;
     }
 }
 
 static void
 receive_tick_ack_called(UA_Client *client, void *userdata, UA_UInt32 requestId,
     UA_CallResponse *response) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called with %u results", __FUNCTION__, response->resultsSize);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called with %lu results", __FUNCTION__, response->resultsSize);
     UA_StatusCode status_code = response->responseHeader.serviceResult;
     if(status_code != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
@@ -48,7 +53,7 @@ receive_tick_ack_called(UA_Client *client, void *userdata, UA_UInt32 requestId,
     }
 
     UA_Boolean tick_ack_result = *(UA_Boolean*)response->results[0].outputArguments->data;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %u", tick_ack_result);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, tick_ack_result);
 }
 
 int main(int argc, char* argv[]) {
@@ -58,10 +63,12 @@ int main(int argc, char* argv[]) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_Server* server = UA_Server_new();
     UA_ServerConfig* server_config = UA_Server_getConfig(server);
-    UA_Int32 clock_port = 0;
+    UA_UInt16 robot_port = 0;
+    UA_UInt16 clock_port = 0;
     if (argc > 2) {
-        status = UA_ServerConfig_setMinimal(server_config, atoi(argv[1]), NULL);
+        robot_port = atoi(argv[1]);
         clock_port = atoi(argv[2]);
+        status = UA_ServerConfig_setMinimal(server_config, atoi(argv[1]), NULL);
     } else {
         usage(argv[0]);
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Please provide a port and clock port");
@@ -81,6 +88,18 @@ int main(int argc, char* argv[]) {
 
     node_value_subscriber clock_tick_subscriber;
     clock_tick_subscriber.subscribe_node_value(clock_client, UA_NODEID_STRING(1, "clock_tick"), &clock_tick_notification_callback);
+
+    next_clock_tick_ = rand() % 20;
+    UA_Variant inputs[3];
+    UA_Variant_init(&inputs[0]);
+    UA_Variant_setScalar(&inputs[0], &robot_port, &UA_TYPES[UA_TYPES_UINT16]);
+    UA_Variant_init(&inputs[1]);
+    UA_Variant_setScalar(&inputs[1], &current_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
+    UA_Variant_init(&inputs[2]);
+    UA_Variant_setScalar(&inputs[2], &next_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
+    UA_UInt32 request_id = 0;
+    UA_Client_call_async(clock_client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_STRING(1, "receive_tick_ack"), 3, inputs, &receive_tick_ack_called, NULL, &request_id);
+
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);
