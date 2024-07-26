@@ -6,7 +6,7 @@ information_node_inserter::information_node_inserter() {
 information_node_inserter::~information_node_inserter() {
 }
 
-UA_StatusCode information_node_inserter::add_information_node(UA_Server* _server, std::string _node_id, std::string _browse_name, UA_UInt32 _type_index, void* _value) {
+UA_StatusCode information_node_inserter::add_information_node(UA_Server* _server, UA_NodeId _node_id, std::string _browse_name, UA_UInt32 _type_index, void* _value) {
     /* Define the attribute and value of the variable node */
     UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
     UA_Variant_setScalar(&variable_attributes.value, _value, &UA_TYPES[_type_index]);
@@ -16,7 +16,7 @@ UA_StatusCode information_node_inserter::add_information_node(UA_Server* _server
     variable_attributes.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
 
     /* Define where the node shall be added with which browsename */
-    UA_NodeId requested_new_node_id = UA_NODEID_STRING(1, const_cast<char*>(_node_id.c_str()));
+    UA_NodeId requested_new_node_id = _node_id;
     UA_NodeId parent_node_id = UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER);
     UA_NodeId reference_type_id = UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES);
     UA_QualifiedName browse_name = UA_QUALIFIEDNAME(1, const_cast<char*>(_browse_name.c_str()));

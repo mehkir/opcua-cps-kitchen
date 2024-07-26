@@ -4,6 +4,8 @@ method_node_inserter::method_node_inserter() : is_method_node_added_(false) {
 }
 
 method_node_inserter::~method_node_inserter() {
+    input_arguments_.clear();
+    output_arguments_.clear();
 }
 
 void method_node_inserter::add_input_argument(std::string _description, std::string _name, UA_UInt32 _type_index) {
@@ -32,7 +34,7 @@ void method_node_inserter::add_output_argument(std::string _description, std::st
     output_arguments_.push_back(output_argument);
 }
 
-UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_UInt32 _method_node_id, std::string _browse_name, UA_MethodCallback _method_callback) {
+UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_NodeId _method_node_id, std::string _browse_name, UA_MethodCallback _method_callback) {
     UA_StatusCode status_code = UA_STATUSCODE_BAD;
     if (is_method_node_added_) {
         return status_code;
@@ -44,7 +46,7 @@ UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_UInt3
     method_attributes_.displayName = UA_LOCALIZEDTEXT("en-US", const_cast<char*>(display_name.c_str()));
     method_attributes_.executable = true;
     method_attributes_.userExecutable = true;
-    status_code = UA_Server_addMethodNode(_server, UA_NODEID_NUMERIC(1,_method_node_id),
+    status_code = UA_Server_addMethodNode(_server, _method_node_id,
                             UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
                             UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_browse_name.c_str())),
