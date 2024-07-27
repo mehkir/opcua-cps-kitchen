@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <thread>
+#include <time.h>
 
 #include "information_node_inserter.hpp"
 #include "node_value_subscriber.hpp"
@@ -92,9 +93,10 @@ int main(int argc, char* argv[]) {
     }
 
     node_value_subscriber clock_tick_subscriber;
-    clock_tick_subscriber.subscribe_node_value(clock_client, UA_NODEID_STRING(1, "clock_tick"), clock_tick_notification_callback);
+    clock_tick_subscriber.subscribe_node_value(clock_client, UA_NODEID_STRING(1, "clock_tick"), clock_tick_notification_callback, NULL);
 
-    next_clock_tick_ = 123;
+    srand(time(NULL));
+    next_clock_tick_ = rand() % 1000;
     UA_Variant inputs[3];
     UA_Variant_init(&inputs[0]);
     UA_Variant_setScalar(&inputs[0], &robot_port, &UA_TYPES[UA_TYPES_UINT16]);

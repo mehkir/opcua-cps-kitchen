@@ -1,0 +1,5 @@
+file(GLOB MY_SOURCES "./src/*.cpp")
+file(GLOB MY_HEADERS "./include/*.hpp")
+add_library(robot_lib ${MY_SOURCES} ${MY_HEADERS})
+target_include_directories(robot_lib PUBLIC ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
+target_link_libraries(robot_lib PUBLIC open62541 wrappers_lib)
