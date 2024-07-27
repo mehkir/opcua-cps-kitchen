@@ -14,7 +14,7 @@
 UA_UInt64 clock_tick_ = 0;
 UA_UInt64 next_clock_tick_ = 0;
 UA_Int32 clock_client_count_ = 0;
-std::set<uint16_t> currently_acknowledged_set;
+std::set<uint16_t> currently_acknowledged_set_;
 
 static UA_StatusCode
 receive_tick_ack (UA_Server *server,
@@ -33,11 +33,11 @@ receive_tick_ack (UA_Server *server,
     if (current_client_tick != clock_tick_) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "current tick of the client is not equal to the current tick of the server");
         UA_Boolean ack_received = false;
-        // UA_Variant_setScalar(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         return UA_STATUSCODE_GOOD;
     }
     /* Determine the next smallest tick and if all clients sent their next ticks */
-    if(currently_acknowledged_set.size() != clock_client_count_) {
+    if(currently_acknowledged_set_.size() != clock_client_count_) {
         if (next_tick > clock_tick_) {
             if (next_clock_tick_ == clock_tick_) {
                 next_clock_tick_ = next_tick;
@@ -45,19 +45,19 @@ receive_tick_ack (UA_Server *server,
                 next_clock_tick_ = next_tick < next_clock_tick_ ? next_tick : next_clock_tick_;
             }
         }
-        currently_acknowledged_set.insert(port);
+        currently_acknowledged_set_.insert(port);
         UA_Boolean ack_received = true;
-        // UA_Variant_setScalar(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Ack received from port: %d", port);
-    } else {
+    } 
+    if (currently_acknowledged_set_.size() == clock_client_count_) {
         UA_Variant new_clock_tick;
         UA_Variant_setScalar(&new_clock_tick, &next_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
-        currently_acknowledged_set.clear();
+        currently_acknowledged_set_.clear();
         clock_tick_ = next_clock_tick_;
         UA_Boolean ack_received = true;
-        // UA_Variant_setScalar(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         UA_Server_writeValue(server, UA_NODEID_STRING(1, "clock_tick"), new_clock_tick);
-        UA_Variant_clear(&new_clock_tick);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "New clock tick is: %lu", clock_tick_);
     }
     return UA_STATUSCODE_GOOD;
@@ -106,7 +106,7 @@ int main(int argc, char* argv[]) {
     receive_tick_ack_inserter.add_input_argument("current tick of the client", "current_client_tick", UA_TYPES_UINT64);
     receive_tick_ack_inserter.add_input_argument("next tick of the tick client", "next_tick", UA_TYPES_UINT64);
     receive_tick_ack_inserter.add_output_argument("ack received", "ack_received", UA_TYPES_BOOLEAN);
-    status = receive_tick_ack_inserter.add_method_node(server, UA_NODEID_STRING(1,"receive_tick_ack"), "receive tick ack", &receive_tick_ack);
+    status = receive_tick_ack_inserter.add_method_node(server, UA_NODEID_STRING(1,"receive_tick_ack"), "receive tick ack", receive_tick_ack);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding method node");
         return EXIT_FAILURE;

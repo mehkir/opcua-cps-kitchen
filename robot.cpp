@@ -7,6 +7,7 @@
 
 #include <signal.h>
 #include <stdio.h>
+#include <thread>
 
 #include "information_node_inserter.hpp"
 #include "node_value_subscriber.hpp"
@@ -52,8 +53,12 @@ receive_tick_ack_called(UA_Client *client, void *userdata, UA_UInt32 requestId,
         return;
     }
 
-    UA_Boolean tick_ack_result = *(UA_Boolean*)response->results[0].outputArguments->data;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, tick_ack_result);
+    if(UA_Variant_hasScalarType(response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_Boolean tick_ack_result = *(UA_Boolean*)response->results[0].outputArguments->data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, tick_ack_result);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -87,9 +92,9 @@ int main(int argc, char* argv[]) {
     }
 
     node_value_subscriber clock_tick_subscriber;
-    clock_tick_subscriber.subscribe_node_value(clock_client, UA_NODEID_STRING(1, "clock_tick"), &clock_tick_notification_callback);
+    clock_tick_subscriber.subscribe_node_value(clock_client, UA_NODEID_STRING(1, "clock_tick"), clock_tick_notification_callback);
 
-    next_clock_tick_ = rand() % 20;
+    next_clock_tick_ = 123;
     UA_Variant inputs[3];
     UA_Variant_init(&inputs[0]);
     UA_Variant_setScalar(&inputs[0], &robot_port, &UA_TYPES[UA_TYPES_UINT16]);
@@ -98,8 +103,14 @@ int main(int argc, char* argv[]) {
     UA_Variant_init(&inputs[2]);
     UA_Variant_setScalar(&inputs[2], &next_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
     UA_UInt32 request_id = 0;
-    UA_Client_call_async(clock_client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_STRING(1, "receive_tick_ack"), 3, inputs, &receive_tick_ack_called, NULL, &request_id);
+    UA_Client_call_async(clock_client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_STRING(1, "receive_tick_ack"), 3, inputs, receive_tick_ack_called, NULL, &request_id);
 
+    /* Run client iterate asynchronously */
+    std::thread client_iterate_thread([clock_client]() {
+        while(running) {
+            UA_Client_run_iterate(clock_client, 1000);
+        }
+    });
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);
@@ -108,6 +119,7 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    client_iterate_thread.join();
     /* Clean up */
     UA_Client_delete(clock_client);
     UA_Server_delete(server);
