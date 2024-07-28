@@ -35,7 +35,7 @@ void method_node_inserter::add_output_argument(std::string _description, std::st
     output_arguments_.push_back(output_argument);
 }
 
-UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_NodeId _method_node_id, std::string _browse_name, UA_MethodCallback _method_callback) {
+UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_NodeId _method_node_id, std::string _browse_name, UA_MethodCallback _method_callback, void* _node_context) {
     UA_StatusCode status_code = UA_STATUSCODE_BAD;
     if (is_method_node_added_) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Method node already added");
@@ -53,7 +53,7 @@ UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_NodeI
                             UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_browse_name.c_str())),
                             method_attributes_, _method_callback,
-                            input_arguments_.size(), input_arguments_.data(), output_arguments_.size(), output_arguments_.data(), NULL, NULL);
+                            input_arguments_.size(), input_arguments_.data(), output_arguments_.size(), output_arguments_.data(), _node_context, NULL);
     is_method_node_added_ = true;
     return status_code;
 }

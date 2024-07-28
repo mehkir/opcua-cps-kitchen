@@ -1,20 +1,24 @@
 #include "../include/robot.hpp"
 #include "node_ids.hpp"
 
+#include <open62541/plugin/log_stdout.h>
+#include <open62541/server_config_default.h>
+#include <open62541/client_config_default.h>
+#include <open62541/client_highlevel_async.h>
 #include <string>
 
 robot::robot(uint16_t _robot_port, uint16_t _clock_port) : robot_server_(UA_Server_new()), robot_port_(_robot_port), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), running_(true) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
-    UA_ServerConfig* server_config = UA_Server_getConfig(robot_server_);
-    status = UA_ServerConfig_setMinimal(server_config, robot_port_, NULL);
+    UA_ServerConfig* robot_server_config = UA_Server_getConfig(robot_server_);
+    status = UA_ServerConfig_setMinimal(robot_server_config, robot_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
         UA_Server_delete(robot_server_);
         return;
     }
 
-    UA_ClientConfig* client_config = UA_Client_getConfig(clock_client_);
-    client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
+    UA_ClientConfig* clock_client_config = UA_Client_getConfig(clock_client_);
+    clock_client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
     std::string clock_endpoint = "opc.tcp://localhost:" + std::to_string(_clock_port);
     status = UA_Client_connect(clock_client_, clock_endpoint.c_str());
     if(status != UA_STATUSCODE_GOOD) {
@@ -75,11 +79,11 @@ robot::receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32 requ
     }
     
     robot* self = static_cast<robot*>(userdata);
-    self->handle_receive_tick_ack(tick_ack_result);
+    self->handle_receive_tick_ack_result(tick_ack_result);
 }
 
 void
-robot::handle_receive_tick_ack(UA_Boolean _tick_ack_result) {
+robot::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
 }
 

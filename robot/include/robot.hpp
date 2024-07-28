@@ -1,11 +1,8 @@
 #ifndef ROBOT_HPP
 #define ROBOT_HPP
 
-#include <open62541/plugin/log_stdout.h>
 #include <open62541/server.h>
-#include <open62541/server_config_default.h>
-#include <open62541/client_config_default.h>
-#include <open62541/client_highlevel_async.h>
+#include <open62541/client.h>
 
 #include <signal.h>
 #include <stdio.h>
@@ -36,7 +33,7 @@ private:
     receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32 request_id, UA_CallResponse* response);
 
     void
-    handle_receive_tick_ack(UA_Boolean _tick_ack_result);
+    handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
 public:
     robot(uint16_t _port, uint16_t _clock_port);
     ~robot();

@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             // Resolved by CMake Tools:
-            "program": "${workspaceFolder}/build/clock",
+            "program": "${workspaceFolder}/build/start_clock_instance",
             "args": ["4900","2"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
