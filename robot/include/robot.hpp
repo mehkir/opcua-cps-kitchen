@@ -11,8 +11,8 @@
 #include <stdio.h>
 #include <thread>
 
-#include "information_node_inserter.hpp"
 #include "node_value_subscriber.hpp"
+#include "method_node_caller.hpp"
 
 class robot {
 private:
@@ -20,6 +20,7 @@ private:
     UA_UInt16 robot_port_;
     UA_Client* clock_client_;
     node_value_subscriber clock_tick_subscriber_;
+    method_node_caller receive_tick_ack_caller_;
     UA_Int64 current_clock_tick_;
     UA_Int64 next_clock_tick_;
     std::thread client_iterate_thread_;

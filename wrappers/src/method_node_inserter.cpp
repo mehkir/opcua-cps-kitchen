@@ -1,4 +1,5 @@
 #include "../include/method_node_inserter.hpp"
+#include <open62541/plugin/log_stdout.h>
 
 method_node_inserter::method_node_inserter() : is_method_node_added_(false) {
 }
@@ -37,6 +38,7 @@ void method_node_inserter::add_output_argument(std::string _description, std::st
 UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_NodeId _method_node_id, std::string _browse_name, UA_MethodCallback _method_callback) {
     UA_StatusCode status_code = UA_STATUSCODE_BAD;
     if (is_method_node_added_) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Method node already added");
         return status_code;
     }
     method_attributes_ = UA_MethodAttributes_default;

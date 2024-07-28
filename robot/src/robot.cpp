@@ -1,6 +1,8 @@
 #include "../include/robot.hpp"
 #include "node_ids.hpp"
 
+#include <string>
+
 robot::robot(uint16_t _robot_port, uint16_t _clock_port) : robot_server_(UA_Server_new()), robot_port_(_robot_port), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), running_(true) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(robot_server_);
@@ -22,6 +24,11 @@ robot::robot(uint16_t _robot_port, uint16_t _clock_port) : robot_server_(UA_Serv
     }
 
     status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
+        UA_Client_delete(clock_client_);
+        return;
+    }
 }
 
 void
@@ -64,6 +71,7 @@ robot::receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32 requ
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, tick_ack_result);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+        return;
     }
     
     robot* self = static_cast<robot*>(userdata);
@@ -83,15 +91,14 @@ robot::~robot() {
 void
 robot::start() {
     next_clock_tick_ = rand() % 1000;
-    UA_Variant inputs[3];
-    UA_Variant_init(&inputs[0]);
-    UA_Variant_setScalar(&inputs[0], &robot_port_, &UA_TYPES[UA_TYPES_UINT16]);
-    UA_Variant_init(&inputs[1]);
-    UA_Variant_setScalar(&inputs[1], &current_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
-    UA_Variant_init(&inputs[2]);
-    UA_Variant_setScalar(&inputs[2], &next_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
-    UA_UInt32 request_id = 0;
-    UA_Client_call_async(clock_client_, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_STRING(1, RECEIVE_TICK_ACK), 3, inputs, receive_tick_ack_called, this, &request_id);
+    receive_tick_ack_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
+    receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
+    receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
+    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+        return;
+    }
 
     client_iterate_thread_ = std::thread([this]() {
         while(running_) {
@@ -99,7 +106,7 @@ robot::start() {
         }
     });
 
-    UA_StatusCode status = UA_Server_run(robot_server_, &running_);
+    status = UA_Server_run(robot_server_, &running_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
         running_ = false;
