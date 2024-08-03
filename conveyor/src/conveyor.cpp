@@ -1,23 +1,10 @@
-#include "../include/controller.hpp"
-#include <open62541/client_config_default.h>
-#include <open62541/client_highlevel.h>
-#include <open62541/plugin/log_stdout.h>
+#include "../include/conveyor.hpp"
+#include "node_ids.hpp"
+
 #include <string>
 
-controller::controller(uint16_t _controller_port, uint16_t _start_port, uint32_t _robot_count, uint16_t _clock_port) : controller_port_(_controller_port), running_(true), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0) {
+conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
-    for (size_t i = 0; i < _robot_count; i++) {
-        UA_Client* client = UA_Client_new();
-        UA_ClientConfig_setDefault(UA_Client_getConfig(client));
-        uint16_t remote_port = _start_port + i;
-        std::string endpoint = "opc.tcp://localhost:" + std::to_string(remote_port);
-        status = UA_Client_connect(client, endpoint.c_str());
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_Client_delete(client);
-        } else {
-            port_remote_robot_map_[remote_port] = remote_robot(client, remote_port);
-        }
-    }
 
     UA_ClientConfig* clock_client_config = UA_Client_getConfig(clock_client_);
     clock_client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
@@ -37,12 +24,11 @@ controller::controller(uint16_t _controller_port, uint16_t _start_port, uint32_t
     }
 }
 
-controller::~controller() {
-    UA_Client_delete(clock_client_);
+conveyor::~conveyor() {
 }
 
 void
-controller::clock_tick_notification_callback(UA_Client* client, UA_UInt32 subscription_id, void* subscription_context,
+conveyor::clock_tick_notification_callback(UA_Client* client, UA_UInt32 subscription_id, void* subscription_context,
                                         UA_UInt32 monitor_id, void* monitor_context, UA_DataValue* value) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if(UA_Variant_hasScalarType(&value->value, &UA_TYPES[UA_TYPES_UINT64])) {
@@ -50,19 +36,19 @@ controller::clock_tick_notification_callback(UA_Client* client, UA_UInt32 subscr
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                     "New clock tick is: %lu", new_clock_tick);
 
-        controller* self = static_cast<controller*>(monitor_context);
+        conveyor* self = static_cast<conveyor*>(monitor_context);
         self->handle_clock_tick_notification(new_clock_tick);
     }
 }
 
 void
-controller::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
+conveyor::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     current_clock_tick_ = _new_clock_tick;
 }
 
 void
-controller::receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32 request_id, UA_CallResponse* response) {
+conveyor::receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32 request_id, UA_CallResponse* response) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
@@ -84,19 +70,19 @@ controller::receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32
         return;
     }
     
-    controller* self = static_cast<controller*>(userdata);
+    conveyor* self = static_cast<conveyor*>(userdata);
     self->handle_receive_tick_ack_result(tick_ack_result);
 }
 
 void
-controller::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
+conveyor::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
 }
 
 void
-controller::start() {
+conveyor::start() {
     next_clock_tick_ = rand() % 1000;
-    receive_tick_ack_caller_.add_input_argument(&controller_port_, UA_TYPES_UINT16);
+    receive_tick_ack_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
     receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
     receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
@@ -104,20 +90,9 @@ controller::start() {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
         return;
     }
-
-    for (std::pair<const uint16_t, remote_robot> port_remote_robot : port_remote_robot_map_) {
-        port_client_thread_map_[port_remote_robot.first] = std::thread([&port_remote_robot, this]() {
-            while(running_) {
-                UA_Client_run_iterate(port_remote_robot.second.get_client(), 1000);
-            }
-        });
-    }
-    for (auto& port_client_thread : port_client_thread_map_) {
-        port_client_thread.second.join();
-    }
 }
 
 void
-controller::stop() {
+conveyor::stop() {
     running_ = false;
 }

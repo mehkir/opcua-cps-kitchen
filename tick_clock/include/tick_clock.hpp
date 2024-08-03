@@ -10,7 +10,7 @@
 class tick_clock {
 private:
     UA_Server* clock_server_;
-    UA_Int16 clock_port_;
+    UA_UInt16 clock_port_;
     UA_UInt64 clock_tick_;
     UA_UInt64 next_clock_tick_;
     UA_UInt32 clock_client_count_;

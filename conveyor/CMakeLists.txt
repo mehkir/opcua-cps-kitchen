@@ -1,0 +1,5 @@
+file(GLOB MY_SOURCES "./src/*.cpp")
+file(GLOB MY_HEADERS "./include/*.hpp")
+add_library(conveyor_lib ${MY_SOURCES} ${MY_HEADERS})
+target_include_directories(conveyor_lib PUBLIC ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
+target_link_libraries(conveyor_lib PUBLIC open62541 wrappers_lib)

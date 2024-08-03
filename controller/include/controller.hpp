@@ -1,13 +1,12 @@
 #ifndef CONTROLLER_HPP
 #define CONTROLLER_HPP
 
-#include <open62541/client_config_default.h>
-#include <open62541/client_highlevel.h>
-#include <open62541/plugin/log_stdout.h>
+#include <open62541/client.h>
 #include <thread>
 #include <unordered_map>
 #include "node_value_subscriber.hpp"
 #include "node_ids.hpp"
+#include "method_node_caller.hpp"
 
 
 struct remote_robot {
@@ -64,11 +63,29 @@ struct remote_robot {
 
 class controller {
 private:
+    UA_UInt16 controller_port_;
     std::unordered_map<uint16_t, remote_robot> port_remote_robot_map_;
     std::unordered_map<uint16_t, std::thread> port_client_thread_map_;
-    bool running_;
+    volatile UA_Boolean running_;
+    UA_Client* clock_client_;
+    UA_Int64 current_clock_tick_;
+    UA_Int64 next_clock_tick_;
+    node_value_subscriber clock_tick_subscriber_;
+    method_node_caller receive_tick_ack_caller_;
+
+    static void
+    clock_tick_notification_callback(UA_Client* client, UA_UInt32 subscription_id, void* subscription_context,
+                                    UA_UInt32 monitor_id, void* monitor_context, UA_DataValue* value);
+    void
+    handle_clock_tick_notification(UA_UInt64 _new_clock_tick);
+
+    static void
+    receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32 request_id, UA_CallResponse* response);
+
+    void
+    handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
 public:
-    controller(uint16_t _start_port, uint32_t _robot_count);
+    controller(uint16_t _controller_port, uint16_t _start_port, uint32_t _robot_count, uint16_t _clock_port);
     ~controller();
 
     void

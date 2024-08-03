@@ -104,7 +104,7 @@ robot::start() {
         return;
     }
 
-    client_iterate_thread_ = std::thread([this]() {
+    clock_client_iterate_thread_ = std::thread([this]() {
         while(running_) {
             UA_Client_run_iterate(clock_client_, 1000);
         }
@@ -120,5 +120,5 @@ robot::start() {
 void
 robot::stop() {
     running_ = false;
-    client_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
 }
