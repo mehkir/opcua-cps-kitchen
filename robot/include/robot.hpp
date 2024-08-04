@@ -11,6 +11,7 @@
 class robot {
 private:
     UA_Server* robot_server_;
+    UA_UInt32 robot_id_;
     UA_UInt16 robot_port_;
     UA_Client* clock_client_;
     node_value_subscriber clock_tick_subscriber_;
@@ -32,7 +33,7 @@ private:
     void
     handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
 public:
-    robot(uint16_t _port, uint16_t _clock_port);
+    robot(uint32_t _robot_id, uint16_t _port, uint16_t _clock_port);
     ~robot();
 
     void

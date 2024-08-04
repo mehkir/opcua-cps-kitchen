@@ -7,7 +7,7 @@
 #include <open62541/client_highlevel_async.h>
 #include <string>
 
-robot::robot(uint16_t _robot_port, uint16_t _clock_port) : robot_server_(UA_Server_new()), robot_port_(_robot_port), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), running_(true) {
+robot::robot(uint32_t _robot_id, uint16_t _robot_port, uint16_t _clock_port) : robot_server_(UA_Server_new()), robot_id_(_robot_id), robot_port_(_robot_port), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), running_(true) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* robot_server_config = UA_Server_getConfig(robot_server_);
     status = UA_ServerConfig_setMinimal(robot_server_config, robot_port_, NULL);

@@ -74,13 +74,13 @@ private:
     method_node_caller receive_tick_ack_caller_;
 
     static void
-    clock_tick_notification_callback(UA_Client* client, UA_UInt32 subscription_id, void* subscription_context,
-                                    UA_UInt32 monitor_id, void* monitor_context, UA_DataValue* value);
+    clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
+                                    UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value);
     void
     handle_clock_tick_notification(UA_UInt64 _new_clock_tick);
 
     static void
-    receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32 request_id, UA_CallResponse* response);
+    receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
     void
     handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);

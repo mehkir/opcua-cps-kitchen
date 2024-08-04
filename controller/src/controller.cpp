@@ -42,15 +42,15 @@ controller::~controller() {
 }
 
 void
-controller::clock_tick_notification_callback(UA_Client* client, UA_UInt32 subscription_id, void* subscription_context,
-                                        UA_UInt32 monitor_id, void* monitor_context, UA_DataValue* value) {
+controller::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
+                                        UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    if(UA_Variant_hasScalarType(&value->value, &UA_TYPES[UA_TYPES_UINT64])) {
-        UA_UInt64 new_clock_tick = *(UA_UInt64 *) value->value.data;
+    if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT64])) {
+        UA_UInt64 new_clock_tick = *(UA_UInt64 *) _value->value.data;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                     "New clock tick is: %lu", new_clock_tick);
 
-        controller* self = static_cast<controller*>(monitor_context);
+        controller* self = static_cast<controller*>(_monitor_context);
         self->handle_clock_tick_notification(new_clock_tick);
     }
 }
@@ -62,29 +62,29 @@ controller::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
 }
 
 void
-controller::receive_tick_ack_called(UA_Client* client, void* userdata, UA_UInt32 request_id, UA_CallResponse* response) {
+controller::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(userdata == NULL) {
+    if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
         return;
     }
 
-    UA_StatusCode status_code = response->responseHeader.serviceResult;
+    UA_StatusCode status_code = _response->responseHeader.serviceResult;
     if(status_code != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
         return;
     }
 
     UA_Boolean tick_ack_result;
-    if(UA_Variant_hasScalarType(response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        tick_ack_result = *(UA_Boolean*)response->results[0].outputArguments->data;
+    if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        tick_ack_result = *(UA_Boolean*)_response->results[0].outputArguments->data;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, tick_ack_result);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;
     }
     
-    controller* self = static_cast<controller*>(userdata);
+    controller* self = static_cast<controller*>(_userdata);
     self->handle_receive_tick_ack_result(tick_ack_result);
 }
 
