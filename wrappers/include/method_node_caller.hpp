@@ -8,7 +8,6 @@ class method_node_caller {
 private:
     std::vector<UA_Variant> input_arguments_;
     std::vector<UA_Variant*> allocated_input_arguments_;
-    bool is_method_node_called_;
 public:
     method_node_caller();
     ~method_node_caller();
@@ -18,6 +17,9 @@ public:
 
     UA_StatusCode
     call_method_node(UA_Client* _client, UA_NodeId _method_node_id, UA_ClientAsyncCallCallback _callback, void* _userdata);
+
+    void
+    clear_input_arguments();
 };
 
 

@@ -45,7 +45,7 @@ private:
     void
     handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
 public:
-    conveyor(UA_UInt16 _conveyor_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port);
+    conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port);
     ~conveyor();
 
     void

@@ -13,6 +13,7 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, stop_handler);
     signal(SIGTERM, stop_handler);
     
+    // _clock_port, _clock_client_count
     tick_clock clock_instance(atoi(argv[1]), atoi(argv[2]));
     clock_instance_ = &clock_instance;
     clock_instance.start();

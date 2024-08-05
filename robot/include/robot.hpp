@@ -7,6 +7,7 @@
 
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
+#include "method_node_inserter.hpp"
 
 class robot {
 private:
@@ -14,12 +15,16 @@ private:
     UA_UInt32 robot_id_;
     UA_UInt16 robot_port_;
     UA_Client* clock_client_;
+    UA_Client* controller_client_;
     node_value_subscriber clock_tick_subscriber_;
     method_node_caller receive_tick_ack_caller_;
+    method_node_caller receive_robot_state_caller_;
     UA_Int64 current_clock_tick_;
     UA_Int64 next_clock_tick_;
     std::thread clock_client_iterate_thread_;
+    std::thread controller_client_iterate_thread_;
     volatile UA_Boolean running_;
+    UA_Boolean busy_status_;
 
     static void
     clock_tick_notification_callback(UA_Client* client, UA_UInt32 subscription_id, void* subscription_context,
@@ -32,8 +37,14 @@ private:
 
     void
     handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
+
+    static void
+    receive_robot_state_called(UA_Client* client, void* userdata, UA_UInt32 request_id, UA_CallResponse* response);
+
+    void
+    handle_receive_robot_state_result(UA_Boolean _robot_state_received);
 public:
-    robot(uint32_t _robot_id, uint16_t _port, uint16_t _clock_port);
+    robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port);
     ~robot();
 
     void
