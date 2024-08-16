@@ -49,6 +49,15 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     receive_robot_state_caller_.add_input_argument(&busy_status_, UA_TYPES_BOOLEAN);
     receive_robot_state_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
     receive_robot_state_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
+
+    receive_task_inserter_.add_input_argument("activitiy id", "activity_id", UA_TYPES_UINT32);
+    receive_task_inserter_.add_input_argument("ingredient id", "ingredient_id", UA_TYPES_UINT32);
+    receive_task_inserter_.add_output_argument("task received", "task_received", UA_TYPES_BOOLEAN);
+    status = receive_task_inserter_.add_method_node(robot_server_, UA_NODEID_STRING(1, RECEIVE_TASK), "receive robot task", receive_task, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot task method node");
+        return;
+    }
 }
 
 void
@@ -141,6 +150,37 @@ robot::handle_receive_robot_state_result(UA_Boolean _robot_state_received) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
         return;
     }
+}
+
+UA_StatusCode
+robot::receive_task(UA_Server *server,
+            const UA_NodeId *session_id, void *session_context,
+            const UA_NodeId *method_id, void *method_context,
+            const UA_NodeId *object_id, void *object_context,
+            size_t input_size, const UA_Variant *input,
+            size_t output_size, UA_Variant *output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(input_size != 2) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
+        return UA_STATUSCODE_BAD;
+    }
+    UA_UInt32 activity_id = *(UA_UInt32*)input[0].data;
+    UA_UInt32 ingredient_id = *(UA_UInt32*)input[1].data;
+
+    if(method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
+        return UA_STATUSCODE_BAD;
+    }
+    robot* self = static_cast<robot*>(method_context);
+    self->handle_receive_task(activity_id, ingredient_id, output);
+    return UA_STATUSCODE_GOOD;
+}
+
+void
+robot::handle_receive_task(UA_UInt32 _activity_id, UA_UInt32 _ingredient_id, UA_Variant* _output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_Boolean task_received = true;
+    UA_Variant_setScalarCopy(_output, &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
 
 robot::~robot() {

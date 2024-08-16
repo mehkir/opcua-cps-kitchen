@@ -14,9 +14,20 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         status = UA_Client_connect(client, endpoint.c_str());
         if(status != UA_STATUSCODE_GOOD) {
             UA_Client_delete(client);
-        } else {
-            //port_remote_robot_map_[remote_port] = remote_robot(client, remote_port);
         }
+    }
+
+    UA_UInt32 total_positions = _robot_count + 2;
+    UA_UInt32 one_half = _robot_count / 2;
+    if (one_half > 0) {
+        UA_Int32 bigger_half = std::max(one_half, _robot_count - one_half);
+        UA_Int32 lower_half = _robot_count - bigger_half;
+        position_to_port_[0] = 0;
+        for (size_t i = 1; i < first_half; i++) {
+            remote_robots_.push_back(remote_robot(_robot_start_port + i));
+        }
+    } else {
+
     }
 
     UA_ClientConfig* clock_client_config = UA_Client_getConfig(clock_client_);

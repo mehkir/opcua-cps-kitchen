@@ -6,7 +6,10 @@
 #define RECEIVE_TICK_ACK "receive_tick_ack"
 
 /* ROBOT */
-#define GET_ROBOT_BUSY_STATUS "get_robot_status"
 #define RECEIVE_ROBOT_STATE "receive_robot_state"
+#define RECEIVE_TASK "receive_task"
+
+/* CONVEYOR */
+#define RECEIVE_CONVEYOR_STATE "receive_conveyor_state"
 
 #endif // NODE_IDS_HPP
