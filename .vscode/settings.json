@@ -60,6 +60,10 @@
         "thread": "cpp",
         "cinttypes": "cpp",
         "typeinfo": "cpp",
-        "set": "cpp"
+        "set": "cpp",
+        "complex": "cpp",
+        "source_location": "cpp",
+        "typeindex": "cpp",
+        "variant": "cpp"
     }
 }

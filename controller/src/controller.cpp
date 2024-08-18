@@ -1,7 +1,5 @@
 #include "../include/controller.hpp"
 #include <open62541/server_config_default.h>
-#include <open62541/client_config_default.h>
-#include <open62541/client_highlevel.h>
 #include <open62541/plugin/log_stdout.h>
 #include <string>
 
@@ -16,12 +14,12 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
 
     for (size_t i = 0; i < _robot_count; i++) {
         uint16_t remote_port = _robot_start_port + i;
-        port_remote_robot_map_[remote_port] = remote_robot(remote_port);
+        port_remote_robot_map_[remote_port] = std::make_unique<remote_robot>(remote_port);
     }
 
     for (size_t i = 0; i < _conveyor_count; i++) {
         uint16_t remote_port = _conveyor_start_port + i;
-        port_remote_conveyor_map_[remote_port] = remote_conveyor(remote_port);
+        port_remote_conveyor_map_[remote_port] = std::make_unique<remote_conveyor>(remote_port);
     }
 
     UA_ClientConfig* clock_client_config = UA_Client_getConfig(clock_client_);
@@ -99,7 +97,7 @@ controller::handle_receive_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UIn
     }
     UA_Boolean robot_state_received = true;
     UA_Variant_setScalarCopy(_output, &robot_state_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
-    remote_robot& robot = port_remote_robot_map_[_port];
+    remote_robot& robot = port_remote_robot_map_[_port].operator*();
     robot.set_busy_status(_busy);
     robot.set_current_tick(_current_tick);
     robot.set_next_tick(_next_tick);
@@ -113,7 +111,7 @@ void
 controller::handle_all_robot_states_received() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     for(auto& port_robot_pair : port_remote_robot_map_) {
-        remote_robot& robot = port_robot_pair.second;
+        remote_robot& robot = port_robot_pair.second.operator*();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d has current tick %lu and next tick %lu", robot.get_port(), robot.get_current_tick(), robot.get_next_tick());
     }
     received_robot_states_.clear();
@@ -155,7 +153,7 @@ controller::handle_receive_conveyor_state(UA_UInt16 _port, UA_Boolean _busy, UA_
     }
     UA_Boolean conveyor_state_received = true;
     UA_Variant_setScalarCopy(_output, &conveyor_state_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
-    remote_conveyor& conveyor = port_remote_conveyor_map_[_port];
+    remote_conveyor& conveyor = port_remote_conveyor_map_[_port].operator*();
     conveyor.set_busy_status(_busy);
     conveyor.set_current_tick(_current_tick);
     conveyor.set_next_tick(_next_tick);
@@ -169,7 +167,7 @@ void
 controller::handle_all_conveyor_states_received() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     for(auto& port_conveyor_pair : port_remote_conveyor_map_) {
-        remote_conveyor& conveyor = port_remote_conveyor_map_[port_conveyor_pair.first];
+        remote_conveyor& conveyor = port_remote_conveyor_map_[port_conveyor_pair.first].operator*();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Conveyor with port %d has current tick %lu and next tick %lu", conveyor.get_port(), conveyor.get_current_tick(), conveyor.get_next_tick());
     }
     received_conveyor_states_.clear();
