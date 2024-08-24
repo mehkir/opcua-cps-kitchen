@@ -32,7 +32,7 @@ struct remote_robot {
             std::string endpoint = "opc.tcp://localhost:" + std::to_string(port_);
             status = UA_Client_connect(client_, endpoint.c_str());
             if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the clock server");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the robot server");
                 return;
             }
 
@@ -96,7 +96,7 @@ struct remote_conveyor {
             std::string endpoint = "opc.tcp://localhost:" + std::to_string(port_);
             status = UA_Client_connect(client_, endpoint.c_str());
             if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the clock server");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the conveyor server");
                 return;
             }
 

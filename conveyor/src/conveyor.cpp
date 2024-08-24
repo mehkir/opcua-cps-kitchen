@@ -2,27 +2,16 @@
 #include "node_ids.hpp"
 
 #include <string>
+#include <memory>
 
 conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
 
     for (size_t i = 0; i < _robot_count; i++) {
-        UA_Client* client = UA_Client_new();
-        UA_ClientConfig_setDefault(UA_Client_getConfig(client));
         uint16_t remote_port = _robot_start_port + i;
-        std::string endpoint = "opc.tcp://localhost:" + std::to_string(remote_port);
-        status = UA_Client_connect(client, endpoint.c_str());
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_Client_delete(client);
-            return;
-        }
-        
+        port_remote_robot_map_[remote_port] = std::make_unique<remote_robot>(remote_port);
+        robot_position_to_port_[i+1] = remote_port;
     }
-
-    for (size_t i = 0; i < _robot_count; i++) {
-        /* code */
-    }
-    
 
     UA_ClientConfig* clock_client_config = UA_Client_getConfig(clock_client_);
     clock_client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
@@ -40,6 +29,8 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         UA_Client_delete(clock_client_);
         return;
     }
+
+    /* Make move action with % robot_count+1 */
 }
 
 conveyor::~conveyor() {
