@@ -4,6 +4,7 @@
 #include <open62541/server.h>
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel.h>
+#include <open62541/plugin/log_stdout.h>
 #include <thread>
 #include <unordered_map>
 #include <set>
@@ -142,6 +143,30 @@ struct remote_conveyor {
         }
 };
 
+struct remote_plate {
+    private:
+        const UA_UInt32 id_;
+        UA_UInt16 adjacent_robot_position_;
+    public:
+        remote_plate(uint32_t _id) : id_(_id) {
+        }
+
+        ~remote_plate() {
+        }
+
+        void set_adjacent_robot_position(UA_UInt16 _adjacent_robot_position) {
+            adjacent_robot_position_ = _adjacent_robot_position;
+        }
+
+        UA_UInt32 get_id() const {
+            return id_;
+        }
+
+        UA_UInt16 get_adjacent_robot_position() {
+            return adjacent_robot_position_;
+        }
+};
+
 class controller {
 private:
     /* controller related member variables */
@@ -153,7 +178,8 @@ private:
     std::set<UA_UInt16> received_robot_states_;
     method_node_inserter receive_robot_state_inserter_;
     /* conveyor related member variables */
-    std::unordered_map<uint16_t, std::unique_ptr<remote_conveyor>> port_remote_conveyor_map_;
+    std::unique_ptr<remote_conveyor> remote_conveyor_;
+    std::vector<remote_plate> remote_plates_;
     std::set<UA_UInt16> received_conveyor_states_;
     method_node_inserter receive_conveyor_state_inserter_;
     /* clock related member variables */
@@ -200,12 +226,12 @@ private:
             size_t output_size, UA_Variant *output);
 
     void
-    handle_receive_conveyor_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output);
+    handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output);
 
     void    
     handle_all_conveyor_states_received();
 public:
-    controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _conveyor_start_port, uint32_t _conveyor_count, uint16_t _clock_port);
+    controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint32_t _conveyor_plates_count, uint16_t _clock_port);
     ~controller();
 
     void

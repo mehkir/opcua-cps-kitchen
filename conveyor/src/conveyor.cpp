@@ -4,7 +4,7 @@
 #include <string>
 #include <memory>
 
-conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
+conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
 
     for (size_t i = 0; i < _robot_count; i++) {
@@ -30,7 +30,11 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         return;
     }
 
-    /* Make move action with % robot_count+1 */
+    for (size_t i = 0; i < _plates_count; i++) {
+        plates_.push_back(plate(i,i,i));
+    }
+    
+
 }
 
 conveyor::~conveyor() {
@@ -86,6 +90,14 @@ conveyor::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32
 void
 conveyor::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+}
+
+void
+conveyor::move_conveyor(uint32_t steps) {
+    for (size_t i = 0; i < plates_.size(); i++) {
+        int new_position = (plates_[i].get_position() + steps) % plates_.size();
+        plates_[i].set_position(new_position);
+    }
 }
 
 void

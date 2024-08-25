@@ -8,6 +8,7 @@
 #include <open62541/plugin/log_stdout.h>
 #include <thread>
 #include <unordered_map>
+#include <string>
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
 
@@ -77,29 +78,25 @@ struct remote_robot {
 
 struct plate {
     private:
-        UA_UInt32 position_;
-        UA_UInt16 adjacent_robot_;
+        const UA_UInt32 plate_id_;
+        UA_UInt16 adjacent_robot_position_;
     public:
-        plate(uint32_t _position, uint32_t _adjacent_robot) : position_(_position), adjacent_robot_(_adjacent_robot) {
+        plate(uint32_t _plate_id, uint32_t _position, uint32_t _adjacent_robot_position) : plate_id_(_plate_id), adjacent_robot_position_(_adjacent_robot_position) {
         }
 
         ~plate() {
         }
 
-        void set_position(UA_UInt32 _position) {
-            position_ = _position;
+        void set_adjacent_robot_position(UA_UInt16 _adjacent_robot_position) {
+            adjacent_robot_position_ = _adjacent_robot_position;
         }
 
-        void set_adjacent_robot(UA_UInt16 _adjacent_robot) {
-            adjacent_robot_ = _adjacent_robot;
+        UA_UInt32 get_plate_id() const {
+            return plate_id_;
         }
 
-        UA_UInt32 get_position() {
-            return position_;
-        }
-
-        UA_UInt16 get_adjacent_robot() {
-            return adjacent_robot_;
+        UA_UInt16 get_adjacent_robot_position() {
+            return adjacent_robot_position_;
         }
 };
 
@@ -131,8 +128,11 @@ private:
 
     void
     handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
+
+    void
+    move_conveyor(uint32_t steps);
 public:
-    conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port);
+    conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port);
     ~conveyor();
 
     void
