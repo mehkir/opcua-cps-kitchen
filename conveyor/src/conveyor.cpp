@@ -1,4 +1,5 @@
 #include "../include/conveyor.hpp"
+#include <open62541/server_config_default.h>
 #include "node_ids.hpp"
 
 #include <string>
@@ -6,6 +7,14 @@
 
 conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
+
+    UA_ServerConfig* conveyor_server_config = UA_Server_getConfig(conveyor_server_);
+    status = UA_ServerConfig_setMinimal(conveyor_server_config, conveyor_port_, NULL);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
+        UA_Server_delete(conveyor_server_);
+        return;
+    }
 
     for (size_t i = 0; i < _robot_count; i++) {
         uint16_t remote_port = _robot_start_port + i;
@@ -34,7 +43,13 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         plates_.push_back(plate(i,i,i));
     }
     
+    receive_tick_ack_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
+    receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
+    receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
 
+    receive_move_instruction_inserter.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
+    receive_move_instruction_inserter.add_output_argument("steps to move received", "steps_to_move_received", UA_TYPES_BOOLEAN);
+    receive_move_instruction_inserter.add_method_node(&)
 }
 
 conveyor::~conveyor() {
@@ -95,17 +110,14 @@ conveyor::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
 void
 conveyor::move_conveyor(uint32_t steps) {
     for (size_t i = 0; i < plates_.size(); i++) {
-        int new_position = (plates_[i].get_position() + steps) % plates_.size();
-        plates_[i].set_position(new_position);
+        int new_position = (plates_[i].get_adjacent_robot_position() + steps) % plates_.size();
+        plates_[i].set_adjacent_robot_position(new_position);
     }
 }
 
 void
 conveyor::start() {
-    next_clock_tick_ = rand() % 1000;
-    receive_tick_ack_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
-    receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
-    receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
+    next_clock_tick_++;
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");

@@ -3,6 +3,7 @@
 
 #define OUTPUT_POSITION 0
 
+#include <open62541/server.h>
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel.h>
 #include <open62541/plugin/log_stdout.h>
@@ -11,6 +12,7 @@
 #include <string>
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
+#include "method_node_inserter.hpp"
 
 struct remote_robot {
     private:
@@ -103,10 +105,12 @@ struct plate {
 class conveyor {
 private:
     /* conveyor related member variables */
+    UA_Server* conveyor_server_;
     UA_UInt16 conveyor_port_;
     volatile UA_Boolean running_;
     std::vector<plate> plates_;
     std::unordered_map<UA_UInt32, UA_UInt16> robot_position_to_port_;
+    method_node_inserter receive_move_instruction_inserter;
     /* clock related member variables */
     UA_Client* clock_client_;
     node_value_subscriber clock_tick_subscriber_;
