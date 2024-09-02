@@ -49,7 +49,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
 
     receive_move_instruction_inserter.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
     receive_move_instruction_inserter.add_output_argument("steps to move received", "steps_to_move_received", UA_TYPES_BOOLEAN);
-    receive_move_instruction_inserter.add_method_node(&)
+    receive_move_instruction_inserter.add_method_node(conveyor_server_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), "receive move instruction", receive_move_instruction, this)
 }
 
 conveyor::~conveyor() {
@@ -73,6 +73,7 @@ void
 conveyor::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     current_clock_tick_ = _new_clock_tick;
+    // TODO: Call assess method
 }
 
 void
@@ -105,6 +106,37 @@ conveyor::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32
 void
 conveyor::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+}
+
+UA_StatusCode
+conveyor::receive_move_instruction(UA_Server *server,
+        const UA_NodeId *session_id, void *session_context,
+        const UA_NodeId *method_id, void *method_context,
+        const UA_NodeId *object_id, void *object_context,
+        size_t input_size, const UA_Variant *input,
+        size_t output_size, UA_Variant *output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(input_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
+        return UA_STATUSCODE_BAD;
+    }
+    UA_UInt32 steps_to_move = *(UA_UInt32*)input[0].data;
+
+    if(method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
+        return UA_STATUSCODE_BAD;
+    }
+    conveyor* self = static_cast<conveyor*>(method_context);
+    self->handle_receive_move_instruction(steps_to_move);
+    return UA_STATUSCODE_BAD;
+}
+
+void
+conveyor::handle_receive_move_instruction(UA_UInt32 _steps_to_move, UA_Variant* _output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    move_conveyor(_steps_to_move);
+    UA_Boolean successfully_moved = true;
+    UA_Variant_setScalarCopy(_output, &successfully_moved, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
 
 void

@@ -133,6 +133,17 @@ private:
     void
     handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
 
+    static UA_StatusCode
+    receive_move_instruction(UA_Server *server,
+            const UA_NodeId *session_id, void *session_context,
+            const UA_NodeId *method_id, void *method_context,
+            const UA_NodeId *object_id, void *object_context,
+            size_t input_size, const UA_Variant *input,
+            size_t output_size, UA_Variant *output);
+    
+    void
+    handle_receive_move_instruction(UA_UInt32 _steps_to_move, UA_Variant* _output);
+
     void
     move_conveyor(uint32_t steps);
 public:

@@ -78,6 +78,7 @@ void
 robot::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     current_clock_tick_ = _new_clock_tick;
+    // TODO: Call assess method
 }
 
 void

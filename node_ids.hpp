@@ -11,5 +11,6 @@
 
 /* CONVEYOR */
 #define RECEIVE_CONVEYOR_STATE "receive_conveyor_state"
+#define RECEIVE_MOVE_INSTRUCTION "receive_move_instruction"
 
 #endif // NODE_IDS_HPP
