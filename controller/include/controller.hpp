@@ -204,12 +204,12 @@ private:
     handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
 
     static UA_StatusCode
-    receive_robot_state(UA_Server *server,
-            const UA_NodeId *session_id, void *session_context,
-            const UA_NodeId *method_id, void *method_context,
-            const UA_NodeId *object_id, void *object_context,
-            size_t input_size, const UA_Variant *input,
-            size_t output_size, UA_Variant *output);
+    receive_robot_state(UA_Server* _server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
 
     void
     handle_receive_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output);
@@ -218,12 +218,12 @@ private:
     handle_all_robot_states_received();
 
     static UA_StatusCode
-    receive_conveyor_state(UA_Server *server,
-            const UA_NodeId *session_id, void *session_context,
-            const UA_NodeId *method_id, void *method_context,
-            const UA_NodeId *object_id, void *object_context,
-            size_t input_size, const UA_Variant *input,
-            size_t output_size, UA_Variant *output);
+    receive_conveyor_state(UA_Server *_server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
 
     void
     handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output);

@@ -8,7 +8,6 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     status = UA_ServerConfig_setMinimal(controller_server_config, controller_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
-        return;
     }
 
     for (size_t i = 0; i < _robot_count; i++) {
@@ -28,13 +27,11 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     status = UA_Client_connect(clock_client_, clock_endpoint.c_str());
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the clock server");
-        return;
     }
 
     status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
-        return;
     }
 
     receive_tick_ack_caller_.add_input_argument(&controller_port_, UA_TYPES_UINT16);
@@ -49,7 +46,6 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     status = receive_robot_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), "receive robot state", receive_robot_state, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot state method node");
-        return;
     }
 
     receive_conveyor_state_inserter_.add_input_argument("conveyor plate id", "plate_id", UA_TYPES_UINT32);
@@ -60,7 +56,6 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     status = receive_conveyor_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), "receive conveyor state", receive_conveyor_state, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive conveyor state method node");
-        return;
     }
 }
 
@@ -70,21 +65,21 @@ controller::~controller() {
 }
 
 UA_StatusCode
-controller::receive_robot_state(UA_Server *server,
-        const UA_NodeId *session_id, void *session_context,
-        const UA_NodeId *method_id, void *method_context,
-        const UA_NodeId *object_id, void *object_context,
-        size_t input_size, const UA_Variant *input,
-        size_t output_size, UA_Variant *output) {
+controller::receive_robot_state(UA_Server* _server,
+        const UA_NodeId* _session_id, void* _session_context,
+        const UA_NodeId* _method_id, void* _method_context,
+        const UA_NodeId* _object_id, void* _object_context,
+        size_t _input_size, const UA_Variant* _input,
+        size_t _output_size, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Extract input arguments */
-    UA_UInt16 port = *(UA_UInt16*)input[0].data;
-    UA_Boolean busy = *(UA_Boolean*)input[1].data;
-    UA_UInt64 current_tick = *(UA_UInt64*)input[2].data;
-    UA_UInt64 next_tick = *(UA_UInt64*)input[3].data;
+    UA_UInt16 port = *(UA_UInt16*)_input[0].data;
+    UA_Boolean busy = *(UA_Boolean*)_input[1].data;
+    UA_UInt64 current_tick = *(UA_UInt64*)_input[2].data;
+    UA_UInt64 next_tick = *(UA_UInt64*)_input[3].data;
     /* Extract method context */
-    controller* self = static_cast<controller*>(method_context);
-    self->handle_receive_robot_state(port, busy, current_tick, next_tick, output);
+    controller* self = static_cast<controller*>(_method_context);
+    self->handle_receive_robot_state(port, busy, current_tick, next_tick, _output);
     return UA_STATUSCODE_GOOD;
 }
 
@@ -118,29 +113,29 @@ controller::handle_all_robot_states_received() {
 }
 
 UA_StatusCode
-controller::receive_conveyor_state(UA_Server *server,
-        const UA_NodeId *session_id, void *session_context,
-        const UA_NodeId *method_id, void *method_context,
-        const UA_NodeId *object_id, void *object_context,
-        size_t input_size, const UA_Variant *input,
-        size_t output_size, UA_Variant *output) {
+controller::receive_conveyor_state(UA_Server* _server,
+        const UA_NodeId* _session_id, void* _session_context,
+        const UA_NodeId* _method_id, void* _method_context,
+        const UA_NodeId* _object_id, void* _object_context,
+        size_t _input_size, const UA_Variant* _input,
+        size_t _output_size, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Extract input arguments */
-    if(input_size != 4) {
+    if(_input_size != 4) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
     }
-    UA_UInt32 plate_id = *(UA_UInt32*)input[0].data;
-    UA_Boolean busy = *(UA_Boolean*)input[1].data;
-    UA_UInt64 current_tick = *(UA_UInt64*)input[2].data;
-    UA_UInt64 next_tick = *(UA_UInt64*)input[3].data;
+    UA_UInt32 plate_id = *(UA_UInt32*)_input[0].data;
+    UA_Boolean busy = *(UA_Boolean*)_input[1].data;
+    UA_UInt64 current_tick = *(UA_UInt64*)_input[2].data;
+    UA_UInt64 next_tick = *(UA_UInt64*)_input[3].data;
     /* Extract method context */
-    if(method_context == NULL) {
+    if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
-    controller* self = static_cast<controller*>(method_context);
-    self->handle_receive_conveyor_state(plate_id, busy, current_tick, next_tick, output);
+    controller* self = static_cast<controller*>(_method_context);
+    self->handle_receive_conveyor_state(plate_id, busy, current_tick, next_tick, _output);
     return UA_STATUSCODE_GOOD;
 }
 

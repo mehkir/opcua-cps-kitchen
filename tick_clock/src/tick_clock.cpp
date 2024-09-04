@@ -33,30 +33,30 @@ tick_clock::~tick_clock() {
     UA_Server_delete(clock_server_);
 }
 
-UA_StatusCode tick_clock::receive_tick_ack(UA_Server *server,
-            const UA_NodeId *session_id, void *session_context,
-            const UA_NodeId *method_id, void *method_context,
-            const UA_NodeId *object_id, void *object_context,
-            size_t input_size, const UA_Variant *input,
-            size_t output_size, UA_Variant *output) {
+UA_StatusCode tick_clock::receive_tick_ack(UA_Server* _server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Extract input arguments */
-    UA_UInt16 port = *(UA_UInt16*)input[0].data;
-    UA_UInt64 current_client_tick = *(UA_UInt64*)input[1].data;
-    UA_UInt64 next_tick = *(UA_UInt64*)input[2].data;
+    UA_UInt16 port = *(UA_UInt16*)_input[0].data;
+    UA_UInt64 current_client_tick = *(UA_UInt64*)_input[1].data;
+    UA_UInt64 next_tick = *(UA_UInt64*)_input[2].data;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Extracted inputs: port: %d, current_client_tick: %lu, next_tick: %lu", port, current_client_tick, next_tick);
-    tick_clock* self = static_cast<tick_clock*>(method_context);
-    self->handle_receive_tick_ack(current_client_tick, next_tick, port, output);
+    tick_clock* self = static_cast<tick_clock*>(_method_context);
+    self->handle_receive_tick_ack(current_client_tick, next_tick, port, _output);
     return UA_STATUSCODE_GOOD;
 }
 
-void tick_clock::handle_receive_tick_ack(UA_UInt64 _current_client_tick, UA_UInt64 _next_tick, UA_UInt16 _port, UA_Variant* output) {
+void tick_clock::handle_receive_tick_ack(UA_UInt64 _current_client_tick, UA_UInt64 _next_tick, UA_UInt16 _port, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     /* Check if the current tick of the client is equal to the current tick of the server */
     if (_current_client_tick != clock_tick_) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "current tick of the client is not equal to the current tick of the server");
         UA_Boolean ack_received = false;
-        UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Variant_setScalarCopy(_output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         return;
     }
     /* Determine the next smallest tick and if all clients sent their next ticks */
@@ -70,7 +70,7 @@ void tick_clock::handle_receive_tick_ack(UA_UInt64 _current_client_tick, UA_UInt
         }
         currently_acknowledged_set_.insert(_port);
         UA_Boolean ack_received = true;
-        UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Variant_setScalarCopy(_output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Ack received from port: %d", _port);
     }
     /* Update/fast-forward clock to determined next tick */
@@ -80,7 +80,7 @@ void tick_clock::handle_receive_tick_ack(UA_UInt64 _current_client_tick, UA_UInt
         currently_acknowledged_set_.clear();
         clock_tick_ = next_clock_tick_;
         UA_Boolean ack_received = true;
-        UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Variant_setScalarCopy(_output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         UA_Server_writeValue(clock_server_, UA_NODEID_STRING(1, "clock_tick"), new_clock_tick);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "New clock tick is: %lu", clock_tick_);
     }

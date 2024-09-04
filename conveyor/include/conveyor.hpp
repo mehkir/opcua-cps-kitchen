@@ -120,6 +120,14 @@ private:
     method_node_caller receive_tick_ack_caller_;
     /* robot related member variables */
     std::unordered_map<uint16_t, std::unique_ptr<remote_robot>> port_remote_robot_map_;
+    /* controller related member variables */
+    UA_Client* controller_client_;
+    method_node_caller receive_conveyor_state_caller_;
+    std::thread controller_client_iterate_thread_;
+    UA_UInt32 plate_id_state_;
+    UA_Boolean plate_busy_state_;
+    UA_UInt64 plate_current_tick_state_;
+    UA_UInt64 plate_next_tick_state_;
 
     static void
     clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
@@ -134,20 +142,27 @@ private:
     handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
 
     static UA_StatusCode
-    receive_move_instruction(UA_Server *server,
-            const UA_NodeId *session_id, void *session_context,
-            const UA_NodeId *method_id, void *method_context,
-            const UA_NodeId *object_id, void *object_context,
-            size_t input_size, const UA_Variant *input,
-            size_t output_size, UA_Variant *output);
+    receive_move_instruction(UA_Server *_server,
+            const UA_NodeId *_session_id, void *_session_context,
+            const UA_NodeId *_method_id, void *_method_context,
+            const UA_NodeId *_object_id, void *_object_context,
+            size_t _input_size, const UA_Variant *_input,
+            size_t _output_size, UA_Variant *_output);
     
     void
     handle_receive_move_instruction(UA_UInt32 _steps_to_move, UA_Variant* _output);
 
     void
     move_conveyor(uint32_t steps);
+
+    static void
+    receive_coveyor_
+
+    void
+    progress_new_tick(UA_UInt64 _new_tick);
+
 public:
-    conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port);
+    conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port);
     ~conveyor();
 
     void

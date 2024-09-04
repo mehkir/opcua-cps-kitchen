@@ -5,15 +5,13 @@
 #include <string>
 #include <memory>
 
-conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
+conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
 
     UA_ServerConfig* conveyor_server_config = UA_Server_getConfig(conveyor_server_);
     status = UA_ServerConfig_setMinimal(conveyor_server_config, conveyor_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
-        UA_Server_delete(conveyor_server_);
-        return;
     }
 
     for (size_t i = 0; i < _robot_count; i++) {
@@ -28,31 +26,45 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     status = UA_Client_connect(clock_client_, clock_endpoint.c_str());
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the clock server");
-        UA_Client_delete(clock_client_);
-        return;
     }
 
     status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
-        UA_Client_delete(clock_client_);
-        return;
     }
 
-    for (size_t i = 0; i < _plates_count; i++) {
-        plates_.push_back(plate(i,i,i));
-    }
-    
     receive_tick_ack_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
     receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
     receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
 
+    for (size_t i = 0; i < _plates_count; i++) {
+        plates_.push_back(plate(i,i,i));
+    }
+
+    UA_ClientConfig* controller_client_config = UA_Client_getConfig(controller_client_);
+    controller_client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
+    std::string controller_endpoint = "opc.tcp://localhost:" + std::to_string(_controller_port);
+    status = UA_Client_connect(controller_client_, controller_endpoint.c_str());
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the controller server");
+    }
+
+    receive_conveyor_state_caller_.add_input_argument(&plate_id_state_, UA_TYPES_UINT32);
+    receive_conveyor_state_caller_.add_input_argument(&plate_busy_state_, UA_TYPES_BOOLEAN);
+    receive_conveyor_state_caller_.add_input_argument(&plate_current_tick_state_, UA_TYPES_UINT64);
+    receive_conveyor_state_caller_.add_input_argument(&plate_next_tick_state_, UA_TYPES_UINT64);
+
     receive_move_instruction_inserter.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
     receive_move_instruction_inserter.add_output_argument("steps to move received", "steps_to_move_received", UA_TYPES_BOOLEAN);
-    receive_move_instruction_inserter.add_method_node(conveyor_server_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), "receive move instruction", receive_move_instruction, this)
+    status = receive_move_instruction_inserter.add_method_node(conveyor_server_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), "receive move instruction", receive_move_instruction, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive move instruction method node");
+    }
 }
 
 conveyor::~conveyor() {
+    UA_Server_delete(conveyor_server_);
+    UA_Client_delete(clock_client_);
 }
 
 void
@@ -73,7 +85,7 @@ void
 conveyor::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     current_clock_tick_ = _new_clock_tick;
-    // TODO: Call assess method
+    progress_new_tick(_new_clock_tick);
 }
 
 void
@@ -109,25 +121,25 @@ conveyor::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
 }
 
 UA_StatusCode
-conveyor::receive_move_instruction(UA_Server *server,
-        const UA_NodeId *session_id, void *session_context,
-        const UA_NodeId *method_id, void *method_context,
-        const UA_NodeId *object_id, void *object_context,
-        size_t input_size, const UA_Variant *input,
-        size_t output_size, UA_Variant *output) {
+conveyor::receive_move_instruction(UA_Server *_server,
+        const UA_NodeId *_session_id, void *_session_context,
+        const UA_NodeId *_method_id, void *_method_context,
+        const UA_NodeId *_object_id, void *_object_context,
+        size_t _input_size, const UA_Variant *_input,
+        size_t _output_size, UA_Variant *_output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(input_size != 1) {
+    if(_input_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
     }
-    UA_UInt32 steps_to_move = *(UA_UInt32*)input[0].data;
+    UA_UInt32 steps_to_move = *(UA_UInt32*)_input[0].data;
 
-    if(method_context == NULL) {
+    if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
-    conveyor* self = static_cast<conveyor*>(method_context);
-    self->handle_receive_move_instruction(steps_to_move);
+    conveyor* self = static_cast<conveyor*>(_method_context);
+    self->handle_receive_move_instruction(steps_to_move, _output);
     return UA_STATUSCODE_BAD;
 }
 
@@ -148,12 +160,25 @@ conveyor::move_conveyor(uint32_t steps) {
 }
 
 void
+conveyor::progress_new_tick(UA_UInt64 _new_tick) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s with new tick %lu", __FUNCTION__, _new_tick);
+}
+
+void
 conveyor::start() {
-    next_clock_tick_++;
+    next_clock_tick_++; // TODO: Compute from move instruction
+
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    receive_conveyor_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), )
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-        return;
+        running_ = false;
+    }
+
+    status = UA_Server_run(conveyor_server_, &running_);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
+        running_ = false;
     }
 }
 
