@@ -143,7 +143,6 @@ robot::handle_receive_robot_state_result(UA_Boolean _robot_state_received) {
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-        return;
     }
 }
 
@@ -191,7 +190,7 @@ robot::~robot() {
 
 void
 robot::start() {
-    next_clock_tick_++;
+    next_clock_tick_++; // TODO: Compute from task instruction
     UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");

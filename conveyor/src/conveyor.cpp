@@ -160,6 +160,58 @@ conveyor::move_conveyor(uint32_t steps) {
 }
 
 void
+conveyor::receive_conveyor_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_userdata == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
+        return;
+    }
+
+    UA_StatusCode status_code = _response->responseHeader.serviceResult;
+    if(status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
+        return;
+    }
+
+    UA_Boolean conveyor_state_received;
+    if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        conveyor_state_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, conveyor_state_received);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+        return;
+    }
+    
+    conveyor* self = static_cast<conveyor*>(_userdata);
+    self->handle_receive_conveyor_state_result(conveyor_state_received);
+}
+
+void
+conveyor::handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_received) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    if (!_conveyor_state_received)
+        return;
+    next_clock_tick_++;
+    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+    }
+}
+
+void
+conveyor::transmit_all_plate_states() {
+    // TODO: Think of required states
+    for (plate p : plates_) {
+        plate_id_state_ = p.get_plate_id();
+        plate_current_tick_state_ = current_clock_tick_;
+        UA_StatusCode status = receive_conveyor_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), receive_conveyor_state_called, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+        }
+    }
+}
+
+void
 conveyor::progress_new_tick(UA_UInt64 _new_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s with new tick %lu", __FUNCTION__, _new_tick);
 }
@@ -167,15 +219,21 @@ conveyor::progress_new_tick(UA_UInt64 _new_tick) {
 void
 conveyor::start() {
     next_clock_tick_++; // TODO: Compute from move instruction
+    transmit_all_plate_states();
 
-    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
-    receive_conveyor_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), )
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-        running_ = false;
-    }
+    clock_client_iterate_thread_ = std::thread([this]() {
+        while(running_) {
+            UA_Client_run_iterate(clock_client_, 1000);
+        }
+    });
 
-    status = UA_Server_run(conveyor_server_, &running_);
+    controller_client_iterate_thread_ = std::thread([this]() {
+        while(running_) {
+            UA_Client_run_iterate(controller_client_, 1000);
+        }
+    });
+
+    UA_StatusCode status = UA_Server_run(conveyor_server_, &running_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
         running_ = false;
@@ -185,4 +243,6 @@ conveyor::start() {
 void
 conveyor::stop() {
     running_ = false;
+    clock_client_iterate_thread_.join();
+    controller_client_iterate_thread_.join();
 }
