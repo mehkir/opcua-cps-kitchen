@@ -82,6 +82,7 @@ struct plate {
     private:
         const UA_UInt32 plate_id_;
         UA_UInt16 adjacent_robot_position_;
+        UA_Boolean busy_;
     public:
         plate(uint32_t _plate_id, uint32_t _position, uint32_t _adjacent_robot_position) : plate_id_(_plate_id), adjacent_robot_position_(_adjacent_robot_position) {
         }
@@ -99,6 +100,14 @@ struct plate {
 
         UA_UInt16 get_adjacent_robot_position() {
             return adjacent_robot_position_;
+        }
+
+        UA_Boolean get_busy_state() {
+            return busy_;
+        }
+
+        UA_Boolean set_busy_state(UA_Boolean _busy) {
+            busy_ = _busy;
         }
 };
 

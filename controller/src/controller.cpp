@@ -108,8 +108,48 @@ controller::handle_all_robot_states_received() {
     for(auto& port_robot_pair : port_remote_robot_map_) {
         remote_robot& robot = port_robot_pair.second.operator*();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d has current tick %lu and next tick %lu", robot.get_port(), robot.get_current_tick(), robot.get_next_tick());
+        robot.instruct(robot.get_port(), robot.get_port(), receive_robot_task_called, this);
     }
     received_robot_states_.clear();
+}
+
+void
+controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_userdata == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
+        return;
+    }
+
+    UA_StatusCode status_code = _response->responseHeader.serviceResult;
+    if(status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
+        return;
+    }
+
+    UA_Boolean controller_state_received;
+    if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        controller_state_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, controller_state_received);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+        return;
+    }
+    
+    controller* self = static_cast<controller*>(_userdata);
+    self->handle_receive_robot_task_called_result(controller_state_received);
+}
+
+void
+controller::handle_receive_robot_task_called_result(UA_Boolean _controller_state_received) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    if (!_controller_state_received)
+        return;
+    next_clock_tick_++;
+    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+    }
 }
 
 UA_StatusCode
@@ -160,9 +200,49 @@ void
 controller::handle_all_conveyor_states_received() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     for(auto& plate : remote_plates_) {
+        remote_conveyor_->instruct(1, receive_conveyor_move_instructions_called, this);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %lu", plate.get_id(), plate.get_adjacent_robot_position());
     }
     received_conveyor_states_.clear();
+}
+
+void
+controller::receive_conveyor_move_instructions_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_userdata == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
+        return;
+    }
+
+    UA_StatusCode status_code = _response->responseHeader.serviceResult;
+    if(status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
+        return;
+    }
+
+    UA_Boolean conveyor_move_instruction_received;
+    if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        conveyor_move_instruction_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, conveyor_move_instruction_received);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+        return;
+    }
+    
+    controller* self = static_cast<controller*>(_userdata);
+    self->handle_receive_conveyor_move_instructions_called_result(conveyor_move_instruction_received);
+}
+
+void
+controller::handle_receive_conveyor_move_instructions_called_result(UA_Boolean conveyor_move_instruction_received) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    if (!conveyor_move_instruction_received)
+        return;
+    next_clock_tick_++;
+    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+    }
 }
 
 void

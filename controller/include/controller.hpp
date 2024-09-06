@@ -24,6 +24,9 @@ struct remote_robot {
         UA_UInt64 next_tick_;
         bool running_;
         std::thread client_thread_;
+        method_node_caller receive_robot_task_caller_;
+        UA_UInt32 activity_id_;
+        UA_UInt32 ingredient_id_;
 
     public:
         remote_robot(UA_UInt16 _port = 0) :  port_(_port), busy_(false), client_(UA_Client_new()), running_(true) {
@@ -36,6 +39,9 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the robot server");
                 return;
             }
+
+            receive_robot_task_caller_.add_input_argument(&activity_id_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_input_argument(&ingredient_id_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
@@ -77,6 +83,15 @@ struct remote_robot {
         UA_UInt64 get_next_tick() const{
             return next_tick_;
         }
+
+        void instruct(UA_UInt32 _activity_id, UA_UInt32 _ingredient_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
+            activity_id_ = _activity_id;
+            ingredient_id_ = ingredient_id_;
+            UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_TASK), _callback, _userdata);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+            }
+        }
 };
 
 struct remote_conveyor {
@@ -88,6 +103,8 @@ struct remote_conveyor {
         UA_UInt64 next_tick_;
         bool running_;
         std::thread client_thread_;
+        method_node_caller receive_conveyor_move_instruction_caller_;
+        UA_UInt32 steps_to_move_;
 
     public:
         remote_conveyor(UA_UInt16 _port = 0) :  port_(_port), busy_(false), client_(UA_Client_new()), running_(true) {
@@ -100,6 +117,8 @@ struct remote_conveyor {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the conveyor server");
                 return;
             }
+
+            receive_conveyor_move_instruction_caller_.add_input_argument(&steps_to_move_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
@@ -141,6 +160,14 @@ struct remote_conveyor {
         UA_UInt64 get_next_tick() const{
             return next_tick_;
         }
+
+        void instruct(UA_UInt32 _steps_to_move, UA_ClientAsyncCallCallback _callback, void* _userdata) {
+            steps_to_move_ = _steps_to_move;
+            UA_StatusCode status = receive_conveyor_move_instruction_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), _callback, _userdata);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+            }
+        }
 };
 
 struct remote_plate {
@@ -177,6 +204,8 @@ private:
     std::unordered_map<uint16_t, std::unique_ptr<remote_robot>> port_remote_robot_map_;
     std::set<UA_UInt16> received_robot_states_;
     method_node_inserter receive_robot_state_inserter_;
+    UA_UInt32 activity_id;
+    UA_UInt32 ingredient_id;
     /* conveyor related member variables */
     std::unique_ptr<remote_conveyor> remote_conveyor_;
     std::vector<remote_plate> remote_plates_;
@@ -217,6 +246,12 @@ private:
     void
     handle_all_robot_states_received();
 
+    static void
+    receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    void
+    handle_receive_robot_task_called_result(UA_Boolean _controller_state_received);
+
     static UA_StatusCode
     receive_conveyor_state(UA_Server *_server,
             const UA_NodeId* _session_id, void* _session_context,
@@ -230,6 +265,13 @@ private:
 
     void    
     handle_all_conveyor_states_received();
+
+    static void
+    receive_conveyor_move_instructions_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    void
+    handle_receive_conveyor_move_instructions_called_result(UA_Boolean _controller_state_received);
+
 public:
     controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint32_t _conveyor_plates_count, uint16_t _clock_port);
     ~controller();

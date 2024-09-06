@@ -204,6 +204,7 @@ conveyor::transmit_all_plate_states() {
     for (plate p : plates_) {
         plate_id_state_ = p.get_plate_id();
         plate_current_tick_state_ = current_clock_tick_;
+        plate_busy_state_ = p.get_busy_state();
         UA_StatusCode status = receive_conveyor_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), receive_conveyor_state_called, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
