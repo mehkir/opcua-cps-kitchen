@@ -139,11 +139,6 @@ robot::handle_receive_robot_state_result(UA_Boolean _robot_state_received) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!_robot_state_received)
         return;
-    next_clock_tick_++;
-    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-    }
 }
 
 UA_StatusCode
@@ -173,8 +168,16 @@ robot::receive_task(UA_Server *_server,
 void
 robot::handle_receive_task(UA_UInt32 _activity_id, UA_UInt32 _ingredient_id, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    next_clock_tick_++;
+    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+    }
     UA_Boolean task_received = true;
-    UA_Variant_setScalarCopy(_output, &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    status = UA_Variant_setScalarCopy(_output, &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error returning receive task ack");
+    }
 }
 
 void

@@ -147,8 +147,18 @@ void
 conveyor::handle_receive_move_instruction(UA_UInt32 _steps_to_move, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     move_conveyor(_steps_to_move);
+
+    next_clock_tick_++;
+    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+    }
+    
     UA_Boolean successfully_moved = true;
-    UA_Variant_setScalarCopy(_output, &successfully_moved, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    status = UA_Variant_setScalarCopy(_output, &successfully_moved, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error returning receive move instuction ack");
+    }
 }
 
 void
@@ -191,11 +201,6 @@ conveyor::handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_receiv
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!_conveyor_state_received)
         return;
-    next_clock_tick_++;
-    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-    }
 }
 
 void
