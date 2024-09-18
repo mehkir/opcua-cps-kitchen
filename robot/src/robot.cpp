@@ -6,7 +6,6 @@
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel_async.h>
 #include <string>
-#include <unistd.h>
 
 robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : robot_server_(UA_Server_new()), robot_id_(_robot_id), robot_port_(_robot_port), clock_client_(UA_Client_new()), controller_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), running_(true) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -22,11 +21,6 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     status = UA_Client_connect(clock_client_, clock_endpoint.c_str());
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the clock server");
-        // while (status != UA_STATUSCODE_GOOD) {
-        //     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Retrying to connect after 1 second to the clock server");
-        //     sleep(1);
-        //     UA_Client_connect(clock_client_, clock_endpoint.c_str());
-        // }
     }
 
     status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
@@ -44,11 +38,6 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     status = UA_Client_connect(controller_client_, controller_endpoint.c_str());
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the controller server");
-        // while (status != UA_STATUSCODE_GOOD) {
-        //     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Retrying to connect after 1 second to the controller server");
-        //     sleep(1);
-        //     UA_Client_connect(controller_client_, controller_endpoint.c_str());
-        // }
     }
 
     receive_robot_state_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);

@@ -37,7 +37,6 @@ struct remote_robot {
             status = UA_Client_connect(client_, endpoint.c_str());
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the robot server");
-                return;
             }
 
             receive_robot_task_caller_.add_input_argument(&activity_id_, UA_TYPES_UINT32);
@@ -115,7 +114,6 @@ struct remote_conveyor {
             status = UA_Client_connect(client_, endpoint.c_str());
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the conveyor server");
-                return;
             }
 
             receive_conveyor_move_instruction_caller_.add_input_argument(&steps_to_move_, UA_TYPES_UINT32);
