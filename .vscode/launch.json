@@ -33,8 +33,8 @@
             "type": "cppdbg",
             "request": "launch",
             // Resolved by CMake Tools:
-            "program": "${workspaceFolder}/build/robot",
-            "args": ["4840","4900"],
+            "program": "${workspaceFolder}/build/start_robot_instance",
+            "args": ["0","4000","5000","6000"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [

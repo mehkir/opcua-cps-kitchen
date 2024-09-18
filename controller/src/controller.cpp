@@ -98,6 +98,7 @@ controller::handle_receive_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UIn
     robot.set_next_tick(_next_tick);
     received_robot_states_.insert(_port);
     if(received_robot_states_.size() == port_remote_robot_map_.size()) {
+        received_robot_states_.clear();
         handle_all_robot_states_received();
     }
 }
@@ -110,7 +111,6 @@ controller::handle_all_robot_states_received() {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d has current tick %lu and next tick %lu", robot.get_port(), robot.get_current_tick(), robot.get_next_tick());
         robot.instruct(robot.get_port(), robot.get_port(), receive_robot_task_called, this);
     }
-    received_robot_states_.clear();
 }
 
 void
@@ -145,11 +145,11 @@ controller::handle_receive_robot_task_called_result(UA_Boolean _controller_state
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!_controller_state_received)
         return;
-    next_clock_tick_++;
-    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-    }
+    // next_clock_tick_++;
+    // UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    // if(status != UA_STATUSCODE_GOOD) {
+    //     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+    // }
 }
 
 UA_StatusCode
@@ -192,6 +192,7 @@ controller::handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy,
     plate.set_adjacent_robot_position(0);
     received_conveyor_states_.insert(_plate_id);
     if(received_conveyor_states_.size() == remote_plates_.size()) {
+        received_conveyor_states_.clear();
         handle_all_conveyor_states_received();
     }
 }
@@ -203,7 +204,6 @@ controller::handle_all_conveyor_states_received() {
         remote_conveyor_->instruct(1, receive_conveyor_move_instructions_called, this);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %lu", plate.get_id(), plate.get_adjacent_robot_position());
     }
-    received_conveyor_states_.clear();
 }
 
 void
@@ -238,11 +238,11 @@ controller::handle_receive_conveyor_move_instructions_called_result(UA_Boolean c
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!conveyor_move_instruction_received)
         return;
-    next_clock_tick_++;
-    UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-    }
+    // next_clock_tick_++;
+    // UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
+    // if(status != UA_STATUSCODE_GOOD) {
+    //     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+    // }
 }
 
 void
