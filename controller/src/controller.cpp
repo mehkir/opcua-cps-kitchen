@@ -10,33 +10,57 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
     }
 
+    /* Run the controller server */
+    controller_server_iterate_thread_ = std::thread([this]() {
+        while(running_) {
+            UA_StatusCode status = UA_Server_run_iterate(controller_server_, true);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the controller server");
+            }
+        }
+    });
+
+    /* Setup robot clients */
     for (size_t i = 0; i < _robot_count; i++) {
         uint16_t remote_port = _robot_start_port + i;
         port_remote_robot_map_[remote_port] = std::make_unique<remote_robot>(remote_port);
     }
 
+    /* Setup conveyor client */
     remote_conveyor_ = std::make_unique<remote_conveyor>(_remote_conveyor_port);
     for (size_t i = 0; i < _conveyor_plates_count; i++) {
         remote_plates_.push_back(remote_plate(i));
     }
     
-
-    UA_ClientConfig* clock_client_config = UA_Client_getConfig(clock_client_);
-    clock_client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-    std::string clock_endpoint = "opc.tcp://localhost:" + std::to_string(_clock_port);
-    status = UA_Client_connect(clock_client_, clock_endpoint.c_str());
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the clock server");
+    /* Setup clock client */
+    client_connection_establisher clock_client_connection_establisher;
+    UA_SessionState session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
+    if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
     }
 
-    status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
-    }
+    if (session_state == UA_SESSIONSTATE_ACTIVATED) {
+        /* Run the clock client */
+        clock_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(clock_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the clock client");
+                }
+            }
+        });
 
-    receive_tick_ack_caller_.add_input_argument(&controller_port_, UA_TYPES_UINT16);
-    receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
-    receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
+        /* Setup clock tick monitoring */
+        status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
+        }
+
+        /* Add receive tick ack method caller to send next tick */
+        receive_tick_ack_caller_.add_input_argument(&controller_port_, UA_TYPES_UINT16);
+        receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
+        receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
+    }
 
     receive_robot_state_inserter_.add_input_argument("robot port", "port", UA_TYPES_UINT16);
     receive_robot_state_inserter_.add_input_argument("robot busy status", "busy", UA_TYPES_BOOLEAN);
@@ -145,11 +169,6 @@ controller::handle_receive_robot_task_called_result(UA_Boolean _controller_state
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!_controller_state_received)
         return;
-    // next_clock_tick_++;
-    // UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
-    // if(status != UA_STATUSCODE_GOOD) {
-    //     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-    // }
 }
 
 UA_StatusCode
@@ -238,11 +257,6 @@ controller::handle_receive_conveyor_move_instructions_called_result(UA_Boolean c
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!conveyor_move_instruction_received)
         return;
-    // next_clock_tick_++;
-    // UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
-    // if(status != UA_STATUSCODE_GOOD) {
-    //     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-    // }
 }
 
 void
@@ -304,29 +318,11 @@ controller::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
 
 void
 controller::start() {
-    UA_StatusCode status = UA_STATUSCODE_GOOD;
-    // next_clock_tick_ = rand() % 1000;
-    // status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
-    // if(status != UA_STATUSCODE_GOOD) {
-    //     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-    //     return;
-    // }
-
-    clock_client_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_Client_run_iterate(clock_client_, 1000);
-        }
-    });
-
-    status = UA_Server_run(controller_server_, &running_);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
-        running_ = false;
-    }
+    clock_client_iterate_thread_.join();
+    controller_server_iterate_thread_.join();
 }
 
 void
 controller::stop() {
     running_ = false;
-    clock_client_iterate_thread_.join();
 }

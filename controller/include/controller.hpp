@@ -13,6 +13,7 @@
 #include "node_ids.hpp"
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
+#include "client_connection_establisher.hpp"
 
 
 struct remote_robot {
@@ -30,13 +31,10 @@ struct remote_robot {
 
     public:
         remote_robot(UA_UInt16 _port = 0) :  port_(_port), busy_(false), client_(UA_Client_new()), running_(true) {
-            UA_StatusCode status = UA_STATUSCODE_GOOD;
-            UA_ClientConfig* client_config = UA_Client_getConfig(client_);
-            client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-            std::string endpoint = "opc.tcp://localhost:" + std::to_string(port_);
-            status = UA_Client_connect(client_, endpoint.c_str());
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the robot server");
+            client_connection_establisher robot_client_connection_establisher;
+            UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
+            if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing robot client session");
             }
 
             receive_robot_task_caller_.add_input_argument(&activity_id_, UA_TYPES_UINT32);
@@ -44,7 +42,7 @@ struct remote_robot {
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
-                    UA_Client_run_iterate(client_, 1000);
+                    UA_Client_run_iterate(client_, 100);
                 }
             });
         }
@@ -107,20 +105,17 @@ struct remote_conveyor {
 
     public:
         remote_conveyor(UA_UInt16 _port = 0) :  port_(_port), busy_(false), client_(UA_Client_new()), running_(true) {
-            UA_StatusCode status = UA_STATUSCODE_GOOD;
-            UA_ClientConfig* client_config = UA_Client_getConfig(client_);
-            client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-            std::string endpoint = "opc.tcp://localhost:" + std::to_string(port_);
-            status = UA_Client_connect(client_, endpoint.c_str());
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the conveyor server");
+            client_connection_establisher conveyor_client_connection_establisher;
+            UA_SessionState session_state = conveyor_client_connection_establisher.establish_connection(client_, port_);
+            if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
             }
 
             receive_conveyor_move_instruction_caller_.add_input_argument(&steps_to_move_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
-                    UA_Client_run_iterate(client_, 1000);
+                    UA_Client_run_iterate(client_, 100);
                 }
             });
         }
@@ -198,6 +193,7 @@ private:
     UA_Server* controller_server_;
     UA_UInt16 controller_port_;
     volatile UA_Boolean running_;
+    std::thread controller_server_iterate_thread_;
     /* robot related member variables */
     std::unordered_map<uint16_t, std::unique_ptr<remote_robot>> port_remote_robot_map_;
     std::set<UA_UInt16> received_robot_states_;
