@@ -13,6 +13,7 @@
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
+#include "client_connection_establisher.hpp"
 
 struct remote_robot {
     private:
@@ -26,14 +27,10 @@ struct remote_robot {
 
     public:
         remote_robot(UA_UInt16 _port = 0) :  port_(_port), busy_(false), client_(UA_Client_new()), running_(true) {
-            UA_StatusCode status = UA_STATUSCODE_GOOD;
-            UA_ClientConfig* client_config = UA_Client_getConfig(client_);
-            client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-            std::string endpoint = "opc.tcp://localhost:" + std::to_string(port_);
-            status = UA_Client_connect(client_, endpoint.c_str());
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the robot server");
-                return;
+            client_connection_establisher robot_client_connection_establisher;
+            UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
+            if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing robot client session");
             }
 
             client_thread_ = std::thread([this]() {
@@ -120,6 +117,7 @@ private:
     std::vector<plate> plates_;
     std::unordered_map<UA_UInt32, UA_UInt16> robot_position_to_port_;
     method_node_inserter receive_move_instruction_inserter;
+    std::thread conveyor_server_iterate_thread_;
     /* clock related member variables */
     UA_Client* clock_client_;
     node_value_subscriber clock_tick_subscriber_;

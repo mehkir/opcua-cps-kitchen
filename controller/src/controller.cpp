@@ -7,7 +7,7 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     UA_ServerConfig* controller_server_config = UA_Server_getConfig(controller_server_);
     status = UA_ServerConfig_setMinimal(controller_server_config, controller_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the controller server");
     }
 
     /* Run the controller server */
