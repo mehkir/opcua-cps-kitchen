@@ -17,61 +17,17 @@
 
 struct remote_robot {
     private:
-        UA_Client* client_;
         UA_UInt16 port_;
-        UA_Boolean busy_;
-        UA_UInt64 current_tick_;
-        UA_UInt64 next_tick_;
-        bool running_;
-        std::thread client_thread_;
 
     public:
-        remote_robot(UA_UInt16 _port = 0) :  port_(_port), busy_(false), client_(UA_Client_new()), running_(true) {
-            client_connection_establisher robot_client_connection_establisher;
-            UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
-            if (session_state != UA_SESSIONSTATE_ACTIVATED) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing robot client session");
-            }
-
-            client_thread_ = std::thread([this]() {
-                while(running_) {
-                    UA_Client_run_iterate(client_, 1000);
-                }
-            });
+        remote_robot(UA_UInt16 _port = 0) :  port_(_port) {
         }
 
         ~remote_robot() {
-            running_ = false;
-            client_thread_.join();
-            UA_Client_delete(client_);
-        }
-
-        void set_busy_status(UA_Boolean _busy_status) {
-            busy_ = _busy_status;
-        }
-
-        void set_current_tick(UA_UInt64 _current_tick) {
-            current_tick_ = _current_tick;
-        }
-
-        void set_next_tick(UA_UInt64 _next_tick) {
-            next_tick_ = _next_tick;
         }
 
         UA_UInt16 get_port() {
             return port_;
-        }
-
-        UA_Boolean is_busy() const{
-            return busy_;
-        }
-
-        UA_UInt64 get_current_tick() const{
-            return current_tick_;
-        }
-
-        UA_UInt64 get_next_tick() const{
-            return next_tick_;
         }
 };
 
@@ -81,7 +37,7 @@ struct plate {
         UA_UInt16 adjacent_robot_position_;
         UA_Boolean busy_;
     public:
-        plate(uint32_t _plate_id, uint32_t _position, uint32_t _adjacent_robot_position) : plate_id_(_plate_id), adjacent_robot_position_(_adjacent_robot_position) {
+        plate(uint32_t _plate_id, uint32_t _adjacent_robot_position) : plate_id_(_plate_id), adjacent_robot_position_(_adjacent_robot_position) {
         }
 
         ~plate() {

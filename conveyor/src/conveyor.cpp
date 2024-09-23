@@ -24,6 +24,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         }
     });
 
+    // TODO: Let robots send their position instead of managing ports to position
     for (size_t i = 0; i < _robot_count; i++) {
         uint16_t remote_port = _robot_start_port + i;
         port_remote_robot_map_[remote_port] = std::make_unique<remote_robot>(remote_port);
@@ -61,7 +62,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     }
 
     for (size_t i = 0; i < _plates_count; i++) {
-        plates_.push_back(plate(i,i,i));
+        plates_.push_back(plate(i,i));
     }
 
     /* Setup controller client */
