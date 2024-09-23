@@ -32,12 +32,12 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
 
     /* Setup clock client */
     client_connection_establisher clock_client_connection_establisher;
-    UA_SessionState session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
-    if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+    UA_SessionState clock_session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
+    if (clock_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
     }
 
-    if (session_state == UA_SESSIONSTATE_ACTIVATED) {
+    if (clock_session_state == UA_SESSIONSTATE_ACTIVATED) {
         /* Run the clock client */
         clock_client_iterate_thread_ = std::thread([this]() {
             while(running_) {
@@ -64,12 +64,11 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         plates_.push_back(plate(i,i,i));
     }
 
-    UA_ClientConfig* controller_client_config = UA_Client_getConfig(controller_client_);
-    controller_client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-    std::string controller_endpoint = "opc.tcp://localhost:" + std::to_string(_controller_port);
-    status = UA_Client_connect(controller_client_, controller_endpoint.c_str());
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the controller server");
+    /* Setup controller client */
+    client_connection_establisher controller_client_connection_establisher;
+    UA_SessionState controller_session_state = controller_client_connection_establisher.establish_connection(controller_client_, _controller_port);
+    if (controller_session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing controller client session");
     }
 
     receive_conveyor_state_caller_.add_input_argument(&plate_id_state_, UA_TYPES_UINT32);
