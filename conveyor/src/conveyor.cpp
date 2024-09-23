@@ -71,6 +71,17 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing controller client session");
     }
 
+    if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        controller_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the controller client");
+                }
+            }
+        });
+    }
+
     receive_conveyor_state_caller_.add_input_argument(&plate_id_state_, UA_TYPES_UINT32);
     receive_conveyor_state_caller_.add_input_argument(&plate_busy_state_, UA_TYPES_BOOLEAN);
     receive_conveyor_state_caller_.add_input_argument(&plate_current_tick_state_, UA_TYPES_UINT64);
@@ -249,22 +260,12 @@ conveyor::start() {
     next_clock_tick_++; // TODO: Compute from move instruction
     transmit_all_plate_states();
 
-    clock_client_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_Client_run_iterate(clock_client_, 1000);
-        }
-    });
-
-    controller_client_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_Client_run_iterate(controller_client_, 1000);
-        }
-    });
+    conveyor_server_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
+    controller_client_iterate_thread_.join();
 }
 
 void
 conveyor::stop() {
     running_ = false;
-    clock_client_iterate_thread_.join();
-    controller_client_iterate_thread_.join();
 }

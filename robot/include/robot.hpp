@@ -18,6 +18,7 @@ private:
     volatile UA_Boolean running_;
     UA_Boolean busy_status_;
     method_node_inserter receive_task_inserter_;
+    std::thread robot_server_iterate_thread_;
     /* clock related member variables */
     UA_Client* clock_client_;
     node_value_subscriber clock_tick_subscriber_;

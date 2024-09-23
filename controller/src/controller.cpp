@@ -318,8 +318,8 @@ controller::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
 
 void
 controller::start() {
-    clock_client_iterate_thread_.join();
     controller_server_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
 }
 
 void

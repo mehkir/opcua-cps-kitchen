@@ -6,6 +6,7 @@
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel_async.h>
 #include <string>
+#include "client_connection_establisher.hpp"
 
 robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : robot_server_(UA_Server_new()), robot_id_(_robot_id), robot_port_(_robot_port), clock_client_(UA_Client_new()), controller_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), running_(true) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -15,29 +16,62 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
     }
 
-    UA_ClientConfig* clock_client_config = UA_Client_getConfig(clock_client_);
-    clock_client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-    std::string clock_endpoint = "opc.tcp://localhost:" + std::to_string(_clock_port);
-    status = UA_Client_connect(clock_client_, clock_endpoint.c_str());
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the clock server");
+    /* Run the robot server */
+    robot_server_iterate_thread_ = std::thread([this]() {
+        while(running_) {
+            UA_StatusCode status = UA_Server_run_iterate(robot_server_, true);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the robot server");
+            }
+        }
+    });
+
+    /* Setup clock client */
+    client_connection_establisher clock_client_connection_establisher;
+    UA_SessionState clock_session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
+    if (clock_session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
     }
 
-    status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
+    if (clock_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        /* Run the clock client */
+        clock_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(clock_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the clock client");
+                }
+            }
+        });
+
+        /* Setup clock tick monitoring */
+        status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
+        }
+
+        /* Add receive tick ack method caller to send next tick */
+        receive_tick_ack_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
+        receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
+        receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
     }
 
-    receive_tick_ack_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
-    receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
-    receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
+    /* Setup controller client */
+    client_connection_establisher controller_client_connection_establisher;
+    UA_SessionState controller_session_state = controller_client_connection_establisher.establish_connection(controller_client_, _controller_port);
+    if (controller_session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing controller client session");
+    }
 
-    UA_ClientConfig* controller_client_config = UA_Client_getConfig(controller_client_);
-    controller_client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
-    std::string controller_endpoint = "opc.tcp://localhost:" + std::to_string(_controller_port);
-    status = UA_Client_connect(controller_client_, controller_endpoint.c_str());
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error connecting to the controller server");
+    if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        controller_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the controller client");
+                }
+            }
+        });
     }
 
     receive_robot_state_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
@@ -200,28 +234,12 @@ robot::start() {
         running_ = false;
     }
 
-    clock_client_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_Client_run_iterate(clock_client_, 1000);
-        }
-    });
-
-    controller_client_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_Client_run_iterate(controller_client_, 1000);
-        }
-    });
-
-    status = UA_Server_run(robot_server_, &running_);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
-        running_ = false;
-    }
+    clock_client_iterate_thread_.join();
+    controller_client_iterate_thread_.join();
+    robot_server_iterate_thread_.join();
 }
 
 void
 robot::stop() {
     running_ = false;
-    clock_client_iterate_thread_.join();
-    controller_client_iterate_thread_.join();
 }
