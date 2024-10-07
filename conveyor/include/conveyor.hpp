@@ -15,29 +15,13 @@
 #include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
 
-struct remote_robot {
-    private:
-        UA_UInt16 port_;
-
-    public:
-        remote_robot(UA_UInt16 _port = 0) :  port_(_port) {
-        }
-
-        ~remote_robot() {
-        }
-
-        UA_UInt16 get_port() {
-            return port_;
-        }
-};
-
 struct plate {
     private:
         const UA_UInt32 plate_id_;
         UA_UInt16 adjacent_robot_position_;
         UA_Boolean busy_;
     public:
-        plate(uint32_t _plate_id, uint32_t _adjacent_robot_position) : plate_id_(_plate_id), adjacent_robot_position_(_adjacent_robot_position) {
+        plate(uint32_t _plate_id, uint32_t _adjacent_robot_position) : plate_id_(_plate_id), adjacent_robot_position_(_adjacent_robot_position), busy_(false) {
         }
 
         ~plate() {
@@ -64,6 +48,41 @@ struct plate {
         }
 };
 
+struct robot_position_mapping {
+    private:
+        std::unordered_map<UA_UInt16, UA_UInt32> robot_port_to_position_;
+        std::unordered_map<UA_UInt32, UA_UInt16> position_to_robot_port_;
+        std::unordered_map<UA_UInt32, plate*> position_to_plate_;
+    public:
+        void add_robot_port_to_position_mapping(UA_UInt16 _robot_port, UA_UInt32 _position) {
+            robot_port_to_position_[_robot_port] = _position;
+        }
+
+        void add_position_to_robot_port_mapping(UA_UInt32 _position, UA_UInt16 _robot_port) {
+            position_to_robot_port_[_position] = _robot_port;
+        }
+
+        void add_position_to_plate_mapping(UA_UInt32 _position, plate* _plate) {
+            position_to_plate_[_position] = _plate;
+        }
+
+        UA_UInt32 get_robot_position(UA_UInt16 _robot_port) {
+            return robot_port_to_position_[_robot_port];
+        }
+
+        UA_UInt16 get_robot_port(UA_UInt32 _position) {
+            return position_to_robot_port_[_position];
+        }
+
+        plate* get_plate(UA_UInt32 _positon) {
+            return position_to_plate_[_positon];
+        }
+
+        plate* get_plate(UA_UInt16 _robot_port) {
+            return position_to_plate_[robot_port_to_position_[_robot_port]];
+        }
+};
+
 class conveyor {
 private:
     /* conveyor related member variables */
@@ -71,8 +90,10 @@ private:
     UA_UInt16 conveyor_port_;
     volatile UA_Boolean running_;
     std::vector<plate> plates_;
-    std::unordered_map<UA_UInt32, UA_UInt16> robot_position_to_port_;
-    method_node_inserter receive_move_instruction_inserter;
+    robot_position_mapping robot_position_mapping_;
+    std::unordered_map<UA_UInt16, UA_UInt32> robot_port_to_position_;
+    method_node_inserter receive_move_instruction_inserter_;
+    method_node_inserter place_processed_order_inserter_;
     std::thread conveyor_server_iterate_thread_;
     /* clock related member variables */
     UA_Client* clock_client_;
@@ -81,8 +102,6 @@ private:
     UA_UInt64 next_clock_tick_;
     std::thread clock_client_iterate_thread_;
     method_node_caller receive_tick_ack_caller_;
-    /* robot related member variables */
-    std::unordered_map<uint16_t, std::unique_ptr<remote_robot>> port_remote_robot_map_;
     /* controller related member variables */
     UA_Client* controller_client_;
     method_node_caller receive_conveyor_state_caller_;
@@ -124,6 +143,17 @@ private:
     void
     handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_received);
 
+    static UA_StatusCode
+    place_processed_order(UA_Server *_server,
+            const UA_NodeId *_session_id, void *_session_context,
+            const UA_NodeId *_method_id, void *_method_context,
+            const UA_NodeId *_object_id, void *_object_context,
+            size_t _input_size, const UA_Variant *_input,
+            size_t _output_size, UA_Variant *_output);
+    
+    void
+    handle_place_processed_order(UA_UInt16 _robot_port, UA_UInt32 _procesed_order_id, UA_Variant* _output);
+
     void
     transmit_all_plate_states();
 
@@ -131,7 +161,7 @@ private:
     progress_new_tick(UA_UInt64 _new_tick);
 
 public:
-    conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port);
+    conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port);
     ~conveyor();
 
     void

@@ -5,7 +5,7 @@
 #include <string>
 #include <memory>
 
-conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt32 _plates_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
+conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
 
     UA_ServerConfig* conveyor_server_config = UA_Server_getConfig(conveyor_server_);
@@ -24,11 +24,10 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         }
     });
 
-    // TODO: Let robots send their position instead of managing ports to position
     for (size_t i = 0; i < _robot_count; i++) {
         uint16_t remote_port = _robot_start_port + i;
-        port_remote_robot_map_[remote_port] = std::make_unique<remote_robot>(remote_port);
-        robot_position_to_port_[i+1] = remote_port;
+        robot_position_mapping_.add_robot_port_to_position_mapping(remote_port, i+1);
+        robot_position_mapping_.add_position_to_robot_port_mapping(i+1, remote_port);
     }
 
     /* Setup clock client */
@@ -61,8 +60,9 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
     }
 
-    for (size_t i = 0; i < _plates_count; i++) {
+    for (size_t i = 0; i < _robot_count+1; i++) {
         plates_.push_back(plate(i,i));
+        robot_position_mapping_.add_position_to_plate_mapping(i, &plates_[i]);
     }
 
     /* Setup controller client */
@@ -88,12 +88,16 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     receive_conveyor_state_caller_.add_input_argument(&plate_current_tick_state_, UA_TYPES_UINT64);
     receive_conveyor_state_caller_.add_input_argument(&plate_next_tick_state_, UA_TYPES_UINT64);
 
-    receive_move_instruction_inserter.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
-    receive_move_instruction_inserter.add_output_argument("steps to move received", "steps_to_move_received", UA_TYPES_BOOLEAN);
-    status = receive_move_instruction_inserter.add_method_node(conveyor_server_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), "receive move instruction", receive_move_instruction, this);
+    receive_move_instruction_inserter_.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
+    receive_move_instruction_inserter_.add_output_argument("steps to move received", "steps_to_move_received", UA_TYPES_BOOLEAN);
+    status = receive_move_instruction_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), "receive move instruction", receive_move_instruction, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive move instruction method node");
     }
+
+    place_processed_order_inserter_.add_input_argument("order identifier", "order_id", UA_TYPES_UINT32);
+    place_processed_order_inserter_.add_output_argument("order placed", "order_placed", UA_TYPES_BOOLEAN);
+    status = place_processed_order_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, PLACE_PROCESSED_ORDER), "place processed order", place_processed_order, this);
 }
 
 conveyor::~conveyor() {
@@ -174,7 +178,7 @@ conveyor::receive_move_instruction(UA_Server *_server,
     }
     conveyor* self = static_cast<conveyor*>(_method_context);
     self->handle_receive_move_instruction(steps_to_move, _output);
-    return UA_STATUSCODE_BAD;
+    return UA_STATUSCODE_GOOD;
 }
 
 void
@@ -235,6 +239,36 @@ conveyor::handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_receiv
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!_conveyor_state_received)
         return;
+}
+
+UA_StatusCode
+conveyor::place_processed_order(UA_Server *_server,
+        const UA_NodeId *_session_id, void *_session_context,
+        const UA_NodeId *_method_id, void *_method_context,
+        const UA_NodeId *_object_id, void *_object_context,
+        size_t _input_size, const UA_Variant *_input,
+        size_t _output_size, UA_Variant *_output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_input_size != 2) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
+        return UA_STATUSCODE_BAD;
+    }
+    UA_UInt16 robot_port = *(UA_UInt16*)_input[0].data;
+    UA_UInt32 processed_order_id = *(UA_UInt32*)_input[1].data;
+
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
+        return UA_STATUSCODE_BAD;
+    }
+    conveyor* self = static_cast<conveyor*>(_method_context);
+    self->handle_place_processed_order(robot_port, processed_order_id, _output);
+    return UA_STATUSCODE_GOOD;
+
+}
+
+void
+conveyor::handle_place_processed_order(UA_UInt16 _robot_port, UA_UInt32 _procesed_order_id, UA_Variant* _output) {
+
 }
 
 void
