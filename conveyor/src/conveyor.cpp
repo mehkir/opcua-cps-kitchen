@@ -204,6 +204,7 @@ conveyor::move_conveyor(uint32_t steps) {
     for (size_t i = 0; i < plates_.size(); i++) {
         int new_position = (plates_[i].get_adjacent_robot_position() + steps) % plates_.size();
         plates_[i].set_adjacent_robot_position(new_position);
+        robot_position_mapping_.add_position_to_plate_mapping(new_position, &plates_[i]);
     }
 }
 
