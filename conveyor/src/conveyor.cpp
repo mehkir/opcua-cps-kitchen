@@ -237,7 +237,7 @@ conveyor::receive_conveyor_state_called(UA_Client* _client, void* _userdata, UA_
 
 void
 conveyor::handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_received) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (!_conveyor_state_received)
         return;
 }
@@ -269,6 +269,7 @@ conveyor::place_processed_order(UA_Server *_server,
 
 void
 conveyor::handle_place_processed_order(UA_UInt16 _robot_port, UA_UInt32 _procesed_order_id, UA_Variant* _output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
 
 }
 

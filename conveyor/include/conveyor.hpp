@@ -137,12 +137,14 @@ private:
     void
     move_conveyor(uint32_t steps);
 
+    /* Sends the conveyor state to the controller */
     static void
     receive_conveyor_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
     void
     handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_received);
 
+    /* Places a processed order on a plate */
     static UA_StatusCode
     place_processed_order(UA_Server *_server,
             const UA_NodeId *_session_id, void *_session_context,
