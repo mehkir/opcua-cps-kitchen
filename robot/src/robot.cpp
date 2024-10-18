@@ -8,7 +8,7 @@
 #include <string>
 #include "client_connection_establisher.hpp"
 
-robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : robot_server_(UA_Server_new()), robot_id_(_robot_id), robot_port_(_robot_port), clock_client_(UA_Client_new()), controller_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), running_(true) {
+robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port) : robot_server_(UA_Server_new()), robot_id_(_robot_id), robot_port_(_robot_port), clock_client_(UA_Client_new()), controller_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), conveyor_client_(UA_Client_new()), running_(true) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* robot_server_config = UA_Server_getConfig(robot_server_);
     status = UA_ServerConfig_setMinimal(robot_server_config, robot_port_, NULL);
@@ -86,6 +86,26 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot task method node");
     }
+
+    /* Setup conveyor client */
+    client_connection_establisher conveyor_client_connection_establisher;
+    UA_SessionState conveyor_session_state = conveyor_client_connection_establisher.establish_connection(conveyor_client_, _conveyor_port);
+    if (conveyor_session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
+    }
+
+    if (conveyor_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        conveyor_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the conveyor client");
+                }
+            }
+        });
+    }
+
+    place_finished_order_caller_.add_input_argument(&finished_order_id_, UA_TYPES_UINT32);
 }
 
 void
@@ -183,24 +203,23 @@ robot::receive_task(UA_Server *_server,
             size_t _input_size, const UA_Variant *_input,
             size_t _output_size, UA_Variant *_output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_input_size != 2) {
+    if(_input_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
     }
-    UA_UInt32 activity_id = *(UA_UInt32*)_input[0].data;
-    UA_UInt32 ingredient_id = *(UA_UInt32*)_input[1].data;
+    UA_UInt32 recipe_id = *(UA_UInt32*)_input[0].data;
 
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
     robot* self = static_cast<robot*>(_method_context);
-    self->handle_receive_task(activity_id, ingredient_id, _output);
+    self->handle_receive_task(recipe_id, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-robot::handle_receive_task(UA_UInt32 _activity_id, UA_UInt32 _ingredient_id, UA_Variant* _output) {
+robot::handle_receive_task(UA_UInt32 _recipe_id, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     next_clock_tick_++;
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
@@ -215,8 +234,44 @@ robot::handle_receive_task(UA_UInt32 _activity_id, UA_UInt32 _ingredient_id, UA_
 }
 
 void
+robot::place_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_userdata == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
+        return;
+    }
+
+    UA_StatusCode status_code = _response->responseHeader.serviceResult;
+    if(status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
+        return;
+    }
+
+    UA_Boolean place_finished_order_successful;
+    if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        place_finished_order_successful = *(UA_Boolean*)_response->results[0].outputArguments->data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, place_finished_order_successful);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+        return;
+    }
+    
+    robot* self = static_cast<robot*>(_userdata);
+    self->handle_place_finished_order_result(place_finished_order_successful);
+}
+
+void
+robot::handle_place_finished_order_result(UA_Boolean _place_finished_order_successful) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (busy_status_ && _place_finished_order_successful) {
+        busy_status_ = false;
+    } 
+}
+
+void
 robot::progress_new_tick(UA_UInt64 _new_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s with new tick %lu", __FUNCTION__, _new_tick);
+    place_finished_order_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), place_finished_order_called, this);
 }
 
 robot::~robot() {
@@ -237,6 +292,7 @@ robot::start() {
     clock_client_iterate_thread_.join();
     controller_client_iterate_thread_.join();
     robot_server_iterate_thread_.join();
+    conveyor_client_iterate_thread_.join();
 }
 
 void

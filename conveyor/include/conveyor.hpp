@@ -27,24 +27,24 @@ struct plate {
         ~plate() {
         }
 
-        void set_adjacent_robot_position(UA_UInt16 _adjacent_robot_position) {
-            adjacent_robot_position_ = _adjacent_robot_position;
-        }
-
         UA_UInt32 get_plate_id() const {
             return plate_id_;
+        }
+
+        void set_adjacent_robot_position(UA_UInt16 _adjacent_robot_position) {
+            adjacent_robot_position_ = _adjacent_robot_position;
         }
 
         UA_UInt16 get_adjacent_robot_position() {
             return adjacent_robot_position_;
         }
 
-        UA_Boolean get_busy_state() {
-            return busy_;
-        }
-
         UA_Boolean set_busy_state(UA_Boolean _busy) {
             busy_ = _busy;
+        }
+
+        UA_Boolean get_busy_state() {
+            return busy_;
         }
 };
 
@@ -91,9 +91,8 @@ private:
     volatile UA_Boolean running_;
     std::vector<plate> plates_;
     robot_position_mapping robot_position_mapping_;
-    std::unordered_map<UA_UInt16, UA_UInt32> robot_port_to_position_;
     method_node_inserter receive_move_instruction_inserter_;
-    method_node_inserter place_processed_order_inserter_;
+    method_node_inserter place_finished_order_inserter_;
     std::thread conveyor_server_iterate_thread_;
     /* clock related member variables */
     UA_Client* clock_client_;
@@ -109,7 +108,7 @@ private:
     UA_UInt32 plate_id_state_;
     UA_Boolean plate_busy_state_;
     UA_UInt64 plate_current_tick_state_;
-    UA_UInt64 plate_next_tick_state_;
+    UA_UInt16 plate_adjacent_robot_position_;
 
     static void
     clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
@@ -144,9 +143,9 @@ private:
     void
     handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_received);
 
-    /* Places a processed order on a plate */
+    /* Places a finished order on a plate */
     static UA_StatusCode
-    place_processed_order(UA_Server *_server,
+    place_finished_order(UA_Server *_server,
             const UA_NodeId *_session_id, void *_session_context,
             const UA_NodeId *_method_id, void *_method_context,
             const UA_NodeId *_object_id, void *_object_context,
@@ -154,7 +153,7 @@ private:
             size_t _output_size, UA_Variant *_output);
     
     void
-    handle_place_processed_order(UA_UInt16 _robot_port, UA_UInt32 _procesed_order_id, UA_Variant* _output);
+    handle_place_finished_order(UA_UInt16 _robot_port, UA_UInt32 _procesed_order_id, UA_Variant* _output);
 
     void
     transmit_all_plate_states();

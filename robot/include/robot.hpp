@@ -30,6 +30,11 @@ private:
     UA_Client* controller_client_;
     method_node_caller receive_robot_state_caller_;
     std::thread controller_client_iterate_thread_;
+    /* conveyor related member variables */
+    UA_Client* conveyor_client_;
+    std::thread conveyor_client_iterate_thread_;
+    method_node_caller place_finished_order_caller_;
+    UA_UInt32 finished_order_id_;
 
     static void
     clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
@@ -58,13 +63,19 @@ private:
             size_t _output_size, UA_Variant *_output);
     
     void
-    handle_receive_task(UA_UInt32 _activity_id, UA_UInt32 _ingredient_id, UA_Variant* _output);
+    handle_receive_task(UA_UInt32 _recipe_id, UA_Variant* _output);
+
+    static void
+    place_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    void
+    handle_place_finished_order_result(UA_Boolean _place_finished_order_successful);
 
     void
     progress_new_tick(UA_UInt64 _new_tick);
 
 public:
-    robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port);
+    robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port);
     ~robot();
 
     void

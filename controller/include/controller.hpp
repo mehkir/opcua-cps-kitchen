@@ -26,8 +26,7 @@ struct remote_robot {
         bool running_;
         std::thread client_thread_;
         method_node_caller receive_robot_task_caller_;
-        UA_UInt32 activity_id_;
-        UA_UInt32 ingredient_id_;
+        UA_UInt32 recipe_id_;
 
     public:
         remote_robot(UA_UInt16 _port = 0) :  port_(_port), busy_(false), client_(UA_Client_new()), running_(true) {
@@ -37,8 +36,7 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing robot client session");
             }
 
-            receive_robot_task_caller_.add_input_argument(&activity_id_, UA_TYPES_UINT32);
-            receive_robot_task_caller_.add_input_argument(&ingredient_id_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_input_argument(&recipe_id_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
@@ -81,9 +79,8 @@ struct remote_robot {
             return next_tick_;
         }
 
-        void instruct(UA_UInt32 _activity_id, UA_UInt32 _ingredient_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
-            activity_id_ = _activity_id;
-            ingredient_id_ = ingredient_id_;
+        void instruct(UA_UInt32 _recipe_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
+            recipe_id_ = _recipe_id;
             UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_TASK), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
@@ -167,6 +164,7 @@ struct remote_plate {
     private:
         const UA_UInt32 id_;
         UA_UInt16 adjacent_robot_position_;
+        UA_Boolean busy_;
     public:
         remote_plate(uint32_t _id) : id_(_id) {
         }
@@ -174,16 +172,24 @@ struct remote_plate {
         ~remote_plate() {
         }
 
-        void set_adjacent_robot_position(UA_UInt16 _adjacent_robot_position) {
-            adjacent_robot_position_ = _adjacent_robot_position;
-        }
-
         UA_UInt32 get_id() const {
             return id_;
         }
 
+        void set_adjacent_robot_position(UA_UInt16 _adjacent_robot_position) {
+            adjacent_robot_position_ = _adjacent_robot_position;
+        }
+
         UA_UInt16 get_adjacent_robot_position() {
             return adjacent_robot_position_;
+        }
+
+        UA_Boolean set_busy_state(UA_Boolean _busy) {
+            busy_ = _busy;
+        }
+
+        UA_Boolean get_busy_state() {
+            return busy_;
         }
 };
 
@@ -198,8 +204,6 @@ private:
     std::unordered_map<uint16_t, std::unique_ptr<remote_robot>> port_remote_robot_map_;
     std::set<UA_UInt16> received_robot_states_;
     method_node_inserter receive_robot_state_inserter_;
-    UA_UInt32 activity_id;
-    UA_UInt32 ingredient_id;
     /* conveyor related member variables */
     std::unique_ptr<remote_conveyor> remote_conveyor_;
     std::vector<remote_plate> remote_plates_;
@@ -255,7 +259,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output);
+    handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt16 _adjacent_robot_position, UA_Variant* _output);
 
     void    
     handle_all_conveyor_states_received();
@@ -267,7 +271,7 @@ private:
     handle_receive_conveyor_move_instructions_called_result(UA_Boolean _controller_state_received);
 
 public:
-    controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint32_t _conveyor_plates_count, uint16_t _clock_port);
+    controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port);
     ~controller();
 
     void

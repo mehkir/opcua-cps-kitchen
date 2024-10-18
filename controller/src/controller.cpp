@@ -2,7 +2,7 @@
 #include <open62541/server_config_default.h>
 #include <string>
 
-controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint32_t _conveyor_plates_count, uint16_t _clock_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0) {
+controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* controller_server_config = UA_Server_getConfig(controller_server_);
     status = UA_ServerConfig_setMinimal(controller_server_config, controller_port_, NULL);
@@ -28,7 +28,7 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
 
     /* Setup conveyor client */
     remote_conveyor_ = std::make_unique<remote_conveyor>(_remote_conveyor_port);
-    for (size_t i = 0; i < _conveyor_plates_count; i++) {
+    for (size_t i = 0; i < _robot_count+1; i++) {
         remote_plates_.push_back(remote_plate(i));
     }
     
@@ -133,7 +133,7 @@ controller::handle_all_robot_states_received() {
     for(auto& port_robot_pair : port_remote_robot_map_) {
         remote_robot& robot = port_robot_pair.second.operator*();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d has current tick %lu and next tick %lu", robot.get_port(), robot.get_current_tick(), robot.get_next_tick());
-        robot.instruct(robot.get_port(), robot.get_port(), receive_robot_task_called, this);
+        robot.instruct(robot.get_port(), receive_robot_task_called, this);
     }
 }
 
@@ -187,28 +187,31 @@ controller::receive_conveyor_state(UA_Server* _server,
     UA_UInt32 plate_id = *(UA_UInt32*)_input[0].data;
     UA_Boolean busy = *(UA_Boolean*)_input[1].data;
     UA_UInt64 current_tick = *(UA_UInt64*)_input[2].data;
-    UA_UInt64 next_tick = *(UA_UInt64*)_input[3].data;
+    UA_UInt16 adjacent_robot_position = *(UA_UInt16*)_input[3].data;
     /* Extract method context */
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
     controller* self = static_cast<controller*>(_method_context);
-    self->handle_receive_conveyor_state(plate_id, busy, current_tick, next_tick, _output);
+    self->handle_receive_conveyor_state(plate_id, busy, current_tick, adjacent_robot_position, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output) {
+controller::handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt16 _adjacent_robot_position, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if(remote_plates_.size() >= _plate_id) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Conveyor with plate id %d not found", _plate_id);
         return;
     }
     UA_Boolean conveyor_state_received = true;
-    UA_Variant_setScalarCopy(_output, &conveyor_state_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    UA_StatusCode status = UA_Variant_setScalarCopy(_output, &conveyor_state_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error setting ");
+    }
     remote_plate& plate = remote_plates_[_plate_id];
-    plate.set_adjacent_robot_position(0);
+    plate.set_adjacent_robot_position(_adjacent_robot_position);
     received_conveyor_states_.insert(_plate_id);
     if(received_conveyor_states_.size() == remote_plates_.size()) {
         received_conveyor_states_.clear();
@@ -220,9 +223,9 @@ void
 controller::handle_all_conveyor_states_received() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     for(auto& plate : remote_plates_) {
-        remote_conveyor_->instruct(1, receive_conveyor_move_instructions_called, this);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %lu", plate.get_id(), plate.get_adjacent_robot_position());
     }
+    remote_conveyor_->instruct(1, receive_conveyor_move_instructions_called, this);
 }
 
 void

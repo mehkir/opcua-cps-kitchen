@@ -86,7 +86,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     receive_conveyor_state_caller_.add_input_argument(&plate_id_state_, UA_TYPES_UINT32);
     receive_conveyor_state_caller_.add_input_argument(&plate_busy_state_, UA_TYPES_BOOLEAN);
     receive_conveyor_state_caller_.add_input_argument(&plate_current_tick_state_, UA_TYPES_UINT64);
-    receive_conveyor_state_caller_.add_input_argument(&plate_next_tick_state_, UA_TYPES_UINT64);
+    receive_conveyor_state_caller_.add_input_argument(&plate_adjacent_robot_position_, UA_TYPES_UINT16);
 
     receive_move_instruction_inserter_.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
     receive_move_instruction_inserter_.add_output_argument("steps to move received", "steps_to_move_received", UA_TYPES_BOOLEAN);
@@ -95,9 +95,12 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive move instruction method node");
     }
 
-    place_processed_order_inserter_.add_input_argument("order identifier", "order_id", UA_TYPES_UINT32);
-    place_processed_order_inserter_.add_output_argument("order placed", "order_placed", UA_TYPES_BOOLEAN);
-    status = place_processed_order_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, PLACE_PROCESSED_ORDER), "place processed order", place_processed_order, this);
+    place_finished_order_inserter_.add_input_argument("order identifier", "order_id", UA_TYPES_UINT32);
+    place_finished_order_inserter_.add_output_argument("order placed", "order_placed", UA_TYPES_BOOLEAN);
+    status = place_finished_order_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), "place finished order", place_finished_order, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the place finished order method node");
+    }
 }
 
 conveyor::~conveyor() {
@@ -243,7 +246,7 @@ conveyor::handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_receiv
 }
 
 UA_StatusCode
-conveyor::place_processed_order(UA_Server *_server,
+conveyor::place_finished_order(UA_Server *_server,
         const UA_NodeId *_session_id, void *_session_context,
         const UA_NodeId *_method_id, void *_method_context,
         const UA_NodeId *_object_id, void *_object_context,
@@ -255,21 +258,33 @@ conveyor::place_processed_order(UA_Server *_server,
         return UA_STATUSCODE_BAD;
     }
     UA_UInt16 robot_port = *(UA_UInt16*)_input[0].data;
-    UA_UInt32 processed_order_id = *(UA_UInt32*)_input[1].data;
+    UA_UInt32 finished_order_id = *(UA_UInt32*)_input[1].data;
 
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
     conveyor* self = static_cast<conveyor*>(_method_context);
-    self->handle_place_processed_order(robot_port, processed_order_id, _output);
+    self->handle_place_finished_order(robot_port, finished_order_id, _output);
     return UA_STATUSCODE_GOOD;
 
 }
 
 void
-conveyor::handle_place_processed_order(UA_UInt16 _robot_port, UA_UInt32 _procesed_order_id, UA_Variant* _output) {
+conveyor::handle_place_finished_order(UA_UInt16 _robot_port, UA_UInt32 _procesed_order_id, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    plate* target_plate = robot_position_mapping_.get_plate(_robot_port);
+    UA_Boolean finished_order_placement_accepted = !target_plate->get_busy_state();
+    if (finished_order_placement_accepted) {
+        target_plate->set_busy_state(true);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s for plate id %d was successful", __FUNCTION__, target_plate->get_plate_id());
+    } else {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s for plate id %d has failed, plate is busy", __FUNCTION__, target_plate->get_plate_id());
+    }
+    UA_StatusCode status = UA_Variant_setScalarCopy(_output, &finished_order_placement_accepted, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error returning receive move instuction ack");
+    }
 
 }
 
@@ -280,6 +295,7 @@ conveyor::transmit_all_plate_states() {
         plate_id_state_ = p.get_plate_id();
         plate_current_tick_state_ = current_clock_tick_;
         plate_busy_state_ = p.get_busy_state();
+        plate_adjacent_robot_position_ = p.get_adjacent_robot_position();
         UA_StatusCode status = receive_conveyor_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), receive_conveyor_state_called, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
