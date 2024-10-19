@@ -235,11 +235,11 @@ conveyor::receive_conveyor_state_called(UA_Client* _client, void* _userdata, UA_
     }
     
     conveyor* self = static_cast<conveyor*>(_userdata);
-    self->handle_receive_conveyor_state_result(conveyor_state_received);
+    self->handle_conveyor_state_result(conveyor_state_received);
 }
 
 void
-conveyor::handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_received) {
+conveyor::handle_conveyor_state_result(UA_Boolean _conveyor_state_received) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (!_conveyor_state_received)
         return;

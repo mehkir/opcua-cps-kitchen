@@ -185,11 +185,11 @@ robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32
     }
     
     robot* self = static_cast<robot*>(_userdata);
-    self->handle_receive_robot_state_result(robot_state_received);
+    self->handle_robot_state_result(robot_state_received);
 }
 
 void
-robot::handle_receive_robot_state_result(UA_Boolean _robot_state_received) {
+robot::handle_robot_state_result(UA_Boolean _robot_state_received) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!_robot_state_received)
         return;

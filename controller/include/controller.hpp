@@ -200,6 +200,8 @@ private:
     UA_UInt16 controller_port_;
     volatile UA_Boolean running_;
     std::thread controller_server_iterate_thread_;
+    std::set<UA_UInt16> received_proceeded_to_next_tick_notifications_;
+    method_node_inserter receive_proceeded_to_next_tick_notification_inserter_;
     /* robot related member variables */
     std::unordered_map<uint16_t, std::unique_ptr<remote_robot>> port_remote_robot_map_;
     std::set<UA_UInt16> received_robot_states_;
@@ -239,7 +241,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_receive_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output);
+    handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output);
 
     void
     handle_all_robot_states_received();
@@ -259,16 +261,26 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt16 _adjacent_robot_position, UA_Variant* _output);
+    handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt16 _adjacent_robot_position, UA_Variant* _output);
 
     void    
     handle_all_conveyor_states_received();
 
     static void
-    receive_conveyor_move_instructions_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+    receive_conveyor_instruction_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
     void
-    handle_receive_conveyor_move_instructions_called_result(UA_Boolean _controller_state_received);
+    handle_receive_conveyor_instruction_called_result(UA_Boolean _controller_state_received);
+
+    static UA_StatusCode
+    receive_proceeded_to_next_tick_notification(UA_Server *_server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
+
+    void handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Variant* _output);
 
 public:
     controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port);

@@ -81,6 +81,12 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive conveyor state method node");
     }
+
+    receive_proceeded_to_next_tick_notification_inserter_.add_input_argument("remote port", "remote_port", UA_TYPES_UINT16);
+    status = receive_proceeded_to_next_tick_notification_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), "receive proceeded to next tick notification", receive_proceeded_to_next_tick_notification, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive proceeded to next tick notification");
+    }
 }
 
 controller::~controller() {
@@ -103,12 +109,12 @@ controller::receive_robot_state(UA_Server* _server,
     UA_UInt64 next_tick = *(UA_UInt64*)_input[3].data;
     /* Extract method context */
     controller* self = static_cast<controller*>(_method_context);
-    self->handle_receive_robot_state(port, busy, current_tick, next_tick, _output);
+    self->handle_robot_state(port, busy, current_tick, next_tick, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_receive_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output) {
+controller::handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if(port_remote_robot_map_.find(_port) == port_remote_robot_map_.end()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d not found", _port);
@@ -194,13 +200,13 @@ controller::receive_conveyor_state(UA_Server* _server,
         return UA_STATUSCODE_BAD;
     }
     controller* self = static_cast<controller*>(_method_context);
-    self->handle_receive_conveyor_state(plate_id, busy, current_tick, adjacent_robot_position, _output);
+    self->handle_conveyor_state(plate_id, busy, current_tick, adjacent_robot_position, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt16 _adjacent_robot_position, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt16 _adjacent_robot_position, UA_Variant* _output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(remote_plates_.size() >= _plate_id) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Conveyor with plate id %d not found", _plate_id);
         return;
@@ -221,15 +227,15 @@ controller::handle_receive_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy,
 
 void
 controller::handle_all_conveyor_states_received() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for(auto& plate : remote_plates_) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %lu", plate.get_id(), plate.get_adjacent_robot_position());
     }
-    remote_conveyor_->instruct(1, receive_conveyor_move_instructions_called, this);
+    remote_conveyor_->instruct(1, receive_conveyor_instruction_called, this);
 }
 
 void
-controller::receive_conveyor_move_instructions_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+controller::receive_conveyor_instruction_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
@@ -252,14 +258,53 @@ controller::receive_conveyor_move_instructions_called(UA_Client* _client, void* 
     }
     
     controller* self = static_cast<controller*>(_userdata);
-    self->handle_receive_conveyor_move_instructions_called_result(conveyor_move_instruction_received);
+    self->handle_receive_conveyor_instruction_called_result(conveyor_move_instruction_received);
 }
 
 void
-controller::handle_receive_conveyor_move_instructions_called_result(UA_Boolean conveyor_move_instruction_received) {
+controller::handle_receive_conveyor_instruction_called_result(UA_Boolean conveyor_move_instruction_received) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if (!conveyor_move_instruction_received)
         return;
+}
+
+UA_StatusCode
+controller::receive_proceeded_to_next_tick_notification(UA_Server *_server,
+        const UA_NodeId* _session_id, void* _session_context,
+        const UA_NodeId* _method_id, void* _method_context,
+        const UA_NodeId* _object_id, void* _object_context,
+        size_t _input_size, const UA_Variant* _input,
+        size_t _output_size, UA_Variant* _output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    /* Extract input arguments */
+    if(_input_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
+        return UA_STATUSCODE_BAD;
+    }
+    UA_UInt16 remote_port = *(UA_UInt16*)_input[0].data;
+    /* Extract method context */
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
+        return UA_STATUSCODE_BAD;
+    }
+    controller* self = static_cast<controller*>(_method_context);
+    self->handle_proceeded_to_next_tick_notification(remote_port, _output);
+    return UA_STATUSCODE_GOOD;
+}
+
+void
+controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Variant* _output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_Boolean proceeded_to_next_tick_notification_received = true;
+    UA_StatusCode status = UA_Variant_setScalarCopy(_output, &proceeded_to_next_tick_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error setting ");
+    }
+    received_proceeded_to_next_tick_notifications_.insert(_port);
+    if (received_proceeded_to_next_tick_notifications_.size() == (port_remote_robot_map_.size()+1)) {
+        received_proceeded_to_next_tick_notifications_.clear();
+        //TODO: Call Place remove finished orders ... think about a notification filed like in tick clock?
+    }
 }
 
 void

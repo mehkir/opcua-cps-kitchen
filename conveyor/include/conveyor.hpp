@@ -141,7 +141,7 @@ private:
     receive_conveyor_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
     void
-    handle_receive_conveyor_state_result(UA_Boolean _conveyor_state_received);
+    handle_conveyor_state_result(UA_Boolean _conveyor_state_received);
 
     /* Places a finished order on a plate */
     static UA_StatusCode

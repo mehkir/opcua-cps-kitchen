@@ -52,7 +52,7 @@ private:
     receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
     void
-    handle_receive_robot_state_result(UA_Boolean _robot_state_received);
+    handle_robot_state_result(UA_Boolean _robot_state_received);
 
     static UA_StatusCode
     receive_task(UA_Server *_server,
