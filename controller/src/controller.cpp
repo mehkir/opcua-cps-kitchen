@@ -4,12 +4,45 @@
 
 controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
+    /* Setup controller */
     UA_ServerConfig* controller_server_config = UA_Server_getConfig(controller_server_);
     status = UA_ServerConfig_setMinimal(controller_server_config, controller_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the controller server");
     }
 
+    receive_robot_state_inserter_.add_input_argument("robot port", "port", UA_TYPES_UINT16);
+    receive_robot_state_inserter_.add_input_argument("robot busy status", "busy", UA_TYPES_BOOLEAN);
+    receive_robot_state_inserter_.add_input_argument("robot current tick", "current_tick", UA_TYPES_UINT64);
+    receive_robot_state_inserter_.add_input_argument("robot next tick", "next_tick", UA_TYPES_UINT64);
+    receive_robot_state_inserter_.add_output_argument("robot state received", "robot_state_received", UA_TYPES_BOOLEAN);
+    status = receive_robot_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), "receive robot state", receive_robot_state, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot state method node");
+    }
+
+    receive_conveyor_state_inserter_.add_input_argument("conveyor plate id", "plate_id", UA_TYPES_UINT32);
+    receive_conveyor_state_inserter_.add_input_argument("conveyor plate busy status", "busy", UA_TYPES_BOOLEAN);
+    receive_conveyor_state_inserter_.add_input_argument("conveyor plate current tick", "current_tick", UA_TYPES_UINT64);
+    receive_conveyor_state_inserter_.add_input_argument("conveyor plate next tick", "next_tick", UA_TYPES_UINT64);
+    receive_conveyor_state_inserter_.add_output_argument("conveyor plate state received", "conveyor_state_received", UA_TYPES_BOOLEAN);
+    status = receive_conveyor_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), "receive conveyor state", receive_conveyor_state, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive conveyor state method node");
+    }
+
+    receive_proceeded_to_next_tick_notification_inserter_.add_input_argument("remote port", "remote_port", UA_TYPES_UINT16);
+    status = receive_proceeded_to_next_tick_notification_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), "receive proceeded to next tick notification", receive_proceeded_to_next_tick_notification, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive proceeded to next tick notification");
+    }
+
+    status = place_remove_finished_order_notification_node_inserter_.add_information_node(controller_server_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), "place remove finished order notifier", UA_TYPES_BOOLEAN, &place_remove_finished_order_notification_);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding place_remove_finished_order_notification information node");
+        return;
+    }
+    
     /* Run the controller server */
     controller_server_iterate_thread_ = std::thread([this]() {
         while(running_) {
@@ -60,32 +93,6 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
         receive_tick_ack_caller_.add_input_argument(&controller_port_, UA_TYPES_UINT16);
         receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
         receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
-    }
-
-    receive_robot_state_inserter_.add_input_argument("robot port", "port", UA_TYPES_UINT16);
-    receive_robot_state_inserter_.add_input_argument("robot busy status", "busy", UA_TYPES_BOOLEAN);
-    receive_robot_state_inserter_.add_input_argument("robot current tick", "current_tick", UA_TYPES_UINT64);
-    receive_robot_state_inserter_.add_input_argument("robot next tick", "next_tick", UA_TYPES_UINT64);
-    receive_robot_state_inserter_.add_output_argument("robot state received", "robot_state_received", UA_TYPES_BOOLEAN);
-    status = receive_robot_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), "receive robot state", receive_robot_state, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot state method node");
-    }
-
-    receive_conveyor_state_inserter_.add_input_argument("conveyor plate id", "plate_id", UA_TYPES_UINT32);
-    receive_conveyor_state_inserter_.add_input_argument("conveyor plate busy status", "busy", UA_TYPES_BOOLEAN);
-    receive_conveyor_state_inserter_.add_input_argument("conveyor plate current tick", "current_tick", UA_TYPES_UINT64);
-    receive_conveyor_state_inserter_.add_input_argument("conveyor plate next tick", "next_tick", UA_TYPES_UINT64);
-    receive_conveyor_state_inserter_.add_output_argument("conveyor plate state received", "conveyor_state_received", UA_TYPES_BOOLEAN);
-    status = receive_conveyor_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), "receive conveyor state", receive_conveyor_state, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive conveyor state method node");
-    }
-
-    receive_proceeded_to_next_tick_notification_inserter_.add_input_argument("remote port", "remote_port", UA_TYPES_UINT16);
-    status = receive_proceeded_to_next_tick_notification_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), "receive proceeded to next tick notification", receive_proceeded_to_next_tick_notification, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive proceeded to next tick notification");
     }
 }
 

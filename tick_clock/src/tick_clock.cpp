@@ -12,10 +12,9 @@ tick_clock::tick_clock(UA_UInt16 _clock_port, UA_UInt32 _clock_client_count) : c
         return;
     }
 
-    information_node_inserter info_node_inserter;
-    status = info_node_inserter.add_information_node(clock_server_, UA_NODEID_STRING(1, CLOCK_TICK), "the clock tick", UA_TYPES_UINT64, &clock_tick_);
+    status = clock_tick_inserter_.add_information_node(clock_server_, UA_NODEID_STRING(1, CLOCK_TICK), "the clock tick", UA_TYPES_UINT64, &clock_tick_);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding information node");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding clock_tick information node");
         return;
     }
 
@@ -81,7 +80,7 @@ void tick_clock::handle_receive_tick_ack(UA_UInt64 _current_client_tick, UA_UInt
         clock_tick_ = next_clock_tick_;
         UA_Boolean ack_received = true;
         UA_Variant_setScalarCopy(_output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
-        UA_Server_writeValue(clock_server_, UA_NODEID_STRING(1, "clock_tick"), new_clock_tick);
+        UA_Server_writeValue(clock_server_, UA_NODEID_STRING(1, CLOCK_TICK), new_clock_tick);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "New clock tick is: %lu", clock_tick_);
     }
 }

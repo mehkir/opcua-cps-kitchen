@@ -29,6 +29,7 @@ private:
     /* controller related member variables */
     UA_Client* controller_client_;
     method_node_caller receive_robot_state_caller_;
+    method_node_caller receive_proceeded_to_next_tick_notification_caller_;
     std::thread controller_client_iterate_thread_;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
@@ -53,6 +54,14 @@ private:
 
     void
     handle_robot_state_result(UA_Boolean _robot_state_received);
+
+    /* Receives the controller response to the sent 'proceeded to next tick notification' */
+    static void
+    receive_proceeded_to_next_tick_notification_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    /* Handles the controller reponse to the sent 'proceeded to next tick notification' */
+    void
+    handle_proceeded_to_next_tick_notification_result(UA_Boolean _proceeded_to_next_tick_notification_received);
 
     static UA_StatusCode
     receive_task(UA_Server *_server,

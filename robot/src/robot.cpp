@@ -106,6 +106,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     }
 
     place_finished_order_caller_.add_input_argument(&finished_order_id_, UA_TYPES_UINT32);
+    receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
 }
 
 void
@@ -269,8 +270,46 @@ robot::handle_place_finished_order_result(UA_Boolean _place_finished_order_succe
 }
 
 void
+robot::receive_proceeded_to_next_tick_notification_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_userdata == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
+        return;
+    }
+
+    UA_StatusCode status_code = _response->responseHeader.serviceResult;
+    if(status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
+        return;
+    }
+
+    UA_Boolean proceeded_to_next_tick_notification_received;
+    if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        proceeded_to_next_tick_notification_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, proceeded_to_next_tick_notification_received);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+        return;
+    }
+    
+    robot* self = static_cast<robot*>(_userdata);
+    self->handle_proceeded_to_next_tick_notification_result(proceeded_to_next_tick_notification_received);
+}
+
+void
+robot::handle_proceeded_to_next_tick_notification_result(UA_Boolean _proceeded_to_next_tick_notification_received) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (_proceeded_to_next_tick_notification_received) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s was successful", __FUNCTION__);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s failed", __FUNCTION__);
+    }
+}
+
+void
 robot::progress_new_tick(UA_UInt64 _new_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s with new tick %lu", __FUNCTION__, _new_tick);
+    receive_proceeded_to_next_tick_notification_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), receive_proceeded_to_next_tick_notification_called, this);
     place_finished_order_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), place_finished_order_called, this);
 }
 

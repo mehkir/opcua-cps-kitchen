@@ -103,7 +103,9 @@ private:
     method_node_caller receive_tick_ack_caller_;
     /* controller related member variables */
     UA_Client* controller_client_;
+    /* Sends the conveyor state to the controller */
     method_node_caller receive_conveyor_state_caller_;
+    method_node_caller receive_proceeded_to_next_tick_notification_caller_;
     std::thread controller_client_iterate_thread_;
     UA_UInt32 plate_id_state_;
     UA_Boolean plate_busy_state_;
@@ -136,12 +138,21 @@ private:
     void
     move_conveyor(uint32_t steps);
 
-    /* Sends the conveyor state to the controller */
+    /* Receives the controller response to the sent conveyor state */
     static void
     receive_conveyor_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
+    /* Handles the controller response to the sent conveyor state */
     void
     handle_conveyor_state_result(UA_Boolean _conveyor_state_received);
+
+    /* Receives the controller response to the sent 'proceeded to next tick notification' */
+    static void
+    receive_proceeded_to_next_tick_notification_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    /* Handles the controller reponse to the sent 'proceeded to next tick notification' */
+    void
+    handle_proceeded_to_next_tick_notification_result(UA_Boolean _proceeded_to_next_tick_notification_received);
 
     /* Places a finished order on a plate */
     static UA_StatusCode

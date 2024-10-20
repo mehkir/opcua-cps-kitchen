@@ -14,6 +14,7 @@
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
+#include "information_node_inserter.hpp"
 
 
 struct remote_robot {
@@ -202,6 +203,8 @@ private:
     std::thread controller_server_iterate_thread_;
     std::set<UA_UInt16> received_proceeded_to_next_tick_notifications_;
     method_node_inserter receive_proceeded_to_next_tick_notification_inserter_;
+    UA_Boolean place_remove_finished_order_notification_;
+    information_node_inserter place_remove_finished_order_notification_node_inserter_;
     /* robot related member variables */
     std::unordered_map<uint16_t, std::unique_ptr<remote_robot>> port_remote_robot_map_;
     std::set<UA_UInt16> received_robot_states_;
