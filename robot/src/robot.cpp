@@ -16,6 +16,14 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
     }
 
+    receive_task_inserter_.add_input_argument("activitiy id", "activity_id", UA_TYPES_UINT32);
+    receive_task_inserter_.add_input_argument("ingredient id", "ingredient_id", UA_TYPES_UINT32);
+    receive_task_inserter_.add_output_argument("task received", "task_received", UA_TYPES_BOOLEAN);
+    status = receive_task_inserter_.add_method_node(robot_server_, UA_NODEID_STRING(1, RECEIVE_TASK), "receive robot task", receive_task, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot task method node");
+    }
+
     /* Run the robot server */
     robot_server_iterate_thread_ = std::thread([this]() {
         while(running_) {
@@ -79,13 +87,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     receive_robot_state_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
     receive_robot_state_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
 
-    receive_task_inserter_.add_input_argument("activitiy id", "activity_id", UA_TYPES_UINT32);
-    receive_task_inserter_.add_input_argument("ingredient id", "ingredient_id", UA_TYPES_UINT32);
-    receive_task_inserter_.add_output_argument("task received", "task_received", UA_TYPES_BOOLEAN);
-    status = receive_task_inserter_.add_method_node(robot_server_, UA_NODEID_STRING(1, RECEIVE_TASK), "receive robot task", receive_task, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot task method node");
-    }
+    receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
 
     /* Setup conveyor client */
     client_connection_establisher conveyor_client_connection_establisher;
@@ -106,7 +108,6 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     }
 
     place_finished_order_caller_.add_input_argument(&finished_order_id_, UA_TYPES_UINT32);
-    receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
 }
 
 void

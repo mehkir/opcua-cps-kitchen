@@ -14,6 +14,20 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the conveyor server");
     }
 
+    receive_move_instruction_inserter_.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
+    receive_move_instruction_inserter_.add_output_argument("steps to move received", "steps_to_move_received", UA_TYPES_BOOLEAN);
+    status = receive_move_instruction_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), "receive move instruction", receive_move_instruction, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive move instruction method node");
+    }
+
+    place_finished_order_inserter_.add_input_argument("order identifier", "order_id", UA_TYPES_UINT32);
+    place_finished_order_inserter_.add_output_argument("order placed", "order_placed", UA_TYPES_BOOLEAN);
+    status = place_finished_order_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), "place finished order", place_finished_order, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the place finished order method node");
+    }
+
     /* Run the conveyor server */
     conveyor_server_iterate_thread_ = std::thread([this]() {
         while(running_) {
@@ -87,20 +101,6 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     receive_conveyor_state_caller_.add_input_argument(&plate_busy_state_, UA_TYPES_BOOLEAN);
     receive_conveyor_state_caller_.add_input_argument(&plate_current_tick_state_, UA_TYPES_UINT64);
     receive_conveyor_state_caller_.add_input_argument(&plate_adjacent_robot_position_, UA_TYPES_UINT16);
-
-    receive_move_instruction_inserter_.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
-    receive_move_instruction_inserter_.add_output_argument("steps to move received", "steps_to_move_received", UA_TYPES_BOOLEAN);
-    status = receive_move_instruction_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), "receive move instruction", receive_move_instruction, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive move instruction method node");
-    }
-
-    place_finished_order_inserter_.add_input_argument("order identifier", "order_id", UA_TYPES_UINT32);
-    place_finished_order_inserter_.add_output_argument("order placed", "order_placed", UA_TYPES_BOOLEAN);
-    status = place_finished_order_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), "place finished order", place_finished_order, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the place finished order method node");
-    }
 
     receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
 }
