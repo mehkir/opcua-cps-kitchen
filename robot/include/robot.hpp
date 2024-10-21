@@ -31,6 +31,7 @@ private:
     method_node_caller receive_robot_state_caller_;
     method_node_caller receive_proceeded_to_next_tick_notification_caller_;
     std::thread controller_client_iterate_thread_;
+    node_value_subscriber place_remove_finished_order_notification_subscriber_;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
     std::thread conveyor_client_iterate_thread_;

@@ -95,14 +95,13 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
                 }
             }
         });
+        receive_conveyor_state_caller_.add_input_argument(&plate_id_state_, UA_TYPES_UINT32);
+        receive_conveyor_state_caller_.add_input_argument(&plate_busy_state_, UA_TYPES_BOOLEAN);
+        receive_conveyor_state_caller_.add_input_argument(&plate_current_tick_state_, UA_TYPES_UINT64);
+        receive_conveyor_state_caller_.add_input_argument(&plate_adjacent_robot_position_, UA_TYPES_UINT16);
+
+        receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
     }
-
-    receive_conveyor_state_caller_.add_input_argument(&plate_id_state_, UA_TYPES_UINT32);
-    receive_conveyor_state_caller_.add_input_argument(&plate_busy_state_, UA_TYPES_BOOLEAN);
-    receive_conveyor_state_caller_.add_input_argument(&plate_current_tick_state_, UA_TYPES_UINT64);
-    receive_conveyor_state_caller_.add_input_argument(&plate_adjacent_robot_position_, UA_TYPES_UINT16);
-
-    receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
 }
 
 conveyor::~conveyor() {

@@ -103,9 +103,10 @@ private:
     method_node_caller receive_tick_ack_caller_;
     /* controller related member variables */
     UA_Client* controller_client_;
+    node_value_subscriber place_remove_finished_order_notification_subscriber_;
+    method_node_caller receive_proceeded_to_next_tick_notification_caller_;
     /* Sends the conveyor state to the controller */
     method_node_caller receive_conveyor_state_caller_;
-    method_node_caller receive_proceeded_to_next_tick_notification_caller_;
     std::thread controller_client_iterate_thread_;
     UA_UInt32 plate_id_state_;
     UA_Boolean plate_busy_state_;
