@@ -101,6 +101,11 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         receive_conveyor_state_caller_.add_input_argument(&plate_adjacent_robot_position_, UA_TYPES_UINT16);
 
         receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
+
+        status = place_remove_finished_order_notification_subscriber_.subscribe_node_value(controller_client_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), place_remove_finished_order_notification_callback, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the place remove finished order notification node");
+        }
     }
 }
 
@@ -125,7 +130,7 @@ conveyor::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscr
 
 void
 conveyor::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     current_clock_tick_ = _new_clock_tick;
     progress_new_tick(_new_clock_tick);
 }
@@ -342,6 +347,28 @@ conveyor::handle_proceeded_to_next_tick_notification_result(UA_Boolean _proceede
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s was successful", __FUNCTION__);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s failed", __FUNCTION__);
+    }
+}
+
+void
+conveyor::place_remove_finished_order_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
+                                                        UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_Boolean place_remove_finished_order = *(UA_Boolean *) _value->value.data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                    "Place remove finished oder result is: %d", place_remove_finished_order);
+
+        conveyor* self = static_cast<conveyor*>(_monitor_context);
+        self->handle_place_remove_finished_order_notification(place_remove_finished_order);
+    }
+}
+
+void
+conveyor::handle_place_remove_finished_order_notification(UA_Boolean _place_remove_finished_order) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (_place_remove_finished_order) {
+        //TODO: Remove finished order
     }
 }
 

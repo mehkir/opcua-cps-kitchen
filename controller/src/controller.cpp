@@ -310,7 +310,10 @@ controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Varia
     received_proceeded_to_next_tick_notifications_.insert(_port);
     if (received_proceeded_to_next_tick_notifications_.size() == (port_remote_robot_map_.size()+1)) {
         received_proceeded_to_next_tick_notifications_.clear();
-        //TODO: Call Place remove finished orders ... think about a notification filed like in tick clock?
+        place_remove_finished_order_notification_ = true;
+        UA_Variant place_remove_finished_order_variant;
+        UA_Variant_setScalar(&place_remove_finished_order_variant, &place_remove_finished_order_notification_, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Server_writeValue(controller_server_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), place_remove_finished_order_variant);
     }
 }
 

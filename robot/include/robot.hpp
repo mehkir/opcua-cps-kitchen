@@ -64,6 +64,13 @@ private:
     void
     handle_proceeded_to_next_tick_notification_result(UA_Boolean _proceeded_to_next_tick_notification_received);
 
+    static void
+    place_remove_finished_order_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
+                                                    UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value);
+
+    void
+    handle_place_remove_finished_order_notification(UA_Boolean _place_remove_finished_order);
+
     static UA_StatusCode
     receive_task(UA_Server *_server,
             const UA_NodeId *_session_id, void *_session_context,

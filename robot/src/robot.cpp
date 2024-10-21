@@ -64,6 +64,25 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
     }
 
+    /* Setup conveyor client */
+    client_connection_establisher conveyor_client_connection_establisher;
+    UA_SessionState conveyor_session_state = conveyor_client_connection_establisher.establish_connection(conveyor_client_, _conveyor_port);
+    if (conveyor_session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
+    }
+
+    if (conveyor_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        conveyor_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the conveyor client");
+                }
+            }
+        });
+        place_finished_order_caller_.add_input_argument(&finished_order_id_, UA_TYPES_UINT32);
+    }
+
     /* Setup controller client */
     client_connection_establisher controller_client_connection_establisher;
     UA_SessionState controller_session_state = controller_client_connection_establisher.establish_connection(controller_client_, _controller_port);
@@ -86,25 +105,11 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         receive_robot_state_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
 
         receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
-    }
 
-    /* Setup conveyor client */
-    client_connection_establisher conveyor_client_connection_establisher;
-    UA_SessionState conveyor_session_state = conveyor_client_connection_establisher.establish_connection(conveyor_client_, _conveyor_port);
-    if (conveyor_session_state != UA_SESSIONSTATE_ACTIVATED) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
-    }
-
-    if (conveyor_session_state == UA_SESSIONSTATE_ACTIVATED) {
-        conveyor_client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
-                UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 100);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the conveyor client");
-                }
-            }
-        });
-        place_finished_order_caller_.add_input_argument(&finished_order_id_, UA_TYPES_UINT32);
+        status = place_remove_finished_order_notification_subscriber_.subscribe_node_value(controller_client_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), place_remove_finished_order_notification_callback, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the place remove finished order notification node");
+        }
     }
 }
 
@@ -302,6 +307,28 @@ robot::handle_proceeded_to_next_tick_notification_result(UA_Boolean _proceeded_t
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s was successful", __FUNCTION__);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s failed", __FUNCTION__);
+    }
+}
+
+void
+robot::place_remove_finished_order_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
+                                                        UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_Boolean place_remove_finished_order = *(UA_Boolean *) _value->value.data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
+                    "Place remove finished oder result is: %d", place_remove_finished_order);
+
+        robot* self = static_cast<robot*>(_monitor_context);
+        self->handle_place_remove_finished_order_notification(place_remove_finished_order);
+    }
+}
+
+void
+robot::handle_place_remove_finished_order_notification(UA_Boolean _place_remove_finished_order) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (_place_remove_finished_order) {
+        //TODO: Place finished order
     }
 }
 
