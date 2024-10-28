@@ -8,7 +8,7 @@
 #include <string>
 #include "client_connection_establisher.hpp"
 
-robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port) : robot_server_(UA_Server_new()), robot_id_(_robot_id), robot_port_(_robot_port), clock_client_(UA_Client_new()), controller_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), conveyor_client_(UA_Client_new()), running_(true) {
+robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port) : robot_server_(UA_Server_new()), robot_id_(_robot_id), robot_port_(_robot_port), clock_client_(UA_Client_new()), controller_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), conveyor_client_(UA_Client_new()), running_(true), finished_order_id_(0) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* robot_server_config = UA_Server_getConfig(robot_server_);
     status = UA_ServerConfig_setMinimal(robot_server_config, robot_port_, NULL);
@@ -16,8 +16,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
     }
 
-    receive_task_inserter_.add_input_argument("activitiy id", "activity_id", UA_TYPES_UINT32);
-    receive_task_inserter_.add_input_argument("ingredient id", "ingredient_id", UA_TYPES_UINT32);
+    receive_task_inserter_.add_input_argument("recipe id", "recipe_id", UA_TYPES_UINT32);
     receive_task_inserter_.add_output_argument("task received", "task_received", UA_TYPES_BOOLEAN);
     status = receive_task_inserter_.add_method_node(robot_server_, UA_NODEID_STRING(1, RECEIVE_TASK), "receive robot task", receive_task, this);
     if(status != UA_STATUSCODE_GOOD) {
@@ -101,8 +100,6 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         });
         receive_robot_state_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
         receive_robot_state_caller_.add_input_argument(&busy_status_, UA_TYPES_BOOLEAN);
-        receive_robot_state_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
-        receive_robot_state_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
 
         receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
 
@@ -129,7 +126,7 @@ robot::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscript
 
 void
 robot::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     current_clock_tick_ = _new_clock_tick;
     progress_new_tick(_new_clock_tick);
 }
@@ -163,7 +160,12 @@ robot::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32 _r
 
 void
 robot::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_tick_ack_result) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s next tick transmission successful", __FUNCTION__);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s next tick transmission failed", __FUNCTION__);
+    }
 }
 
 void
@@ -195,9 +197,12 @@ robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32
 
 void
 robot::handle_robot_state_result(UA_Boolean _robot_state_received) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    if (!_robot_state_received)
-        return;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (_robot_state_received) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Controller received state successfully", __FUNCTION__);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Controller returned false", __FUNCTION__);
+    }
 }
 
 UA_StatusCode
@@ -226,7 +231,9 @@ robot::receive_task(UA_Server *_server,
 void
 robot::handle_receive_task(UA_UInt32 _recipe_id, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    next_clock_tick_++;
+    next_clock_tick_++; // TODO implement next clock tick according to next action, cache the action queue
+    busy_status_ = true;
+    finished_order_id_ = _recipe_id;
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
@@ -328,15 +335,28 @@ void
 robot::handle_place_remove_finished_order_notification(UA_Boolean _place_remove_finished_order) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_place_remove_finished_order) {
-        //TODO: Place finished order
+        // TODO check if recipe is done and then call place order
+        UA_StatusCode status = place_finished_order_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), place_finished_order_called, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the place finished order method node", __FUNCTION__);
+        }
+        busy_status_ = false;
+        finished_order_id_ = 0;
+        status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
+        }
     }
 }
 
 void
 robot::progress_new_tick(UA_UInt64 _new_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s with new tick %lu", __FUNCTION__, _new_tick);
-    receive_proceeded_to_next_tick_notification_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), receive_proceeded_to_next_tick_notification_called, this);
-    place_finished_order_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), place_finished_order_called, this);
+    // TODO implement proceeding using cached action queue
+    UA_StatusCode status = receive_proceeded_to_next_tick_notification_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), receive_proceeded_to_next_tick_notification_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive proceeded to next tick method node", __FUNCTION__);
+    }
 }
 
 robot::~robot() {
@@ -347,10 +367,9 @@ robot::~robot() {
 
 void
 robot::start() {
-    next_clock_tick_++; // TODO: Compute from task instruction
     UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
         running_ = false;
     }
 
