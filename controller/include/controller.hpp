@@ -264,7 +264,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt16 _adjacent_robot_position, UA_Variant* _output);
+    handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt16 _adjacent_robot_position, UA_Variant* _output);
 
     void    
     handle_all_conveyor_states_received();

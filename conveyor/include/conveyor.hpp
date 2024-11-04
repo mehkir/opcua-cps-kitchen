@@ -74,8 +74,8 @@ struct robot_position_mapping {
             return position_to_robot_port_[_position];
         }
 
-        plate* get_plate(UA_UInt32 _positon) {
-            return position_to_plate_[_positon];
+        plate* get_plate(UA_UInt32 _position) {
+            return position_to_plate_[_position];
         }
 
         plate* get_plate(UA_UInt16 _robot_port) {
@@ -105,12 +105,12 @@ private:
     UA_Client* controller_client_;
     node_value_subscriber place_remove_finished_order_notification_subscriber_;
     method_node_caller receive_proceeded_to_next_tick_notification_caller_;
+    UA_UInt32 steps_to_move_;
     /* Sends the conveyor state to the controller */
     method_node_caller receive_conveyor_state_caller_;
     std::thread controller_client_iterate_thread_;
     UA_UInt32 plate_id_state_;
     UA_Boolean plate_busy_state_;
-    UA_UInt64 plate_current_tick_state_;
     UA_UInt16 plate_adjacent_robot_position_;
 
     static void

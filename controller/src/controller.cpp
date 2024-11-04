@@ -193,13 +193,12 @@ controller::receive_conveyor_state(UA_Server* _server,
         size_t _output_size, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Extract input arguments */
-    if(_input_size != 4) {
+    if(_input_size != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
     }
     UA_UInt32 plate_id = *(UA_UInt32*)_input[0].data;
     UA_Boolean busy = *(UA_Boolean*)_input[1].data;
-    UA_UInt64 current_tick = *(UA_UInt64*)_input[2].data;
     UA_UInt16 adjacent_robot_position = *(UA_UInt16*)_input[3].data;
     /* Extract method context */
     if(_method_context == NULL) {
@@ -207,12 +206,12 @@ controller::receive_conveyor_state(UA_Server* _server,
         return UA_STATUSCODE_BAD;
     }
     controller* self = static_cast<controller*>(_method_context);
-    self->handle_conveyor_state(plate_id, busy, current_tick, adjacent_robot_position, _output);
+    self->handle_conveyor_state(plate_id, busy, adjacent_robot_position, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt16 _adjacent_robot_position, UA_Variant* _output) {
+controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt16 _adjacent_robot_position, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(remote_plates_.size() >= _plate_id) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Conveyor with plate id %d not found", _plate_id);
