@@ -14,6 +14,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     status = UA_ServerConfig_setMinimal(robot_server_config, robot_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
+        running_ = false;
     }
 
     receive_task_inserter_.add_input_argument("recipe id", "recipe_id", UA_TYPES_UINT32);
@@ -21,6 +22,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     status = receive_task_inserter_.add_method_node(robot_server_, UA_NODEID_STRING(1, RECEIVE_TASK), "receive robot task", receive_task, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot task method node");
+        running_ = false;
     }
 
     /* Run the robot server */
@@ -29,6 +31,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
             UA_StatusCode status = UA_Server_run_iterate(robot_server_, true);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the robot server");
+                running_ = false;
             }
         }
     });
@@ -38,6 +41,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     UA_SessionState clock_session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
     if (clock_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
+        running_ = false;
     }
 
     if (clock_session_state == UA_SESSIONSTATE_ACTIVATED) {
@@ -47,6 +51,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
                 UA_StatusCode status = UA_Client_run_iterate(clock_client_, 100);
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the clock client");
+                    running_ = false;
                 }
             }
         });
@@ -55,6 +60,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
+            running_ = false;
         }
 
         /* Add receive tick ack method caller to send next tick */
@@ -68,6 +74,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     UA_SessionState conveyor_session_state = conveyor_client_connection_establisher.establish_connection(conveyor_client_, _conveyor_port);
     if (conveyor_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
+        running_ = false;
     }
 
     if (conveyor_session_state == UA_SESSIONSTATE_ACTIVATED) {
@@ -76,6 +83,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
                 UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 100);
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the conveyor client");
+                    running_ = false;
                 }
             }
         });
@@ -87,6 +95,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     UA_SessionState controller_session_state = controller_client_connection_establisher.establish_connection(controller_client_, _controller_port);
     if (controller_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing controller client session");
+        running_ = false;
     }
 
     if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
@@ -95,6 +104,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
                 UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the controller client");
+                    running_ = false;
                 }
             }
         });
@@ -106,6 +116,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         status = place_remove_finished_order_notification_subscriber_.subscribe_node_value(controller_client_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), place_remove_finished_order_notification_callback, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the place remove finished order notification node");
+            running_ = false;
         }
     }
 }
@@ -237,11 +248,13 @@ robot::handle_receive_task(UA_UInt32 _recipe_id, UA_Variant* _output) {
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+        running_ = false;
     }
     UA_Boolean task_received = true;
     status = UA_Variant_setScalarCopy(_output, &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error returning receive task ack");
+        running_ = false;
     }
 }
 
@@ -277,6 +290,11 @@ robot::handle_place_finished_order_result(UA_Boolean _place_finished_order_succe
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (busy_status_ && _place_finished_order_successful) {
         busy_status_ = false;
+        finished_order_id_ = 0;
+    }
+    UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
     } 
 }
 
@@ -339,12 +357,7 @@ robot::handle_place_remove_finished_order_notification(UA_Boolean _place_remove_
         UA_StatusCode status = place_finished_order_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), place_finished_order_called, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the place finished order method node", __FUNCTION__);
-        }
-        busy_status_ = false;
-        finished_order_id_ = 0;
-        status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
+            running_ = false;
         }
     }
 }
@@ -373,10 +386,10 @@ robot::start() {
         running_ = false;
     }
 
-    clock_client_iterate_thread_.join();
-    controller_client_iterate_thread_.join();
-    robot_server_iterate_thread_.join();
+    controller_client_iterate_thread_.join();    
     conveyor_client_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
+    robot_server_iterate_thread_.join();
 }
 
 void
