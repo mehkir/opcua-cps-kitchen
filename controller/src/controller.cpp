@@ -109,19 +109,21 @@ controller::receive_robot_state(UA_Server* _server,
         size_t _input_size, const UA_Variant* _input,
         size_t _output_size, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_input_size != 2) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
+        return UA_STATUSCODE_BAD;
+    }
     /* Extract input arguments */
     UA_UInt16 port = *(UA_UInt16*)_input[0].data;
     UA_Boolean busy = *(UA_Boolean*)_input[1].data;
-    UA_UInt64 current_tick = *(UA_UInt64*)_input[2].data;
-    UA_UInt64 next_tick = *(UA_UInt64*)_input[3].data;
     /* Extract method context */
     controller* self = static_cast<controller*>(_method_context);
-    self->handle_robot_state(port, busy, current_tick, next_tick, _output);
+    self->handle_robot_state(port, busy, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output) {
+controller::handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if(port_remote_robot_map_.find(_port) == port_remote_robot_map_.end()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d not found", _port);
@@ -131,8 +133,6 @@ controller::handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _cur
     UA_Variant_setScalarCopy(_output, &robot_state_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     remote_robot& robot = port_remote_robot_map_[_port].operator*();
     robot.set_busy_status(_busy);
-    robot.set_current_tick(_current_tick);
-    robot.set_next_tick(_next_tick);
     received_robot_states_.insert(_port);
     if(received_robot_states_.size() == port_remote_robot_map_.size()) {
         received_robot_states_.clear();
@@ -145,7 +145,7 @@ controller::handle_all_robot_states_received() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     for(auto& port_robot_pair : port_remote_robot_map_) {
         remote_robot& robot = port_robot_pair.second.operator*();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d has current tick %lu and next tick %lu", robot.get_port(), robot.get_current_tick(), robot.get_next_tick());
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d has busy status %d", robot.get_port(), robot.is_busy());
         robot.instruct(robot.get_port(), receive_robot_task_called, this);
     }
 }
@@ -214,7 +214,7 @@ void
 controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt16 _adjacent_robot_position, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(remote_plates_.size() >= _plate_id) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Conveyor with plate id %d not found", _plate_id);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Invalid plate id %d", _plate_id);
         return;
     }
     UA_Boolean conveyor_state_received = true;
@@ -304,7 +304,7 @@ controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Varia
     UA_Boolean proceeded_to_next_tick_notification_received = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(_output, &proceeded_to_next_tick_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error setting ");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output", __FUNCTION__);
     }
     received_proceeded_to_next_tick_notifications_.insert(_port);
     if (received_proceeded_to_next_tick_notifications_.size() == (port_remote_robot_map_.size()+1)) {
@@ -375,8 +375,8 @@ controller::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
 
 void
 controller::start() {
-    controller_server_iterate_thread_.join();
     clock_client_iterate_thread_.join();
+    controller_server_iterate_thread_.join();
 }
 
 void

@@ -22,8 +22,6 @@ struct remote_robot {
         UA_Client* client_;
         UA_UInt16 port_;
         UA_Boolean busy_;
-        UA_UInt64 current_tick_;
-        UA_UInt64 next_tick_;
         bool running_;
         std::thread client_thread_;
         method_node_caller receive_robot_task_caller_;
@@ -56,28 +54,12 @@ struct remote_robot {
             busy_ = _busy_status;
         }
 
-        void set_current_tick(UA_UInt64 _current_tick) {
-            current_tick_ = _current_tick;
-        }
-
-        void set_next_tick(UA_UInt64 _next_tick) {
-            next_tick_ = _next_tick;
-        }
-
         UA_UInt16 get_port() {
             return port_;
         }
 
         UA_Boolean is_busy() const{
             return busy_;
-        }
-
-        UA_UInt64 get_current_tick() const{
-            return current_tick_;
-        }
-
-        UA_UInt64 get_next_tick() const{
-            return next_tick_;
         }
 
         void instruct(UA_UInt32 _recipe_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
@@ -244,7 +226,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_UInt64 _current_tick, UA_UInt64 _next_tick, UA_Variant* _output);
+    handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_Variant* _output);
 
     void
     handle_all_robot_states_received();
