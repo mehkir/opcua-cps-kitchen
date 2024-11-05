@@ -21,8 +21,7 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
 
     receive_conveyor_state_inserter_.add_input_argument("conveyor plate id", "plate_id", UA_TYPES_UINT32);
     receive_conveyor_state_inserter_.add_input_argument("conveyor plate busy status", "busy", UA_TYPES_BOOLEAN);
-    receive_conveyor_state_inserter_.add_input_argument("conveyor plate current tick", "current_tick", UA_TYPES_UINT64);
-    receive_conveyor_state_inserter_.add_input_argument("conveyor plate next tick", "next_tick", UA_TYPES_UINT64);
+    receive_conveyor_state_inserter_.add_input_argument("conveyor plate position", "plate_position", UA_TYPES_UINT16);
     receive_conveyor_state_inserter_.add_output_argument("conveyor plate state received", "conveyor_state_received", UA_TYPES_BOOLEAN);
     status = receive_conveyor_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), "receive conveyor state", receive_conveyor_state, this);
     if(status != UA_STATUSCODE_GOOD) {
