@@ -13,8 +13,6 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
 
     receive_robot_state_inserter_.add_input_argument("robot port", "port", UA_TYPES_UINT16);
     receive_robot_state_inserter_.add_input_argument("robot busy status", "busy", UA_TYPES_BOOLEAN);
-    receive_robot_state_inserter_.add_input_argument("robot current tick", "current_tick", UA_TYPES_UINT64);
-    receive_robot_state_inserter_.add_input_argument("robot next tick", "next_tick", UA_TYPES_UINT64);
     receive_robot_state_inserter_.add_output_argument("robot state received", "robot_state_received", UA_TYPES_BOOLEAN);
     status = receive_robot_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), "receive robot state", receive_robot_state, this);
     if(status != UA_STATUSCODE_GOOD) {
@@ -164,23 +162,24 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
         return;
     }
 
-    UA_Boolean controller_state_received;
+    UA_Boolean robot_task_sent;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        controller_state_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, controller_state_received);
+        robot_task_sent = *(UA_Boolean*)_response->results[0].outputArguments->data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Remote robot response for instruction: %d", __FUNCTION__, robot_task_sent);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;
     }
     
     controller* self = static_cast<controller*>(_userdata);
-    self->handle_receive_robot_task_called_result(controller_state_received);
+    self->handle_receive_robot_task_called_result(robot_task_sent);
 }
 
 void
-controller::handle_receive_robot_task_called_result(UA_Boolean _controller_state_received) {
+controller::handle_receive_robot_task_called_result(UA_Boolean _robot_task_sent) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    if (!_controller_state_received)
+    //TODO: Rethink if it is not more suitable to put robot as userdata
+    if (!_robot_task_sent)
         return;
 }
 
@@ -223,6 +222,7 @@ controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error setting ");
     }
     remote_plate& plate = remote_plates_[_plate_id];
+    plate.set_busy_state(_busy);
     plate.set_adjacent_robot_position(_adjacent_robot_position);
     received_conveyor_states_.insert(_plate_id);
     if(received_conveyor_states_.size() == remote_plates_.size()) {
@@ -257,7 +257,7 @@ controller::receive_conveyor_instruction_called(UA_Client* _client, void* _userd
     UA_Boolean conveyor_move_instruction_received;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         conveyor_move_instruction_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, conveyor_move_instruction_received);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Remote conveyor response for instruction: %d", __FUNCTION__, conveyor_move_instruction_received);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;

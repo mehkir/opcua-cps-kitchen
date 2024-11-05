@@ -175,7 +175,7 @@ private:
     handle_place_finished_order(UA_UInt16 _robot_port, UA_UInt32 _procesed_order_id, UA_Variant* _output);
 
     void
-    transmit_all_plate_states();
+    transmit_plate_state(plate _plate);
 
     void
     progress_new_tick(UA_UInt64 _new_tick);

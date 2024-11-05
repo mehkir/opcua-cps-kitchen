@@ -242,6 +242,7 @@ robot::receive_task(UA_Server *_server,
 void
 robot::handle_receive_task(UA_UInt32 _recipe_id, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: robot with port %d received recipe id %d", __FUNCTION__, robot_port_, _recipe_id);
     next_clock_tick_++; // TODO implement next clock tick according to next action, cache the action queue
     busy_status_ = true;
     finished_order_id_ = _recipe_id;
@@ -275,7 +276,7 @@ robot::place_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt3
     UA_Boolean place_finished_order_successful;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         place_finished_order_successful = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, place_finished_order_successful);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Plate occupation result is %d", __FUNCTION__, place_finished_order_successful);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;
@@ -315,7 +316,7 @@ robot::receive_proceeded_to_next_tick_notification_called(UA_Client* _client, vo
     UA_Boolean proceeded_to_next_tick_notification_received;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         proceeded_to_next_tick_notification_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, proceeded_to_next_tick_notification_received);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Reponse result is %d", __FUNCTION__, proceeded_to_next_tick_notification_received);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;

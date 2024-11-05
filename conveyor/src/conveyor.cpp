@@ -268,8 +268,8 @@ conveyor::handle_conveyor_state_result(UA_Boolean _conveyor_state_received) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s was successful", __FUNCTION__);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s failed", __FUNCTION__);
+        running_ = false;
     }
-        
 }
 
 UA_StatusCode
@@ -312,21 +312,20 @@ conveyor::handle_place_finished_order(UA_UInt16 _robot_port, UA_UInt32 _procesed
     UA_StatusCode status = UA_Variant_setScalarCopy(_output, &finished_order_placement_accepted, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error returning receive move instuction ack");
+        running_ = false;
     }
-
+    transmit_plate_state(*target_plate);
 }
 
 void
-conveyor::transmit_all_plate_states() {
-    for (plate p : plates_) {
-        plate_id_state_ = p.get_plate_id();
-        plate_busy_state_ = p.get_busy_state();
-        plate_adjacent_robot_position_ = p.get_adjacent_robot_position();
-        UA_StatusCode status = receive_conveyor_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), receive_conveyor_state_called, this);
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
-            running_ = false;
-        }
+conveyor::transmit_plate_state(plate _plate) {
+    plate_id_state_ = _plate.get_plate_id();
+    plate_busy_state_ = _plate.get_busy_state();
+    plate_adjacent_robot_position_ = _plate.get_adjacent_robot_position();
+    UA_StatusCode status = receive_conveyor_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), receive_conveyor_state_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
+        running_ = false;
     }
 }
 
@@ -347,7 +346,7 @@ conveyor::receive_proceeded_to_next_tick_notification_called(UA_Client* _client,
     UA_Boolean proceeded_to_next_tick_notification_received;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         proceeded_to_next_tick_notification_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, proceeded_to_next_tick_notification_received);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Response result is %d", __FUNCTION__, proceeded_to_next_tick_notification_received);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;
@@ -374,7 +373,7 @@ conveyor::place_remove_finished_order_notification_callback(UA_Client* _client, 
     if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_Boolean place_remove_finished_order = *(UA_Boolean *) _value->value.data;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                    "Place remove finished oder result is: %d", place_remove_finished_order);
+                    "Place remove finished order result is: %d", place_remove_finished_order);
 
         conveyor* self = static_cast<conveyor*>(_monitor_context);
         self->handle_place_remove_finished_order_notification(place_remove_finished_order);
@@ -388,6 +387,7 @@ conveyor::handle_place_remove_finished_order_notification(UA_Boolean _place_remo
         UA_UInt32 output_position = 0;
         plate* output_plate = robot_position_mapping_.get_plate(output_position);
         output_plate->set_busy_state(false);
+        transmit_plate_state(*output_plate);
         //TODO: add field to plate holding recipe id
     }
 }
@@ -404,7 +404,8 @@ conveyor::progress_new_tick(UA_UInt64 _new_tick) {
 
 void
 conveyor::start() {
-    transmit_all_plate_states();
+    for(plate p : plates_)
+        transmit_plate_state(p);
 
     controller_client_iterate_thread_.join();
     clock_client_iterate_thread_.join();

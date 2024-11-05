@@ -63,10 +63,12 @@ struct remote_robot {
         }
 
         void instruct(UA_UInt32 _recipe_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
             recipe_id_ = _recipe_id;
             UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_TASK), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+                running_ = false;
             }
         }
 };
@@ -139,6 +141,7 @@ struct remote_conveyor {
             UA_StatusCode status = receive_conveyor_move_instruction_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+                running_ = false;
             }
         }
 };
@@ -235,7 +238,7 @@ private:
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
     void
-    handle_receive_robot_task_called_result(UA_Boolean _controller_state_received);
+    handle_receive_robot_task_called_result(UA_Boolean _robot_task_sent);
 
     static UA_StatusCode
     receive_conveyor_state(UA_Server *_server,
