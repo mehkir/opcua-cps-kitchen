@@ -28,6 +28,12 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     }
 
     /* Run the robot server */
+    status = UA_Server_run_startup(robot_server_);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error at robot startup");
+        running_ = false;
+        return;
+    }
     try {
         robot_server_iterate_thread_ = std::thread([this]() {
             while(running_) {
@@ -385,6 +391,7 @@ robot::progress_new_tick(UA_UInt64 _new_tick) {
 }
 
 robot::~robot() {
+    UA_Server_run_shutdown(robot_server_);
     UA_Server_delete(robot_server_);
     UA_Client_delete(clock_client_);
     UA_Client_delete(controller_client_);

@@ -1,7 +1,6 @@
 #include "../include/controller.hpp"
 #include <open62541/server_config_default.h>
 #include <string>
-#include <unistd.h>
 
 controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), place_remove_finished_order_notification_(false) {
     /* Setup controller */
@@ -50,6 +49,12 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     }
     
     /* Run the controller server */
+    status = UA_Server_run_startup(controller_server_);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error at controller startup");
+        running_ = false;
+        return;
+    }
     try {
         controller_server_iterate_thread_ = std::thread([this]() {
             while(running_) {
@@ -76,6 +81,7 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
 }
 
 controller::~controller() {
+    UA_Server_run_shutdown(controller_server_);
     UA_Server_delete(controller_server_);
 }
 

@@ -33,6 +33,12 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     }
 
     /* Run the conveyor server */
+    status = UA_Server_run_startup(conveyor_server_);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error at conveyor startup");
+        running_ = false;
+        return;
+    }
     try {
         conveyor_server_iterate_thread_ = std::thread([this]() {
             while(running_) {
@@ -124,6 +130,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
 }
 
 conveyor::~conveyor() {
+    UA_Server_run_shutdown(conveyor_server_);
     UA_Server_delete(conveyor_server_);
     UA_Client_delete(clock_client_);
 }

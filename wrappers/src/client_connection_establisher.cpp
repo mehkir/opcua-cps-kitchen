@@ -28,7 +28,7 @@ UA_SessionState client_connection_establisher::establish_connection(UA_Client* _
         UA_Client_run_iterate(_client, 0);
         UA_Client_getState(_client, &secure_channel_state, &session_state, NULL);
         if (secure_channel_state == UA_SECURECHANNELSTATE_CLOSED) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Retrying to connect to the server");
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Retrying to connect to the server on port %d", _server_port);
             UA_Client_connectAsync(_client, server_endpoint.c_str());
             sleep_ms(1000);
             retry_counter++;
