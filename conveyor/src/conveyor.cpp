@@ -5,7 +5,7 @@
 #include <string>
 #include <memory>
 
-conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : conveyor_server_(UA_Server_new()), conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()), steps_to_move_(0) {
+conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : conveyor_server_(UA_Server_new()), conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()), steps_to_move_(0), controller_client_(UA_Client_new()) {
     UA_ServerConfig* conveyor_server_config = UA_Server_getConfig(conveyor_server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(conveyor_server_config, conveyor_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
@@ -129,7 +129,7 @@ conveyor::~conveyor() {
 void
 conveyor::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
                                         UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT64])) {
         UA_UInt64 new_clock_tick = *(UA_UInt64 *) _value->value.data;
         if (new_clock_tick == 0) {
