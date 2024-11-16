@@ -39,7 +39,7 @@ struct plate {
             return adjacent_robot_position_;
         }
 
-        UA_Boolean set_busy_state(UA_Boolean _busy) {
+        void set_busy_state(UA_Boolean _busy) {
             busy_ = _busy;
         }
 

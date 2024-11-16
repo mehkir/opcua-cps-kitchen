@@ -140,7 +140,7 @@ conveyor::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscr
 void
 conveyor::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: instructed steps to move=%d, actual steps to move=%d", __FUNCTION__, steps_to_move_, _new_clock_tick-current_clock_tick_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: instructed steps to move=%d, actual steps to move=%ld", __FUNCTION__, steps_to_move_, _new_clock_tick-current_clock_tick_);
     steps_to_move_ = _new_clock_tick-current_clock_tick_;
     current_clock_tick_ = _new_clock_tick;
     progress_new_tick(_new_clock_tick);

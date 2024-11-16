@@ -234,7 +234,7 @@ void
 controller::handle_all_conveyor_states_received() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for(auto& plate : remote_plates_) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %lu", plate.get_id(), plate.get_adjacent_robot_position());
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %u", plate.get_id(), plate.get_adjacent_robot_position());
     }
     remote_conveyor_->instruct(1, receive_conveyor_instruction_called, this);
 }
