@@ -33,15 +33,17 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     }
 
     /* Run the conveyor server */
-    conveyor_server_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_StatusCode status = UA_Server_run_iterate(conveyor_server_, true);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the conveyor server");
-                running_ = false;
+    try {
+        conveyor_server_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Server_run_iterate(conveyor_server_, true);
             }
-        }
-    });
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running conveyor");
+        running_ = false;
+        return;
+    }
 
     for (size_t i = 0; i < _robot_count; i++) {
         uint16_t remote_port = _robot_start_port + i;

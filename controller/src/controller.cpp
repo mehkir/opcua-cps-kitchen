@@ -1,6 +1,7 @@
 #include "../include/controller.hpp"
 #include <open62541/server_config_default.h>
 #include <string>
+#include <unistd.h>
 
 controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), place_remove_finished_order_notification_(false) {
     /* Setup controller */
@@ -49,15 +50,17 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     }
     
     /* Run the controller server */
-    controller_server_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_StatusCode status = UA_Server_run_iterate(controller_server_, true);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the controller server, status code: %d", status);
-                running_ = false;
+    try {
+        controller_server_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_Server_run_iterate(controller_server_, true);
             }
-        }
-    });
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running controller");
+        running_ = false;
+        return;
+    }
 
     /* Setup robot clients */
     for (size_t i = 0; i < _robot_count; i++) {

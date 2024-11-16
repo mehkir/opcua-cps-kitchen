@@ -28,15 +28,17 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     }
 
     /* Run the robot server */
-    robot_server_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_StatusCode status = UA_Server_run_iterate(robot_server_, true);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the robot server");
-                running_ = false;
+    try {
+        robot_server_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_Server_run_iterate(robot_server_, true);
             }
-        }
-    });
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running robot");
+        running_ = false;
+        return;
+    }
 
     /* Setup controller client */
     client_connection_establisher controller_client_connection_establisher;

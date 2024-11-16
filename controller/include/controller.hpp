@@ -33,13 +33,19 @@ struct remote_robot {
             UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
             if (session_state != UA_SESSIONSTATE_ACTIVATED) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing robot client session");
+                running_ = false;
+                return;
             }
 
             receive_robot_task_caller_.add_input_argument(&recipe_id_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
-                    UA_Client_run_iterate(client_, 100);
+                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
+                    if (status != UA_STATUSCODE_GOOD) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running robot client");
+                        running_ = false;
+                    }
                 }
             });
         }
@@ -91,13 +97,19 @@ struct remote_conveyor {
             UA_SessionState session_state = conveyor_client_connection_establisher.establish_connection(client_, port_);
             if (session_state != UA_SESSIONSTATE_ACTIVATED) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
+                running_ = false;
+                return;
             }
 
             receive_conveyor_move_instruction_caller_.add_input_argument(&steps_to_move_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
-                    UA_Client_run_iterate(client_, 100);
+                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
+                    if (status != UA_STATUSCODE_GOOD) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running conveyor client");
+                        running_ = false;
+                    }
                 }
             });
         }
