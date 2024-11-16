@@ -417,9 +417,9 @@ conveyor::start() {
     for(plate p : plates_)
         transmit_plate_state(p);
 
-    controller_client_iterate_thread_.join();
-    clock_client_iterate_thread_.join();
     conveyor_server_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
+    controller_client_iterate_thread_.join();
 }
 
 void

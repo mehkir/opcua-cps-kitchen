@@ -2,13 +2,14 @@
 #include <open62541/server_config_default.h>
 #include <string>
 
-controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0) {
-    UA_StatusCode status = UA_STATUSCODE_GOOD;
+controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), place_remove_finished_order_notification_(false) {
     /* Setup controller */
     UA_ServerConfig* controller_server_config = UA_Server_getConfig(controller_server_);
-    status = UA_ServerConfig_setMinimal(controller_server_config, controller_port_, NULL);
+    UA_StatusCode status = UA_ServerConfig_setMinimal(controller_server_config, controller_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the controller server");
+        running_ = false;
+        return;
     }
 
     receive_robot_state_inserter_.add_input_argument("robot port", "port", UA_TYPES_UINT16);
@@ -17,6 +18,8 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     status = receive_robot_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), "receive robot state", receive_robot_state, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot state method node");
+        running_ = false;
+        return;
     }
 
     receive_conveyor_state_inserter_.add_input_argument("conveyor plate id", "plate_id", UA_TYPES_UINT32);
@@ -26,17 +29,22 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     status = receive_conveyor_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), "receive conveyor state", receive_conveyor_state, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive conveyor state method node");
+        running_ = false;
+        return;
     }
 
     receive_proceeded_to_next_tick_notification_inserter_.add_input_argument("remote port", "remote_port", UA_TYPES_UINT16);
     status = receive_proceeded_to_next_tick_notification_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), "receive proceeded to next tick notification", receive_proceeded_to_next_tick_notification, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive proceeded to next tick notification");
+        running_ = false;
+        return;
     }
 
     status = place_remove_finished_order_notification_node_inserter_.add_information_node(controller_server_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), "place remove finished order notifier", UA_TYPES_BOOLEAN, &place_remove_finished_order_notification_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding place_remove_finished_order_notification information node");
+        running_ = false;
         return;
     }
     
@@ -46,6 +54,7 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
             UA_StatusCode status = UA_Server_run_iterate(controller_server_, true);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the controller server");
+                running_ = false;
             }
         }
     });
@@ -84,6 +93,8 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
         status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
+            running_ = false;
+            return;
         }
 
         /* Add receive tick ack method caller to send next tick */
@@ -369,13 +380,15 @@ controller::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt
 
 void
 controller::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
 }
 
 void
 controller::start() {
-    clock_client_iterate_thread_.join();
+    if (!running_)
+        return;
     controller_server_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
 }
 
 void

@@ -398,10 +398,10 @@ robot::start() {
         running_ = false;
     }
 
-    controller_client_iterate_thread_.join();    
-    conveyor_client_iterate_thread_.join();
-    clock_client_iterate_thread_.join();
     robot_server_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
+    conveyor_client_iterate_thread_.join();
+    controller_client_iterate_thread_.join();
 }
 
 void
