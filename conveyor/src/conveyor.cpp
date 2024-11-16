@@ -49,40 +49,6 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         robot_position_mapping_.add_position_to_robot_port_mapping(i+1, remote_port);
     }
 
-    /* Setup clock client */
-    client_connection_establisher clock_client_connection_establisher;
-    UA_SessionState clock_session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
-    if (clock_session_state != UA_SESSIONSTATE_ACTIVATED) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
-        running_ = false;
-        return;
-    }
-
-    if (clock_session_state == UA_SESSIONSTATE_ACTIVATED) {
-        /* Run the clock client */
-        clock_client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
-                UA_StatusCode status = UA_Client_run_iterate(clock_client_, 100);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the clock client");
-                    running_ = false;
-                }
-            }
-        });
-
-        /* Setup clock tick monitoring */
-        status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
-            running_ = false;
-        }
-
-        /* Add receive tick ack method caller to send next tick */
-        receive_tick_ack_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
-        receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
-        receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
-    }
-
     for (size_t i = 0; i < _robot_count+1; i++) {
         plates_.push_back(plate(i,i));
         robot_position_mapping_.add_position_to_plate_mapping(i, &plates_[i]);
@@ -118,6 +84,40 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the place remove finished order notification node");
             running_ = false;
         }
+    }
+
+    /* Setup clock client */
+    client_connection_establisher clock_client_connection_establisher;
+    UA_SessionState clock_session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
+    if (clock_session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
+        running_ = false;
+        return;
+    }
+
+    if (clock_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        /* Run the clock client */
+        clock_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(clock_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the clock client");
+                    running_ = false;
+                }
+            }
+        });
+
+        /* Setup clock tick monitoring */
+        status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
+            running_ = false;
+        }
+
+        /* Add receive tick ack method caller to send next tick */
+        receive_tick_ack_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
+        receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
+        receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
     }
 }
 
@@ -418,8 +418,8 @@ conveyor::start() {
         transmit_plate_state(p);
 
     conveyor_server_iterate_thread_.join();
-    clock_client_iterate_thread_.join();
     controller_client_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
 }
 
 void

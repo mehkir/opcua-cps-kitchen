@@ -38,6 +38,59 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         }
     });
 
+    /* Setup controller client */
+    client_connection_establisher controller_client_connection_establisher;
+    UA_SessionState controller_session_state = controller_client_connection_establisher.establish_connection(controller_client_, _controller_port);
+    if (controller_session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing controller client session");
+        running_ = false;
+        return;
+    }
+
+    if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        controller_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the controller client");
+                    running_ = false;
+                }
+            }
+        });
+        receive_robot_state_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
+        receive_robot_state_caller_.add_input_argument(&busy_status_, UA_TYPES_BOOLEAN);
+
+        receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
+
+        status = place_remove_finished_order_notification_subscriber_.subscribe_node_value(controller_client_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), place_remove_finished_order_notification_callback, this);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the place remove finished order notification node");
+            running_ = false;
+        }
+    }
+
+    /* Setup conveyor client */
+    client_connection_establisher conveyor_client_connection_establisher;
+    UA_SessionState conveyor_session_state = conveyor_client_connection_establisher.establish_connection(conveyor_client_, _conveyor_port);
+    if (conveyor_session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
+        running_ = false;
+        return;
+    }
+
+    if (conveyor_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        conveyor_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the conveyor client");
+                    running_ = false;
+                }
+            }
+        });
+        place_finished_order_caller_.add_input_argument(&finished_order_id_, UA_TYPES_UINT32);
+    }
+
     /* Setup clock client */
     client_connection_establisher clock_client_connection_establisher;
     UA_SessionState clock_session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
@@ -70,59 +123,6 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
         receive_tick_ack_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
         receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
         receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
-    }
-
-    /* Setup conveyor client */
-    client_connection_establisher conveyor_client_connection_establisher;
-    UA_SessionState conveyor_session_state = conveyor_client_connection_establisher.establish_connection(conveyor_client_, _conveyor_port);
-    if (conveyor_session_state != UA_SESSIONSTATE_ACTIVATED) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
-        running_ = false;
-        return;
-    }
-
-    if (conveyor_session_state == UA_SESSIONSTATE_ACTIVATED) {
-        conveyor_client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
-                UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 100);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the conveyor client");
-                    running_ = false;
-                }
-            }
-        });
-        place_finished_order_caller_.add_input_argument(&finished_order_id_, UA_TYPES_UINT32);
-    }
-
-    /* Setup controller client */
-    client_connection_establisher controller_client_connection_establisher;
-    UA_SessionState controller_session_state = controller_client_connection_establisher.establish_connection(controller_client_, _controller_port);
-    if (controller_session_state != UA_SESSIONSTATE_ACTIVATED) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing controller client session");
-        running_ = false;
-        return;
-    }
-
-    if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
-        controller_client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
-                UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the controller client");
-                    running_ = false;
-                }
-            }
-        });
-        receive_robot_state_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
-        receive_robot_state_caller_.add_input_argument(&busy_status_, UA_TYPES_BOOLEAN);
-
-        receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
-
-        status = place_remove_finished_order_notification_subscriber_.subscribe_node_value(controller_client_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), place_remove_finished_order_notification_callback, this);
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the place remove finished order notification node");
-            running_ = false;
-        }
     }
 }
 
@@ -399,9 +399,9 @@ robot::start() {
     }
 
     robot_server_iterate_thread_.join();
-    clock_client_iterate_thread_.join();
-    conveyor_client_iterate_thread_.join();
     controller_client_iterate_thread_.join();
+    conveyor_client_iterate_thread_.join();
+    clock_client_iterate_thread_.join();
 }
 
 void

@@ -251,7 +251,7 @@ private:
     void handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Variant* _output);
 
 public:
-    controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port);
+    controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port);
     ~controller();
 
     void
