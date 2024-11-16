@@ -15,6 +15,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
         running_ = false;
+        return;
     }
 
     receive_task_inserter_.add_input_argument("recipe id", "recipe_id", UA_TYPES_UINT32);
@@ -23,6 +24,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot task method node");
         running_ = false;
+        return;
     }
 
     /* Run the robot server */
@@ -42,6 +44,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     if (clock_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
         running_ = false;
+        return;
     }
 
     if (clock_session_state == UA_SESSIONSTATE_ACTIVATED) {
@@ -75,6 +78,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     if (conveyor_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing conveyor client session");
         running_ = false;
+        return;
     }
 
     if (conveyor_session_state == UA_SESSIONSTATE_ACTIVATED) {
@@ -96,6 +100,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     if (controller_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing controller client session");
         running_ = false;
+        return;
     }
 
     if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
@@ -124,9 +129,13 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
 void
 robot::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
                                         UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT64])) {
         UA_UInt64 new_clock_tick = *(UA_UInt64 *) _value->value.data;
+        if (new_clock_tick == 0) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Ignore initial zero notification", __FUNCTION__);
+            return;
+        }
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                     "New clock tick is: %lu", new_clock_tick);
 
@@ -381,6 +390,8 @@ robot::~robot() {
 
 void
 robot::start() {
+    if (!running_)
+        return;
     UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
