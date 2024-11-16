@@ -5,11 +5,9 @@
 #include <string>
 #include <memory>
 
-conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()), steps_to_move_(0) {
-    UA_StatusCode status = UA_STATUSCODE_GOOD;
-
+conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port) : conveyor_server_(UA_Server_new()), conveyor_port_(_conveyor_port), running_(true), current_clock_tick_(0), next_clock_tick_(0), clock_client_(UA_Client_new()), steps_to_move_(0) {
     UA_ServerConfig* conveyor_server_config = UA_Server_getConfig(conveyor_server_);
-    status = UA_ServerConfig_setMinimal(conveyor_server_config, conveyor_port_, NULL);
+    UA_StatusCode status = UA_ServerConfig_setMinimal(conveyor_server_config, conveyor_port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the conveyor server");
         running_ = false;
