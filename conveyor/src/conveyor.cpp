@@ -11,6 +11,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the conveyor server");
         running_ = false;
+        return;
     }
 
     receive_move_instruction_inserter_.add_input_argument("steps to move", "steps_to_move", UA_TYPES_UINT32);
@@ -19,6 +20,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive move instruction method node");
         running_ = false;
+        return;
     }
 
     place_finished_order_inserter_.add_input_argument("order identifier", "order_id", UA_TYPES_UINT32);
@@ -27,6 +29,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the place finished order method node");
         running_ = false;
+        return;
     }
 
     /* Run the conveyor server */
@@ -52,6 +55,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     if (clock_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
         running_ = false;
+        return;
     }
 
     if (clock_session_state == UA_SESSIONSTATE_ACTIVATED) {
@@ -90,6 +94,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     if (controller_session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing controller client session");
         running_ = false;
+        return;
     }
 
     if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
@@ -127,6 +132,10 @@ conveyor::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscr
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
     if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT64])) {
         UA_UInt64 new_clock_tick = *(UA_UInt64 *) _value->value.data;
+        if (new_clock_tick == 0) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Ignore initial zero notification", __FUNCTION__);
+            return;
+        }
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
                     "New clock tick is: %lu", new_clock_tick);
 
@@ -402,6 +411,9 @@ conveyor::progress_new_tick(UA_UInt64 _new_tick) {
 
 void
 conveyor::start() {
+    if (!running_)
+        return;
+
     for(plate p : plates_)
         transmit_plate_state(p);
 
