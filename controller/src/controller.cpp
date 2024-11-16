@@ -2,7 +2,7 @@
 #include <open62541/server_config_default.h>
 #include <string>
 
-controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), clock_client_(UA_Client_new()), current_clock_tick_(0), next_clock_tick_(0), place_remove_finished_order_notification_(false) {
+controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port, uint16_t _clock_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), place_remove_finished_order_notification_(false) {
     /* Setup controller */
     UA_ServerConfig* controller_server_config = UA_Server_getConfig(controller_server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(controller_server_config, controller_port_, NULL);
@@ -70,43 +70,10 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     for (size_t i = 0; i < _robot_count+1; i++) {
         remote_plates_.push_back(remote_plate(i));
     }
-    
-    /* Setup clock client */
-    client_connection_establisher clock_client_connection_establisher;
-    UA_SessionState session_state = clock_client_connection_establisher.establish_connection(clock_client_, _clock_port);
-    if (session_state != UA_SESSIONSTATE_ACTIVATED) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing clock client session");
-    }
-
-    if (session_state == UA_SESSIONSTATE_ACTIVATED) {
-        /* Run the clock client */
-        clock_client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
-                UA_StatusCode status = UA_Client_run_iterate(clock_client_, 100);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the clock client");
-                }
-            }
-        });
-
-        /* Setup clock tick monitoring */
-        status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the clock tick node");
-            running_ = false;
-            return;
-        }
-
-        /* Add receive tick ack method caller to send next tick */
-        receive_tick_ack_caller_.add_input_argument(&controller_port_, UA_TYPES_UINT16);
-        receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
-        receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
-    }
 }
 
 controller::~controller() {
     UA_Server_delete(controller_server_);
-    UA_Client_delete(clock_client_);
 }
 
 UA_StatusCode
@@ -327,68 +294,10 @@ controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Varia
 }
 
 void
-controller::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
-                                        UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    if(!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT64])) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad data type");
-            return;
-    }
-    UA_UInt64 new_clock_tick = *(UA_UInt64 *) _value->value.data;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                "New clock tick is: %lu", new_clock_tick);
-
-    if(_monitor_context == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Monitor context is NULL");
-        return;
-    }
-    controller* self = static_cast<controller*>(_monitor_context);
-    self->handle_clock_tick_notification(new_clock_tick);
-}
-
-void
-controller::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    current_clock_tick_ = _new_clock_tick;
-}
-
-void
-controller::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-
-    UA_StatusCode status_code = _response->responseHeader.serviceResult;
-    if(status_code != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
-        return;
-    }
-
-    UA_Boolean tick_ack_result;
-    if(!UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
-        return;
-    }
-    tick_ack_result = *(UA_Boolean*)_response->results[0].outputArguments->data;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, tick_ack_result);
-    
-    if(_userdata == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
-        return;
-    }
-    controller* self = static_cast<controller*>(_userdata);
-    self->handle_receive_tick_ack_result(tick_ack_result);
-}
-
-void
-controller::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-}
-
-void
 controller::start() {
     if (!running_)
         return;
     controller_server_iterate_thread_.join();
-    clock_client_iterate_thread_.join();
 }
 
 void

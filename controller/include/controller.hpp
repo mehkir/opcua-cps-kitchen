@@ -199,26 +199,6 @@ private:
     std::vector<remote_plate> remote_plates_;
     std::set<UA_UInt16> received_conveyor_states_;
     method_node_inserter receive_conveyor_state_inserter_;
-    /* clock related member variables */
-    UA_Client* clock_client_;
-    UA_Int64 current_clock_tick_;
-    UA_Int64 next_clock_tick_;
-    std::thread clock_client_iterate_thread_;
-    node_value_subscriber clock_tick_subscriber_;
-    method_node_caller receive_tick_ack_caller_;
-    
-
-    static void
-    clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
-                                    UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value);
-    void
-    handle_clock_tick_notification(UA_UInt64 _new_clock_tick);
-
-    static void
-    receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
-
-    void
-    handle_receive_tick_ack_result(UA_Boolean _tick_ack_result);
 
     static UA_StatusCode
     receive_robot_state(UA_Server* _server,
