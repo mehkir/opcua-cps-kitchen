@@ -391,10 +391,24 @@ robot::progress_new_tick(UA_UInt64 _new_tick) {
 }
 
 robot::~robot() {
+    running_ = false;
+    join_threads();
     UA_Server_run_shutdown(robot_server_);
     UA_Server_delete(robot_server_);
     UA_Client_delete(clock_client_);
     UA_Client_delete(controller_client_);
+}
+
+void
+robot::join_threads() {
+    if (robot_server_iterate_thread_.joinable())
+        robot_server_iterate_thread_.join();
+    if (controller_client_iterate_thread_.joinable())
+        controller_client_iterate_thread_.join();
+    if (conveyor_client_iterate_thread_.joinable())
+        conveyor_client_iterate_thread_.join();
+    if (clock_client_iterate_thread_.joinable())
+        clock_client_iterate_thread_.join();
 }
 
 void
@@ -406,11 +420,7 @@ robot::start() {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
         running_ = false;
     }
-
-    robot_server_iterate_thread_.join();
-    controller_client_iterate_thread_.join();
-    conveyor_client_iterate_thread_.join();
-    clock_client_iterate_thread_.join();
+    join_threads();
 }
 
 void

@@ -180,6 +180,9 @@ private:
     void
     progress_new_tick(UA_UInt64 _new_tick);
 
+    void
+    join_threads();
+
 public:
     conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UInt32 _robot_count, UA_UInt16 _clock_port, UA_UInt16 _controller_port);
     ~conveyor();

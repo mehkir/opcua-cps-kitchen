@@ -81,6 +81,8 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
 }
 
 controller::~controller() {
+    running_ = false;
+    join_threads();
     UA_Server_run_shutdown(controller_server_);
     UA_Server_delete(controller_server_);
 }
@@ -303,10 +305,16 @@ controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Varia
 }
 
 void
+controller::join_threads() {
+    if (controller_server_iterate_thread_.joinable())
+        controller_server_iterate_thread_.join();
+}
+
+void
 controller::start() {
     if (!running_)
         return;
-    controller_server_iterate_thread_.join();
+    join_threads();
 }
 
 void

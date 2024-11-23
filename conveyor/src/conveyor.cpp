@@ -130,6 +130,8 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
 }
 
 conveyor::~conveyor() {
+    running_ = false;
+    join_threads();
     UA_Server_run_shutdown(conveyor_server_);
     UA_Server_delete(conveyor_server_);
     UA_Client_delete(clock_client_);
@@ -419,16 +421,24 @@ conveyor::progress_new_tick(UA_UInt64 _new_tick) {
 }
 
 void
+conveyor::join_threads() {
+    if (conveyor_server_iterate_thread_.joinable())
+        conveyor_server_iterate_thread_.join();
+    if (controller_client_iterate_thread_.joinable())
+        controller_client_iterate_thread_.join();
+    if (clock_client_iterate_thread_.joinable())
+        clock_client_iterate_thread_.join();
+}
+
+void
 conveyor::start() {
     if (!running_)
         return;
 
     for(plate p : plates_)
         transmit_plate_state(p);
-
-    conveyor_server_iterate_thread_.join();
-    controller_client_iterate_thread_.join();
-    clock_client_iterate_thread_.join();
+    
+    join_threads();
 }
 
 void

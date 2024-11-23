@@ -91,6 +91,9 @@ private:
     void
     progress_new_tick(UA_UInt64 _new_tick);
 
+    void
+    join_threads();
+
 public:
     robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port);
     ~robot();

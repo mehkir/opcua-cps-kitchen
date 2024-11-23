@@ -52,7 +52,8 @@ struct remote_robot {
 
         ~remote_robot() {
             running_ = false;
-            client_thread_.join();
+            if (client_thread_.joinable())
+                client_thread_.join();
             UA_Client_delete(client_);
         }
 
@@ -116,7 +117,8 @@ struct remote_conveyor {
 
         ~remote_conveyor() {
             running_ = false;
-            client_thread_.join();
+            if (client_thread_.joinable())
+                client_thread_.join();
             UA_Client_delete(client_);
         }
 
@@ -261,6 +263,9 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Variant* _output);
+
+    void
+    join_threads();
 
 public:
     controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port);
