@@ -3,7 +3,7 @@
 #include <open62541/plugin/log_stdout.h>
 #include <open62541/server_config_default.h>
 
-tick_clock::tick_clock(UA_UInt16 _clock_port, UA_UInt32 _clock_client_count) : clock_server_(UA_Server_new()), clock_port_(_clock_port), clock_tick_(0), next_clock_tick_(0), clock_client_count_(_clock_client_count) {
+tick_clock::tick_clock(UA_UInt16 _clock_port, UA_UInt32 _clock_client_count) : clock_server_(UA_Server_new()), clock_port_(_clock_port), clock_tick_(0), next_clock_tick_(0), clock_client_count_(_clock_client_count), running_(true) {
     UA_ServerConfig* clock_server_config = UA_Server_getConfig(clock_server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(clock_server_config, _clock_port, NULL);
     if(status != UA_STATUSCODE_GOOD) {
