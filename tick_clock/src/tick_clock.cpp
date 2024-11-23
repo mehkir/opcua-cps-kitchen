@@ -29,6 +29,7 @@ tick_clock::tick_clock(UA_UInt16 _clock_port, UA_UInt32 _clock_client_count) : c
 }
 
 tick_clock::~tick_clock() {
+    running_ = false;
     UA_Server_delete(clock_server_);
 }
 
@@ -89,6 +90,7 @@ void tick_clock::start() {
     UA_StatusCode status = UA_Server_run(clock_server_, &running_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error starting the server");
+        running_ = false;
     }
 }
 
