@@ -47,7 +47,13 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
         running_ = false;
         return;
     }
-    
+
+    /* Setup conveyor client */
+    remote_conveyor_ = std::make_unique<remote_conveyor>(_remote_conveyor_port);
+    for (size_t i = 0; i < _robot_count+1; i++) {
+        remote_plates_.push_back(remote_plate(i));
+    }
+
     /* Run the controller server */
     status = UA_Server_run_startup(controller_server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -71,12 +77,6 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     for (size_t i = 0; i < _robot_count; i++) {
         uint16_t remote_port = _robot_start_port + i;
         port_remote_robot_map_[remote_port] = std::make_unique<remote_robot>(remote_port);
-    }
-
-    /* Setup conveyor client */
-    remote_conveyor_ = std::make_unique<remote_conveyor>(_remote_conveyor_port);
-    for (size_t i = 0; i < _robot_count+1; i++) {
-        remote_plates_.push_back(remote_plate(i));
     }
 }
 
@@ -203,13 +203,13 @@ void
 controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt16 _adjacent_robot_position, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_plate_id >= remote_plates_.size()) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Invalid plate id %d", _plate_id);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Invalid plate id %d. Remote plates count is %d", __FUNCTION__, _plate_id, remote_plates_.size());
         return;
     }
     UA_Boolean conveyor_state_received = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(_output, &conveyor_state_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error setting ");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output", __FUNCTION__);
     }
     remote_plate& plate = remote_plates_[_plate_id];
     plate.set_busy_state(_busy);
