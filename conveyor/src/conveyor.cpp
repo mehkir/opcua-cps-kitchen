@@ -72,15 +72,6 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     }
 
     if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
-        controller_client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
-                UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the controller client");
-                    running_ = false;
-                }
-            }
-        });
         receive_conveyor_state_caller_.add_input_argument(&plate_id_state_, UA_TYPES_UINT32);
         receive_conveyor_state_caller_.add_input_argument(&plate_busy_state_, UA_TYPES_BOOLEAN);
         receive_conveyor_state_caller_.add_input_argument(&plate_adjacent_robot_position_, UA_TYPES_UINT16);
@@ -92,6 +83,16 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to the place remove finished order notification node");
             running_ = false;
         }
+
+        controller_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the controller client");
+                    running_ = false;
+                }
+            }
+        });
     }
 
     /* Setup clock client */
@@ -104,17 +105,6 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     }
 
     if (clock_session_state == UA_SESSIONSTATE_ACTIVATED) {
-        /* Run the clock client */
-        clock_client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
-                UA_StatusCode status = UA_Client_run_iterate(clock_client_, 100);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the clock client");
-                    running_ = false;
-                }
-            }
-        });
-
         /* Setup clock tick monitoring */
         status = clock_tick_subscriber_.subscribe_node_value(clock_client_, UA_NODEID_STRING(1, CLOCK_TICK), clock_tick_notification_callback, this);
         if(status != UA_STATUSCODE_GOOD) {
@@ -126,6 +116,17 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         receive_tick_ack_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
         receive_tick_ack_caller_.add_input_argument(&current_clock_tick_, UA_TYPES_UINT64);
         receive_tick_ack_caller_.add_input_argument(&next_clock_tick_, UA_TYPES_UINT64);
+
+        /* Run the clock client */
+        clock_client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = UA_Client_run_iterate(clock_client_, 100);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running the clock client");
+                    running_ = false;
+                }
+            }
+        });
     }
 }
 

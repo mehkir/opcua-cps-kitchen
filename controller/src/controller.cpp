@@ -184,6 +184,7 @@ controller::receive_conveyor_state(UA_Server* _server,
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
     }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Extract arguments", __FUNCTION__);
     UA_UInt32 plate_id = *(UA_UInt32*)_input[0].data;
     UA_Boolean busy = *(UA_Boolean*)_input[1].data;
     UA_UInt16 adjacent_robot_position = *(UA_UInt16*)_input[3].data;
@@ -192,7 +193,9 @@ controller::receive_conveyor_state(UA_Server* _server,
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: casting method context", __FUNCTION__);
     controller* self = static_cast<controller*>(_method_context);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: casted method context", __FUNCTION__);
     self->handle_conveyor_state(plate_id, busy, adjacent_robot_position, _output);
     return UA_STATUSCODE_GOOD;
 }
