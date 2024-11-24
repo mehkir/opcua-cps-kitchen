@@ -117,6 +117,6 @@ int main(int argc, char* argv[]) {
     }
 
     /* Clean up */
-    status = UA_Server_delete(server);
+    UA_Server_delete(server);
     return status == UA_STATUSCODE_GOOD ? EXIT_SUCCESS : EXIT_FAILURE;
 }
