@@ -9,6 +9,7 @@ add_subdirectory(tick_clock)
 add_subdirectory(demos)
 add_subdirectory(controller)
 add_subdirectory(conveyor)
+add_subdirectory(test_apps)
 
 add_executable(start_robot_instance start_robot_instance.cpp)
 target_link_libraries(start_robot_instance PUBLIC wrappers_lib robot_lib open62541)

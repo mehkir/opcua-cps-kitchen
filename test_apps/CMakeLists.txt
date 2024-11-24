@@ -1,0 +1,3 @@
+add_executable(tick_clock_client tick_clock_client.cpp)
+target_link_libraries(tick_clock_client PUBLIC open62541 wrappers_lib)
+target_include_directories(tick_clock_client PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
