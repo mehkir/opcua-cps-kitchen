@@ -54,6 +54,12 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
         remote_plates_.push_back(remote_plate(i));
     }
 
+    /* Setup robot clients */
+    for (size_t i = 0; i < _robot_count; i++) {
+        uint16_t remote_port = _robot_start_port + i;
+        port_remote_robot_map_[remote_port] = std::make_unique<remote_robot>(remote_port);
+    }
+
     /* Run the controller server */
     status = UA_Server_run_startup(controller_server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -71,12 +77,6 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running controller");
         running_ = false;
         return;
-    }
-
-    /* Setup robot clients */
-    for (size_t i = 0; i < _robot_count; i++) {
-        uint16_t remote_port = _robot_start_port + i;
-        port_remote_robot_map_[remote_port] = std::make_unique<remote_robot>(remote_port);
     }
 }
 
@@ -290,7 +290,7 @@ controller::receive_proceeded_to_next_tick_notification(UA_Server *_server,
 
 void
 controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_Boolean proceeded_to_next_tick_notification_received = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(_output, &proceeded_to_next_tick_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if (status != UA_STATUSCODE_GOOD) {
