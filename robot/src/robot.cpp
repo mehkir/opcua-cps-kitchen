@@ -88,6 +88,7 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
     }
 
     if (conveyor_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        place_finished_order_caller_.add_input_argument(&robot_port_, UA_TYPES_UINT16);
         place_finished_order_caller_.add_input_argument(&finished_order_id_, UA_TYPES_UINT32);
 
         conveyor_client_iterate_thread_ = std::thread([this]() {
