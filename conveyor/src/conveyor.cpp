@@ -23,6 +23,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
         return;
     }
 
+    place_finished_order_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
     place_finished_order_inserter_.add_input_argument("order identifier", "order_id", UA_TYPES_UINT32);
     place_finished_order_inserter_.add_output_argument("order placed", "order_placed", UA_TYPES_BOOLEAN);
     status = place_finished_order_inserter_.add_method_node(conveyor_server_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), "place finished order", place_finished_order, this);
@@ -74,7 +75,7 @@ conveyor::conveyor(UA_UInt16 _conveyor_port, UA_UInt16 _robot_start_port, UA_UIn
     if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
         receive_conveyor_state_caller_.add_input_argument(&plate_id_state_, UA_TYPES_UINT32);
         receive_conveyor_state_caller_.add_input_argument(&plate_busy_state_, UA_TYPES_BOOLEAN);
-        receive_conveyor_state_caller_.add_input_argument(&plate_adjacent_robot_position_, UA_TYPES_UINT16);
+        receive_conveyor_state_caller_.add_input_argument(&plate_adjacent_robot_position_, UA_TYPES_UINT32);
 
         receive_proceeded_to_next_tick_notification_caller_.add_input_argument(&conveyor_port_, UA_TYPES_UINT16);
 
@@ -324,6 +325,7 @@ conveyor::handle_place_finished_order(UA_UInt16 _robot_port, UA_UInt32 _procesed
     UA_Boolean finished_order_placement_accepted = !target_plate->get_busy_state();
     if (finished_order_placement_accepted) {
         target_plate->set_busy_state(true);
+        target_plate->place_order_id(_procesed_order_id);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s for plate id %d was successful", __FUNCTION__, target_plate->get_plate_id());
     } else {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s for plate id %d has failed, plate is busy", __FUNCTION__, target_plate->get_plate_id());
@@ -406,6 +408,7 @@ conveyor::handle_place_remove_finished_order_notification(UA_Boolean _place_remo
         UA_UInt32 output_position = 0;
         plate* output_plate = robot_position_mapping_.get_plate(output_position);
         output_plate->set_busy_state(false);
+        output_plate->place_order_id(0);
         transmit_plate_state(*output_plate);
         //TODO: add field to plate holding recipe id
     }

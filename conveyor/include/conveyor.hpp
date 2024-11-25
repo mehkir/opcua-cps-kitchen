@@ -18,10 +18,11 @@
 struct plate {
     private:
         const UA_UInt32 plate_id_;
-        UA_UInt16 adjacent_robot_position_;
+        UA_UInt32 adjacent_robot_position_;
+        UA_UInt32 placed_order_id_;
         UA_Boolean busy_;
     public:
-        plate(uint32_t _plate_id, uint32_t _adjacent_robot_position) : plate_id_(_plate_id), adjacent_robot_position_(_adjacent_robot_position), busy_(false) {
+        plate(UA_UInt32 _plate_id, UA_UInt32 _adjacent_robot_position) : plate_id_(_plate_id), adjacent_robot_position_(_adjacent_robot_position), placed_order_id_(0), busy_(false) {
         }
 
         ~plate() {
@@ -31,12 +32,16 @@ struct plate {
             return plate_id_;
         }
 
-        void set_adjacent_robot_position(UA_UInt16 _adjacent_robot_position) {
+        void set_adjacent_robot_position(UA_UInt32 _adjacent_robot_position) {
             adjacent_robot_position_ = _adjacent_robot_position;
         }
 
-        UA_UInt16 get_adjacent_robot_position() {
+        UA_UInt32 get_adjacent_robot_position() {
             return adjacent_robot_position_;
+        }
+
+        void place_order_id(UA_UInt32 _placed_order_id) {
+            placed_order_id_ = _placed_order_id;
         }
 
         void set_busy_state(UA_Boolean _busy) {
@@ -111,7 +116,7 @@ private:
     std::thread controller_client_iterate_thread_;
     UA_UInt32 plate_id_state_;
     UA_Boolean plate_busy_state_;
-    UA_UInt16 plate_adjacent_robot_position_;
+    UA_UInt32 plate_adjacent_robot_position_;
 
     static void
     clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
