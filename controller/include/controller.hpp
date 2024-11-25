@@ -70,7 +70,7 @@ struct remote_robot {
         }
 
         void instruct(UA_UInt32 _recipe_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             recipe_id_ = _recipe_id;
             UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_TASK), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
@@ -151,6 +151,7 @@ struct remote_conveyor {
         }
 
         void instruct(UA_UInt32 _steps_to_move, UA_ClientAsyncCallCallback _callback, void* _userdata) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote conveyor %s called on port", __FUNCTION__, port_);
             steps_to_move_ = _steps_to_move;
             UA_StatusCode status = receive_conveyor_move_instruction_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
@@ -163,7 +164,7 @@ struct remote_conveyor {
 struct remote_plate {
     private:
         const UA_UInt32 id_;
-        UA_UInt16 adjacent_robot_position_;
+        UA_UInt32 adjacent_robot_position_;
         UA_Boolean busy_;
     public:
         remote_plate(uint32_t _id) : id_(_id) {
@@ -176,15 +177,15 @@ struct remote_plate {
             return id_;
         }
 
-        void set_adjacent_robot_position(UA_UInt16 _adjacent_robot_position) {
+        void set_adjacent_robot_position(UA_UInt32 _adjacent_robot_position) {
             adjacent_robot_position_ = _adjacent_robot_position;
         }
 
-        UA_UInt16 get_adjacent_robot_position() {
+        UA_UInt32 get_adjacent_robot_position() {
             return adjacent_robot_position_;
         }
 
-        UA_Boolean set_busy_state(UA_Boolean _busy) {
+        void set_busy_state(UA_Boolean _busy) {
             busy_ = _busy;
         }
 
@@ -243,7 +244,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt16 _adjacent_robot_position, UA_Variant* _output);
+    handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt32 _adjacent_robot_position, UA_Variant* _output);
 
     void    
     handle_all_conveyor_states_received();

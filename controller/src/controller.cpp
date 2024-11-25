@@ -24,7 +24,7 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
 
     receive_conveyor_state_inserter_.add_input_argument("conveyor plate id", "plate_id", UA_TYPES_UINT32);
     receive_conveyor_state_inserter_.add_input_argument("conveyor plate busy status", "busy", UA_TYPES_BOOLEAN);
-    receive_conveyor_state_inserter_.add_input_argument("conveyor plate position", "plate_position", UA_TYPES_UINT16);
+    receive_conveyor_state_inserter_.add_input_argument("conveyor plate position", "plate_position", UA_TYPES_UINT32);
     receive_conveyor_state_inserter_.add_output_argument("conveyor plate state received", "conveyor_state_received", UA_TYPES_BOOLEAN);
     status = receive_conveyor_state_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_CONVEYOR_STATE), "receive conveyor state", receive_conveyor_state, this);
     if(status != UA_STATUSCODE_GOOD) {
@@ -34,6 +34,7 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
     }
 
     receive_proceeded_to_next_tick_notification_inserter_.add_input_argument("remote port", "remote_port", UA_TYPES_UINT16);
+    receive_proceeded_to_next_tick_notification_inserter_.add_output_argument("proceeded to next tick notification received", "proceeded_to_next_tick_notification_received", UA_TYPES_BOOLEAN);
     status = receive_proceeded_to_next_tick_notification_inserter_.add_method_node(controller_server_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), "receive proceeded to next tick notification", receive_proceeded_to_next_tick_notification, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive proceeded to next tick notification");
@@ -187,7 +188,7 @@ controller::receive_conveyor_state(UA_Server* _server,
 
     UA_UInt32 plate_id = *(UA_UInt32*)_input[0].data;
     UA_Boolean busy = *(UA_Boolean*)_input[1].data;
-    UA_UInt16 adjacent_robot_position = *(UA_UInt16*)_input[2].data;
+    UA_UInt32 adjacent_robot_position = *(UA_UInt32*)_input[2].data;
     /* Extract method context */
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
@@ -200,10 +201,10 @@ controller::receive_conveyor_state(UA_Server* _server,
 }
 
 void
-controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt16 _adjacent_robot_position, UA_Variant* _output) {
+controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt32 _adjacent_robot_position, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_plate_id >= remote_plates_.size()) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Invalid plate id %d. Remote plates count is %d", __FUNCTION__, _plate_id, remote_plates_.size());
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Invalid plate id %d. Remote plates count is %ld", __FUNCTION__, _plate_id, remote_plates_.size());
         return;
     }
     UA_Boolean conveyor_state_received = true;
@@ -225,7 +226,7 @@ void
 controller::handle_all_conveyor_states_received() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for(auto& plate : remote_plates_) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %u", plate.get_id(), plate.get_adjacent_robot_position());
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %d", plate.get_id(), plate.get_adjacent_robot_position());
     }
     remote_conveyor_->instruct(1, receive_conveyor_instruction_called, this);
 }
@@ -278,11 +279,13 @@ controller::receive_proceeded_to_next_tick_notification(UA_Server *_server,
         return UA_STATUSCODE_BAD;
     }
     UA_UInt16 remote_port = *(UA_UInt16*)_input[0].data;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: received notification from port %d", __FUNCTION__, remote_port);
     /* Extract method context */
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
+
     controller* self = static_cast<controller*>(_method_context);
     self->handle_proceeded_to_next_tick_notification(remote_port, _output);
     return UA_STATUSCODE_GOOD;
