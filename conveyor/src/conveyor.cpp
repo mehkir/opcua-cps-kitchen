@@ -405,6 +405,8 @@ conveyor::handle_place_remove_finished_order_notification(UA_Boolean _place_remo
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_UInt32 output_position = 0;
     plate* output_plate = robot_position_mapping_.get_plate(output_position);
+    if (!_place_remove_finished_order)
+        return;
     // Sanity check
     if ((output_plate->get_busy_state() && output_plate->get_placed_order_id() == 0)
         || (!output_plate->get_busy_state() && output_plate->get_placed_order_id())) {
@@ -412,12 +414,12 @@ conveyor::handle_place_remove_finished_order_notification(UA_Boolean _place_remo
         running_ = false;
         return;
     }
-    if (_place_remove_finished_order && output_plate->get_busy_state() && output_plate->get_placed_order_id()) {
+    if (output_plate->get_busy_state() && output_plate->get_placed_order_id()) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PLACE: Removed finished recipe_id=%d successfully", output_plate->get_placed_order_id());
         output_plate->set_busy_state(false);
         output_plate->place_order_id(0);
-        transmit_plate_state(*output_plate);
     }
+    transmit_plate_state(*output_plate);
 }
 
 void
