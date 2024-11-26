@@ -44,6 +44,10 @@ struct plate {
             placed_order_id_ = _placed_order_id;
         }
 
+        UA_UInt32 get_placed_order_id() {
+            return placed_order_id_;
+        }
+
         void set_busy_state(UA_Boolean _busy) {
             busy_ = _busy;
         }

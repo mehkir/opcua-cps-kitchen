@@ -140,15 +140,14 @@ robot::robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _clock_port, 
 void
 robot::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
                                         UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT64])) {
         UA_UInt64 new_clock_tick = *(UA_UInt64 *) _value->value.data;
         if (new_clock_tick == 0) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Ignore initial zero notification", __FUNCTION__);
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Ignore initial zero notification", __FUNCTION__);
             return;
         }
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                    "New clock tick is: %lu", new_clock_tick);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "TICKS: New clock tick is: %lu", new_clock_tick);
 
         robot* self = static_cast<robot*>(_monitor_context);
         self->handle_clock_tick_notification(new_clock_tick);
@@ -157,14 +156,14 @@ robot::clock_tick_notification_callback(UA_Client* _client, UA_UInt32 _subscript
 
 void
 robot::handle_clock_tick_notification(UA_UInt64 _new_clock_tick) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     current_clock_tick_ = _new_clock_tick;
     progress_new_tick(_new_clock_tick);
 }
 
 void
 robot::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
         return;
@@ -179,7 +178,6 @@ robot::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32 _r
     UA_Boolean tick_ack_result;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         tick_ack_result = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, tick_ack_result);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;
@@ -191,17 +189,17 @@ robot::receive_tick_ack_called(UA_Client* _client, void* _userdata, UA_UInt32 _r
 
 void
 robot::handle_receive_tick_ack_result(UA_Boolean _tick_ack_result) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_tick_ack_result) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s next tick transmission successful", __FUNCTION__);
+        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s next tick transmission successful", __FUNCTION__);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s next tick transmission failed", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Next tick transmission failed", __FUNCTION__);
     }
 }
 
 void
 robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
         return;
@@ -216,7 +214,7 @@ robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32
     UA_Boolean robot_state_received;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         robot_state_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, robot_state_received);
+        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, robot_state_received);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;
@@ -228,9 +226,9 @@ robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32
 
 void
 robot::handle_robot_state_result(UA_Boolean _robot_state_received) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_robot_state_received) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Controller received state successfully", __FUNCTION__);
+        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Controller received state successfully", __FUNCTION__);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Controller returned false", __FUNCTION__);
     }
@@ -243,7 +241,7 @@ robot::receive_task(UA_Server *_server,
             const UA_NodeId *_object_id, void *_object_context,
             size_t _input_size, const UA_Variant *_input,
             size_t _output_size, UA_Variant *_output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_input_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
@@ -261,11 +259,12 @@ robot::receive_task(UA_Server *_server,
 
 void
 robot::handle_receive_task(UA_UInt32 _recipe_id, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: robot with port %d received recipe id %d", __FUNCTION__, robot_port_, _recipe_id);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Received instruction(recipe_id=%d)", _recipe_id);
     next_clock_tick_++; // TODO implement next clock tick according to next action, cache the action queue
     busy_status_ = true;
     finished_order_id_ = _recipe_id;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "TICKS: Send next tick(port=%d, current_clock_tick=%d, next_tick=%d)", robot_port_, current_clock_tick_, next_clock_tick_);
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
@@ -281,7 +280,7 @@ robot::handle_receive_task(UA_UInt32 _recipe_id, UA_Variant* _output) {
 
 void
 robot::place_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
         return;
@@ -296,7 +295,6 @@ robot::place_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt3
     UA_Boolean place_finished_order_successful;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         place_finished_order_successful = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Plate occupation result is %d", __FUNCTION__, place_finished_order_successful);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;
@@ -308,11 +306,15 @@ robot::place_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt3
 
 void
 robot::handle_place_finished_order_result(UA_Boolean _place_finished_order_successful) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (busy_status_ && _place_finished_order_successful) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (busy_status_ && _place_finished_order_successful && finished_order_id_) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "PLACE: Placed finished recipe_id=%d successfully", finished_order_id_);
         busy_status_ = false;
         finished_order_id_ = 0;
+    } else {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "PLACE: Placing finished recipe_id=%d failed(busy_status=%d, placement_response=%d, recipe_id=%d)", busy_status_, _place_finished_order_successful, finished_order_id_);
     }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, busy_state=%d)", robot_port_, busy_status_);
     UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
@@ -321,7 +323,7 @@ robot::handle_place_finished_order_result(UA_Boolean _place_finished_order_succe
 
 void
 robot::receive_proceeded_to_next_tick_notification_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
         return;
@@ -329,16 +331,16 @@ robot::receive_proceeded_to_next_tick_notification_called(UA_Client* _client, vo
 
     UA_StatusCode status_code = _response->responseHeader.serviceResult;
     if(status_code != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad service result", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
         return;
     }
 
     UA_Boolean proceeded_to_next_tick_notification_received;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         proceeded_to_next_tick_notification_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Reponse result is %d", __FUNCTION__, proceeded_to_next_tick_notification_received);
+        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Reponse result is %d", __FUNCTION__, proceeded_to_next_tick_notification_received);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
     
@@ -348,23 +350,20 @@ robot::receive_proceeded_to_next_tick_notification_called(UA_Client* _client, vo
 
 void
 robot::handle_proceeded_to_next_tick_notification_result(UA_Boolean _proceeded_to_next_tick_notification_received) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_proceeded_to_next_tick_notification_received) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s was successful", __FUNCTION__);
+        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Was successful", __FUNCTION__);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s failed", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Controller responded with false", __FUNCTION__);
     }
 }
 
 void
 robot::place_remove_finished_order_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
                                                         UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_Boolean place_remove_finished_order = *(UA_Boolean *) _value->value.data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND,
-                    "Place remove finished oder result is: %d", place_remove_finished_order);
-
         robot* self = static_cast<robot*>(_monitor_context);
         self->handle_place_remove_finished_order_notification(place_remove_finished_order);
     }
@@ -372,9 +371,10 @@ robot::place_remove_finished_order_notification_callback(UA_Client* _client, UA_
 
 void
 robot::handle_place_remove_finished_order_notification(UA_Boolean _place_remove_finished_order) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_place_remove_finished_order) {
         // TODO check if recipe is done and then call place order
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PLACE: Place finished recipe_id=%d", finished_order_id_);
         UA_StatusCode status = place_finished_order_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), place_finished_order_called, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the place finished order method node", __FUNCTION__);
@@ -385,8 +385,9 @@ robot::handle_place_remove_finished_order_notification(UA_Boolean _place_remove_
 
 void
 robot::progress_new_tick(UA_UInt64 _new_tick) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s with new tick %lu", __FUNCTION__, _new_tick);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s with new tick %lu", __FUNCTION__, _new_tick);
     // TODO implement proceeding using cached action queue
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "PROCEDURE: Send proceeded_to_next_tick notification");
     UA_StatusCode status = receive_proceeded_to_next_tick_notification_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_PROCEEDED_TO_NEXT_TICK_NOTIFICATION), receive_proceeded_to_next_tick_notification_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive proceeded to next tick method node", __FUNCTION__);
@@ -418,6 +419,7 @@ void
 robot::start() {
     if (!running_)
         return;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, busy_state=%d)", robot_port_, busy_status_);
     UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);

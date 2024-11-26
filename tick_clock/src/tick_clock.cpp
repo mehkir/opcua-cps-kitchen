@@ -71,7 +71,7 @@ void tick_clock::handle_receive_tick_ack(UA_UInt64 _current_client_tick, UA_UInt
         currently_acknowledged_set_.insert(_port);
         UA_Boolean ack_received = true;
         UA_Variant_setScalarCopy(_output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Ack received from port: %d", _port);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "TICKS: Next tick received(port=%d, current_tick=%d, next_tick=%d", _port, _current_client_tick, _next_tick);
     }
     /* Update/fast-forward clock to determined next tick */
     if (currently_acknowledged_set_.size() == clock_client_count_) {
@@ -79,10 +79,8 @@ void tick_clock::handle_receive_tick_ack(UA_UInt64 _current_client_tick, UA_UInt
         UA_Variant_setScalar(&new_clock_tick, &next_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
         currently_acknowledged_set_.clear();
         clock_tick_ = next_clock_tick_;
-        UA_Boolean ack_received = true;
-        UA_Variant_setScalarCopy(_output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
         UA_Server_writeValue(clock_server_, UA_NODEID_STRING(1, CLOCK_TICK), new_clock_tick);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "New clock tick is: %lu", clock_tick_);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "TICKS: New clock tick is: %lu", clock_tick_);
     }
 }
 

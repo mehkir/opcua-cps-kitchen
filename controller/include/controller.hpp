@@ -69,10 +69,11 @@ struct remote_robot {
             return busy_;
         }
 
-        void instruct(UA_UInt32 _recipe_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
+        void instruct(UA_UInt32 _recipe_id, UA_ClientAsyncCallCallback _callback) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             recipe_id_ = _recipe_id;
-            UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_TASK), _callback, _userdata);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Instruct robot on port %d (recipe_id=%d)", port_, _recipe_id);
+            UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_TASK), _callback, this);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
@@ -151,8 +152,9 @@ struct remote_conveyor {
         }
 
         void instruct(UA_UInt32 _steps_to_move, UA_ClientAsyncCallCallback _callback, void* _userdata) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote conveyor %s called on port", __FUNCTION__, port_);
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote conveyor %s called on port", __FUNCTION__, port_);
             steps_to_move_ = _steps_to_move;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Instruct conveyor(steps_to_move=%d)", _steps_to_move);
             UA_StatusCode status = receive_conveyor_move_instruction_caller_.call_method_node(client_, UA_NODEID_STRING(1, RECEIVE_MOVE_INSTRUCTION), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
@@ -231,9 +233,6 @@ private:
 
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
-
-    void
-    handle_receive_robot_task_called_result(UA_Boolean _robot_task_sent);
 
     static UA_StatusCode
     receive_conveyor_state(UA_Server *_server,

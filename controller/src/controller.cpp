@@ -95,9 +95,9 @@ controller::receive_robot_state(UA_Server* _server,
         const UA_NodeId* _object_id, void* _object_context,
         size_t _input_size, const UA_Variant* _input,
         size_t _output_size, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_input_size != 2) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
     /* Extract input arguments */
@@ -111,9 +111,9 @@ controller::receive_robot_state(UA_Server* _server,
 
 void
 controller::handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(port_remote_robot_map_.find(_port) == port_remote_robot_map_.end()) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d not found", _port);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "%s: Robot with port %d not found", __FUNCTION__, _port);
         return;
     }
     UA_Boolean robot_state_received = true;
@@ -121,6 +121,7 @@ controller::handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_Variant* _o
     remote_robot& robot = port_remote_robot_map_[_port].operator*();
     robot.set_busy_status(_busy);
     received_robot_states_.insert(_port);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Received robot state(port=%d, busy_state=%d)", _port, _busy);
     if(received_robot_states_.size() == port_remote_robot_map_.size()) {
         received_robot_states_.clear();
         handle_all_robot_states_received();
@@ -129,17 +130,18 @@ controller::handle_robot_state(UA_UInt16 _port, UA_Boolean _busy, UA_Variant* _o
 
 void
 controller::handle_all_robot_states_received() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Handle all robot states");
     for(auto& port_robot_pair : port_remote_robot_map_) {
         remote_robot& robot = port_robot_pair.second.operator*();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Robot with port %d has busy status %d", robot.get_port(), robot.is_busy());
-        robot.instruct(robot.get_port(), receive_robot_task_called, this);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Handle robot state(port=%d, busy_status=%d)", robot.get_port(), robot.is_busy());
+        robot.instruct(robot.get_port(), receive_robot_task_called);
     }
 }
 
 void
 controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
         return;
@@ -154,22 +156,14 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
     UA_Boolean robot_task_sent;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         robot_task_sent = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Remote robot response for instruction: %d", __FUNCTION__, robot_task_sent);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
     
-    controller* self = static_cast<controller*>(_userdata);
-    self->handle_receive_robot_task_called_result(robot_task_sent);
-}
-
-void
-controller::handle_receive_robot_task_called_result(UA_Boolean _robot_task_sent) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    //TODO: Rethink if it is not more suitable to put robot as userdata
-    if (!_robot_task_sent)
-        return;
+    remote_robot* robot = static_cast<remote_robot*>(_userdata);
+    if (!robot_task_sent)
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "%s: Robot on port %d responded false on sent task", __FUNCTION__, robot->get_port());
 }
 
 UA_StatusCode
@@ -179,7 +173,7 @@ controller::receive_conveyor_state(UA_Server* _server,
         const UA_NodeId* _object_id, void* _object_context,
         size_t _input_size, const UA_Variant* _input,
         size_t _output_size, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Extract input arguments */
     if(_input_size != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
@@ -202,7 +196,7 @@ controller::receive_conveyor_state(UA_Server* _server,
 
 void
 controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt32 _adjacent_robot_position, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_plate_id >= remote_plates_.size()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Invalid plate id %d. Remote plates count is %ld", __FUNCTION__, _plate_id, remote_plates_.size());
         return;
@@ -216,6 +210,7 @@ controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt
     plate.set_busy_state(_busy);
     plate.set_adjacent_robot_position(_adjacent_robot_position);
     received_conveyor_states_.insert(_plate_id);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Received conveyor plate state(plate_id=%d, busy_state=%d, position=%d)", _plate_id, _busy, _adjacent_robot_position);
     if(received_conveyor_states_.size() == remote_plates_.size()) {
         received_conveyor_states_.clear();
         handle_all_conveyor_states_received();
@@ -224,16 +219,17 @@ controller::handle_conveyor_state(UA_UInt32 _plate_id, UA_Boolean _busy, UA_UInt
 
 void
 controller::handle_all_conveyor_states_received() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Handle all conveyor plate states");
     for(auto& plate : remote_plates_) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Plate with id %d has currently adjacent robot at position %d", plate.get_id(), plate.get_adjacent_robot_position());
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Handle plate state(plate_id=%d, busy_status=%d, position=%d)", plate.get_id(), plate.get_busy_state(), plate.get_adjacent_robot_position());
     }
     remote_conveyor_->instruct(1, receive_conveyor_instruction_called, this);
 }
 
 void
 controller::receive_conveyor_instruction_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Userdata is NULL");
         return;
@@ -248,7 +244,7 @@ controller::receive_conveyor_instruction_called(UA_Client* _client, void* _userd
     UA_Boolean conveyor_move_instruction_received;
     if(UA_Variant_hasScalarType(_response->results[0].outputArguments, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         conveyor_move_instruction_received = *(UA_Boolean*)_response->results[0].outputArguments->data;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Remote conveyor response for instruction: %d", __FUNCTION__, conveyor_move_instruction_received);
+        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Remote conveyor response for instruction: %d", __FUNCTION__, conveyor_move_instruction_received);
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s bad output argument type", __FUNCTION__);
         return;
@@ -260,9 +256,10 @@ controller::receive_conveyor_instruction_called(UA_Client* _client, void* _userd
 
 void
 controller::handle_receive_conveyor_instruction_called_result(UA_Boolean conveyor_move_instruction_received) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
-    if (!conveyor_move_instruction_received)
-        return;
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s", __FUNCTION__);
+    if (!conveyor_move_instruction_received) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: conveyor instruction is not received successfully", __FUNCTION__);
+    }
 }
 
 UA_StatusCode
@@ -272,14 +269,13 @@ controller::receive_proceeded_to_next_tick_notification(UA_Server *_server,
         const UA_NodeId* _object_id, void* _object_context,
         size_t _input_size, const UA_Variant* _input,
         size_t _output_size, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Extract input arguments */
     if(_input_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
     }
     UA_UInt16 remote_port = *(UA_UInt16*)_input[0].data;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: received notification from port %d", __FUNCTION__, remote_port);
     /* Extract method context */
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
@@ -287,13 +283,15 @@ controller::receive_proceeded_to_next_tick_notification(UA_Server *_server,
     }
 
     controller* self = static_cast<controller*>(_method_context);
+    std::string client = remote_port == self->remote_conveyor_->get_port() ? "conveyor" : "robot";
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PROCEDURE: Received proceeded to next tick notification from %s on port %d", client, remote_port);
     self->handle_proceeded_to_next_tick_notification(remote_port, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
 controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_Boolean proceeded_to_next_tick_notification_received = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(_output, &proceeded_to_next_tick_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if (status != UA_STATUSCODE_GOOD) {
@@ -305,6 +303,7 @@ controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Varia
         place_remove_finished_order_notification_ = true;
         UA_Variant place_remove_finished_order_variant;
         UA_Variant_setScalar(&place_remove_finished_order_variant, &place_remove_finished_order_notification_, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PLACE: Send place/remove finished order notification");
         UA_Server_writeValue(controller_server_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), place_remove_finished_order_variant);
     }
 }
