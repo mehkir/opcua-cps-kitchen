@@ -284,7 +284,7 @@ controller::receive_proceeded_to_next_tick_notification(UA_Server *_server,
 
     controller* self = static_cast<controller*>(_method_context);
     std::string client = remote_port == self->remote_conveyor_->get_port() ? "conveyor" : "robot";
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PROCEDURE: Received proceeded to next tick notification from %s on port %d", client, remote_port);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PROCEDURE: Received proceeded to next tick notification from %s on port %d", client.c_str(), remote_port);
     self->handle_proceeded_to_next_tick_notification(remote_port, _output);
     return UA_STATUSCODE_GOOD;
 }
