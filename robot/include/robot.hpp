@@ -69,7 +69,7 @@ private:
                                                     UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value);
 
     void
-    handle_place_remove_finished_order_notification(UA_Boolean _place_remove_finished_order);
+    handle_place_remove_finished_order_notification(UA_UInt16 _place_remove_finished_order);
 
     static UA_StatusCode
     receive_task(UA_Server *_server,

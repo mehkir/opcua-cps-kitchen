@@ -2,7 +2,7 @@
 #include <open62541/server_config_default.h>
 #include <string>
 
-controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), place_remove_finished_order_notification_(false) {
+controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, uint32_t _robot_count, uint16_t _remote_conveyor_port) : controller_server_(UA_Server_new()), controller_port_(_controller_port), running_(true), place_remove_finished_order_notification_(0) {
     /* Setup controller */
     UA_ServerConfig* controller_server_config = UA_Server_getConfig(controller_server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(controller_server_config, controller_port_, NULL);
@@ -42,7 +42,7 @@ controller::controller(uint16_t _controller_port, uint16_t _robot_start_port, ui
         return;
     }
 
-    status = place_remove_finished_order_notification_node_inserter_.add_information_node(controller_server_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), "place remove finished order notifier", UA_TYPES_BOOLEAN, &place_remove_finished_order_notification_);
+    status = place_remove_finished_order_notification_node_inserter_.add_information_node(controller_server_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), "place remove finished order notifier", UA_TYPES_UINT16, &place_remove_finished_order_notification_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding place_remove_finished_order_notification information node");
         running_ = false;
@@ -300,9 +300,11 @@ controller::handle_proceeded_to_next_tick_notification(UA_UInt16 _port, UA_Varia
     received_proceeded_to_next_tick_notifications_.insert(_port);
     if (received_proceeded_to_next_tick_notifications_.size() == (port_remote_robot_map_.size()+1)) {
         received_proceeded_to_next_tick_notifications_.clear();
-        place_remove_finished_order_notification_ = true;
+        place_remove_finished_order_notification_++;
+        if(place_remove_finished_order_notification_ == 0) // In case of overflow
+            place_remove_finished_order_notification_++;
         UA_Variant place_remove_finished_order_variant;
-        UA_Variant_setScalar(&place_remove_finished_order_variant, &place_remove_finished_order_notification_, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        UA_Variant_setScalar(&place_remove_finished_order_variant, &place_remove_finished_order_notification_, &UA_TYPES[UA_TYPES_UINT16]);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PLACE: Send place/remove finished order notification");
         UA_Server_writeValue(controller_server_, UA_NODEID_STRING(1, PLACE_REMOVE_FINISHED_ORDER), place_remove_finished_order_variant);
     }

@@ -230,7 +230,7 @@ conveyor::handle_receive_move_instruction(UA_UInt32 _steps_to_move, UA_Variant* 
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Received instruction(steps_to_move=%d)", _steps_to_move);
     steps_to_move_ = _steps_to_move;
     next_clock_tick_+= _steps_to_move;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "TICKS: Send next tick(port=%d, current_clock_tick=%d, next_tick=%d)", conveyor_port_, current_clock_tick_, next_clock_tick_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "TICKS: Send next tick(port=%d, current_clock_tick=%ld, next_tick=%ld)", conveyor_port_, current_clock_tick_, next_clock_tick_);
     UA_StatusCode status = receive_tick_ack_caller_.call_method_node(clock_client_, UA_NODEID_STRING(1, RECEIVE_TICK_ACK), receive_tick_ack_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling the method node");
@@ -392,21 +392,26 @@ void
 conveyor::place_remove_finished_order_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
                                                         UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        UA_Boolean place_remove_finished_order = *(UA_Boolean *) _value->value.data;
+    if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT16])) {
+        UA_UInt16 place_remove_finished_order = *(UA_UInt16 *) _value->value.data;
 
         conveyor* self = static_cast<conveyor*>(_monitor_context);
         self->handle_place_remove_finished_order_notification(place_remove_finished_order);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Bad argument type", __FUNCTION__);
     }
 }
 
 void
-conveyor::handle_place_remove_finished_order_notification(UA_Boolean _place_remove_finished_order) {
+conveyor::handle_place_remove_finished_order_notification(UA_UInt16 _place_remove_finished_order) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (!_place_remove_finished_order) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Ignore initial remove finished order notification", __FUNCTION__);
+        return;
+    }
     UA_UInt32 output_position = 0;
     plate* output_plate = robot_position_mapping_.get_plate(output_position);
-    if (!_place_remove_finished_order)
-        return;
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "%s: plate(id=%d,busy=%d,placed_recipe_id=%d,position=%d)", __FUNCTION__, output_plate->get_plate_id(), output_plate->get_busy_state(), output_plate->get_placed_order_id(), output_plate->get_adjacent_robot_position());
     // Sanity check
     if ((output_plate->get_busy_state() && output_plate->get_placed_order_id() == 0)
         || (!output_plate->get_busy_state() && output_plate->get_placed_order_id())) {

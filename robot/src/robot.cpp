@@ -362,24 +362,26 @@ void
 robot::place_remove_finished_order_notification_callback(UA_Client* _client, UA_UInt32 _subscription_id, void* _subscription_context,
                                                         UA_UInt32 _monitor_id, void* _monitor_context, UA_DataValue* _value) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        UA_Boolean place_remove_finished_order = *(UA_Boolean *) _value->value.data;
+    if(UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT16])) {
+        UA_UInt16 place_remove_finished_order = *(UA_UInt16 *) _value->value.data;
         robot* self = static_cast<robot*>(_monitor_context);
         self->handle_place_remove_finished_order_notification(place_remove_finished_order);
     }
 }
 
 void
-robot::handle_place_remove_finished_order_notification(UA_Boolean _place_remove_finished_order) {
+robot::handle_place_remove_finished_order_notification(UA_UInt16 _place_remove_finished_order) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (_place_remove_finished_order) {
-        // TODO check if recipe is done and then call place order
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PLACE: Place finished recipe_id=%d", finished_order_id_);
-        UA_StatusCode status = place_finished_order_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), place_finished_order_called, this);
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the place finished order method node", __FUNCTION__);
-            running_ = false;
-        }
+    if (!_place_remove_finished_order) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Ignore initial remove finished order notification", __FUNCTION__);
+        return;
+    }
+    // TODO check if recipe is done and then call place order
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "PLACE: Place finished recipe_id=%d", finished_order_id_);
+    UA_StatusCode status = place_finished_order_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, PLACE_FINISHED_ORDER), place_finished_order_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the place finished order method node", __FUNCTION__);
+        running_ = false;
     }
 }
 

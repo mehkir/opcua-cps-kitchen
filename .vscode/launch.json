@@ -2,7 +2,7 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "(gdb) Launch conceyor",
+            "name": "(gdb) Launch conveyor",
             "type": "cppdbg",
             "request": "launch",
             // Resolved by CMake Tools:
