@@ -7,6 +7,7 @@
 
 /* ROBOT */
 #define RECEIVE_TASK "receive_task"
+#define HANDOVER_FINSIHED_ORDER "handover_finished_order"
 
 /* CONVEYOR */
 #define RECEIVE_MOVE_INSTRUCTION "receive_move_instruction"
