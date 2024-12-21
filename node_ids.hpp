@@ -1,17 +1,12 @@
 #ifndef NODE_IDS_HPP
 #define NODE_IDS_HPP
 
-/* CLOCK */
-#define CLOCK_TICK "clock_tick"
-#define RECEIVE_TICK_ACK "receive_tick_ack"
-
 /* ROBOT */
 #define RECEIVE_TASK "receive_task"
 #define HANDOVER_FINSIHED_ORDER "handover_finished_order"
 
 /* CONVEYOR */
-#define RECEIVE_MOVE_INSTRUCTION "receive_move_instruction"
-#define PLACE_FINISHED_ORDER "place_finished_order"
+#define FINISHED_ORDER_NOTIFICATION "finished_order_notification"
 
 /* CONTROLLER */
 #define RECEIVE_ROBOT_STATE "receive_robot_state"

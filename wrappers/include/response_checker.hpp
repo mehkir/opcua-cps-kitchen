@@ -13,6 +13,7 @@ public:
     size_t get_results_size();
     size_t get_output_arguments_size(size_t _results_index);
     void* get_data(size_t _results_index, size_t _output_index);
+    UA_StatusCode get_service_result();
 };
 
 

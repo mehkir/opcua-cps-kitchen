@@ -4,6 +4,8 @@
 #include <open62541/server.h>
 #include <open62541/client.h>
 #include <thread>
+#include <queue>
+#include <tuple>
 
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
@@ -12,20 +14,25 @@
 class robot {
 private:
     /* robot related member variables */
-    UA_Server* robot_server_;
-    UA_UInt32 robot_id_;
-    UA_UInt16 robot_port_;
+    UA_Server* server_;
+    UA_UInt32 position_;
+    UA_UInt16 port_;
     UA_Boolean busy_status_;
     UA_UInt32 current_tool_;
     UA_UInt32 current_recipe_id_in_process_;
+    std::queue<std::tuple<std::string, UA_UInt32>> action_queue_;
     volatile UA_Boolean running_;
     method_node_inserter receive_task_inserter_;
     method_node_inserter handover_finished_order_inserter_;
-    std::thread robot_server_iterate_thread_;
+    std::thread server_iterate_thread_;
     /* controller related member variables */
     UA_Client* controller_client_;
     method_node_caller receive_robot_state_caller_;
     std::thread controller_client_iterate_thread_;
+    /* conveyor related member variables */
+    UA_Client* conveyor_client_;
+    method_node_caller receive_finished_order_notification_caller_;
+    std::thread conveyor_client_iterate_thread_;
     
     static void
     receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
@@ -56,10 +63,22 @@ private:
     handle_handover_finished_order(UA_Variant* _output);
 
     void
+    determine_next_action();
+
+    static void
+    receive_finished_order_notification_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    void
+    handle_finished_order_notification_result(UA_Boolean _finished_order_notification_received);
+
+    static void
+    perform_action(UA_Server* _server, void* _data);
+
+    void
     join_threads();
 
 public:
-    robot(UA_UInt32 _robot_id, UA_UInt16 _robot_port, UA_UInt16 _controller_port);
+    robot(UA_UInt32 _position, UA_UInt16 port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port);
     ~robot();
 
     void
