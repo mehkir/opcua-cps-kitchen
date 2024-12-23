@@ -10,7 +10,7 @@
 #include "response_checker.hpp"
 #include "callback_scheduler.hpp"
 
-robot::robot(UA_UInt32 _position, UA_UInt16 _port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port) : server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true), current_recipe_id_in_process_(0) {
+robot::robot(UA_UInt32 _position, UA_UInt16 _port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port) : server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true), busy_status_(false), current_tool_(0), current_recipe_id_in_process_(0) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -21,7 +21,9 @@ robot::robot(UA_UInt32 _position, UA_UInt16 _port, UA_UInt16 _controller_port, U
     }
 
     receive_task_inserter_.add_input_argument("recipe id", "recipe_id", UA_TYPES_UINT32);
-    receive_task_inserter_.add_output_argument("task received", "task_received", UA_TYPES_BOOLEAN);
+    receive_task_inserter_.add_output_argument("robot port", "robot_port", UA_TYPES_UINT16);
+    receive_task_inserter_.add_output_argument("robot position", "robot_position", UA_TYPES_UINT32);
+    receive_task_inserter_.add_output_argument("robot busy status", "robot_busy_status", UA_TYPES_BOOLEAN);
     status = receive_task_inserter_.add_method_node(server_, UA_NODEID_STRING(1, RECEIVE_TASK), "receive robot task", receive_task, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the receive robot task method node", __FUNCTION__);
@@ -177,9 +179,11 @@ robot::handle_receive_task(UA_UInt32 _recipe_id, UA_Variant* _output) {
     current_recipe_id_in_process_ = _recipe_id;
 
     UA_Boolean task_received = true;
-    UA_StatusCode status = UA_Variant_setScalarCopy(_output, &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
+    status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
+    status |= UA_Variant_setScalarCopy(&_output[2], &busy_status_, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning receive task ack", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
         running_ = false;
     }
     // TODO cache the action queue (action0 ... actionN)
@@ -212,11 +216,18 @@ robot::handover_finished_order(UA_Server *_server,
 void
 robot::handle_handover_finished_order(UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
-    UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
-    UA_Variant_setScalarCopy(&_output[2], &current_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
+    status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
+    status |= UA_Variant_setScalarCopy(&_output[2], &current_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error during handover finished order", __FUNCTION__);
+        running_ = false;
+    }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "HANDOVER: Pass finished recipe_id=%d (port=%d, position=%d)", current_recipe_id_in_process_, port_, position_);
     current_recipe_id_in_process_ = 0;
+    busy_status_ = false;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, busy_state=%d)", port_, busy_status_);
+    UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), receive_robot_state_called, this);
 }
 
 robot::~robot() {

@@ -78,7 +78,7 @@ private:
     join_threads();
 
 public:
-    robot(UA_UInt32 _position, UA_UInt16 port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port);
+    robot(UA_UInt32 _position, UA_UInt16 _port, UA_UInt16 _controller_port, UA_UInt16 _conveyor_port);
     ~robot();
 
     void

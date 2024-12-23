@@ -64,6 +64,7 @@
         "complex": "cpp",
         "source_location": "cpp",
         "typeindex": "cpp",
-        "variant": "cpp"
+        "variant": "cpp",
+        "*.ipp": "cpp"
     }
 }
