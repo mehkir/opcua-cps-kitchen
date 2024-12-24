@@ -6,11 +6,7 @@ method_node_caller::method_node_caller() {
 }
 
 method_node_caller::~method_node_caller() {
-    for(UA_Variant* allocated_input_argument : allocated_input_arguments_) {
-        UA_Variant_clear(allocated_input_argument);
-    }
-    input_arguments_.clear();
-    allocated_input_arguments_.clear();
+    clear_input_arguments();
 }
 
 void
