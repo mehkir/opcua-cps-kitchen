@@ -1,9 +1,9 @@
 #include "../include/conveyor.hpp"
 #include <open62541/server_config_default.h>
-#include "node_ids.hpp"
 
 #include <string>
 #include <memory>
+#include "response_checker.hpp"
 
 conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), running_(true) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -17,6 +17,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
     /* Setup plates */
     for (size_t i = 0; i < _robot_count+1; i++) {
         plates_.push_back(plate(i,i));
+        position_plates_map_[i] = &plates_.back();
     }
     
     /* Run the conveyor server */
@@ -73,14 +74,67 @@ conveyor::receive_finished_order_notification(UA_Server *_server,
 void
 conveyor::handle_finished_order_notification(port_t _robot_port, position_t _robot_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (!position_remote_robot_map_.count(_robot_position)) {
+        position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_port, _robot_position);
+    }
     notifications_map_[_robot_position] = _robot_port;
+    for (auto notification = notifications_map_.begin(); notification != notifications_map_.end(); notification++) {
+        if (!position_plates_map_[notification->first]->is_occupied()){
+            remote_robot& robot = position_remote_robot_map_[_robot_position].operator*();
+            robot.handover_finished_order(handover_finished_order_called, this);
+        }
+    }
+}
+
+void
+conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_userdata == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
+        return;
+    }
+    response_checker response(_response);
+    UA_StatusCode status_code = response.get_service_result();;
+    if(status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
+        return;
+    }
+
+    if(!response.get_output_arguments_size(0) != 3) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        return;
+    }
+
+    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
+      ||response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
+      ||response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        return;
+    }
+
+    port_t remote_robot_port = *(port_t*) response.get_data(0,0);
+    position_t remote_robot_position = *(position_t*) response.get_data(0,1);
+    recipe_id_t finished_recipe = *(recipe_id_t*) response.get_data(0,2);
+
+    conveyor* self = static_cast<conveyor*>(_userdata);
+    self->handle_handover_finished_order(remote_robot_port, remote_robot_position, finished_recipe);
+}
+
+void
+conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    plate* p = position_plates_map_[_remote_robot_position];
+    p->place_recipe_id(_finished_recipe);
+    p->set_occupied(true);
+    occupied_plates_.insert(p->get_plate_id());
 }
 
 void
 conveyor::move_conveyor(steps_t _steps) {
     for (size_t i = 0; i < plates_.size(); i++) {
-        int new_position = (plates_[i].get_position() + _steps) % plates_.size();
+        position_t new_position = (plates_[i].get_position() + _steps) % plates_.size();
         plates_[i].set_position(new_position);
+        position_plates_map_[new_position] = &plates_[i];
     }
 }
 

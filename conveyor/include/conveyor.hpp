@@ -11,17 +11,75 @@
 #include <string>
 #include <set>
 #include <unordered_map>
+#include <memory>
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
 #include "types.hpp"
+#include "node_ids.hpp"
+
+struct remote_robot {
+    private:
+        UA_Client* client_;
+        const port_t port_;
+        const position_t position_;
+        bool running_;
+        std::thread client_thread_;
+        method_node_caller handover_finished_order_caller_;
+
+    public:
+        remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), running_(true) {
+            client_connection_establisher robot_client_connection_establisher;
+            UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
+            if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing robot client session");
+                running_ = false;
+                return;
+            }
+
+            client_thread_ = std::thread([this]() {
+                while(running_) {
+                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
+                    if (status != UA_STATUSCODE_GOOD) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running robot client");
+                        running_ = false;
+                    }
+                }
+            });
+        }
+
+        ~remote_robot() {
+            running_ = false;
+            if (client_thread_.joinable())
+                client_thread_.join();
+            UA_Client_delete(client_);
+        }
+
+        port_t get_port() const {
+            return port_;
+        }
+
+        position_t get_position() const {
+            return position_;
+        }
+
+        void handover_finished_order(UA_ClientAsyncCallCallback _callback, void* _userdata) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "HANDOVER: Retrieve finished order from robot on position %d with port %d", position_, port_);
+            UA_StatusCode status = handover_finished_order_caller_.call_method_node(client_, UA_NODEID_STRING(1, HANDOVER_FINSIHED_ORDER), _callback, _userdata);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+                running_ = false;
+            }
+        }
+};
 
 struct plate {
     private:
         const plate_id_t plate_id_;
         position_t position_;
-        UA_UInt32 placed_recipe_id_;
+        recipe_id_t placed_recipe_id_;
         UA_Boolean occupied_;
     public:
         plate(plate_id_t _plate_id, position_t _position) : plate_id_(_plate_id), position_(_position), placed_recipe_id_(0), occupied_(false) {
@@ -29,6 +87,21 @@ struct plate {
 
         ~plate() {
         }
+
+        plate(const plate& _plate) : plate_id_(_plate.plate_id_), position_(_plate.position_), placed_recipe_id_(_plate.placed_recipe_id_), occupied_(_plate.occupied_) {
+        }
+
+        // plate& operator=(const plate& _plate) {
+        //     if (this == &_plate) {
+        //         return *this;
+        //     }
+
+        //     plate_id_ = _plate.plate_id_;
+        //     position_ = _plate.position_;
+        //     placed_recipe_id_ = _plate.placed_recipe_id_;
+        //     occupied_ = _plate.occupied_;
+        //     return *this;
+        // }
 
         plate_id_t get_plate_id() const {
             return plate_id_;
@@ -42,11 +115,11 @@ struct plate {
             return position_;
         }
 
-        void place_recipe_id(UA_UInt32 _placed_recipe_id) {
+        void place_recipe_id(recipe_id_t _placed_recipe_id) {
             placed_recipe_id_ = _placed_recipe_id;
         }
 
-        UA_UInt32 get_placed_recipe_id() {
+        recipe_id_t get_placed_recipe_id() {
             return placed_recipe_id_;
         }
 
@@ -69,9 +142,10 @@ private:
     std::thread server_iterate_thread_;
     method_node_inserter receive_finished_order_inserter_;
     std::set<plate_id_t> occupied_plates_;
+    std::unordered_map<position_t, plate*> position_plates_map_;
     std::unordered_map<position_t, port_t> notifications_map_;
+    std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
 
-    /* Places a finished order on a plate */
     static UA_StatusCode
     receive_finished_order_notification(UA_Server *_server,
             const UA_NodeId *_session_id, void *_session_context,
@@ -85,6 +159,12 @@ private:
 
     void
     move_conveyor(steps_t _steps);
+
+    static void
+    handover_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    void
+    handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe);
 
     void
     join_threads();
