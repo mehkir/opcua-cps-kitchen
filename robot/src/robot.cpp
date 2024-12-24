@@ -296,6 +296,10 @@ robot::handle_finished_order_notification_result(UA_Boolean _finished_order_noti
 
 void
 robot::perform_action(UA_Server* _server, void* _data) {
+    if (_data == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
+        return;
+    }
     robot* self = static_cast<robot*>(_data);
     std::string action = std::get<std::string>(self->action_queue_.front());
     UA_UInt32 action_duration = std::get<UA_UInt32>(self->action_queue_.front());

@@ -129,6 +129,18 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     occupied_plates_.insert(p->get_plate_id());
 }
 
+
+void
+conveyor::perform_movement(UA_Server* _server, void* _data) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (_data == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
+        return;
+    }
+    conveyor* self = static_cast<conveyor*>(_data);
+    self->move_conveyor(1);
+}
+
 void
 conveyor::move_conveyor(steps_t _steps) {
     for (size_t i = 0; i < plates_.size(); i++) {

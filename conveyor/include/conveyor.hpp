@@ -19,6 +19,9 @@
 #include "types.hpp"
 #include "node_ids.hpp"
 
+#define DEBOUNCE_TIME 1
+#define MOVE_TIME 1
+
 struct remote_robot {
     private:
         UA_Client* client_;
@@ -165,6 +168,9 @@ private:
 
     void
     handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe);
+
+    static void
+    perform_movement(UA_Server* _server, void* _data);
 
     void
     join_threads();
