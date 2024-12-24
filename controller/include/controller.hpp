@@ -15,6 +15,7 @@
 #include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
 #include "information_node_inserter.hpp"
+#include "types.hpp"
 
 
 struct remote_robot {
@@ -25,18 +26,18 @@ struct remote_robot {
 
     private:
         UA_Client* client_;
-        const UA_UInt16 port_;
-        const UA_UInt32 position_;
+        const port_t port_;
+        const position_t position_;
         UA_Boolean busy_;
         UA_UInt32 current_tool_;
         bool running_;
         std::thread client_thread_;
         method_node_caller receive_robot_task_caller_;
-        UA_UInt32 recipe_id_;
+        recipe_id_t recipe_id_;
         state_status state_status_;
 
     public:
-        remote_robot(UA_UInt16 _port, UA_UInt32 _position, UA_Boolean _busy_status, UA_UInt32 _current_tool) :  port_(_port), position_(_position), busy_(_busy_status), current_tool_(_current_tool), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), running_(true) {
+        remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), running_(true) {
             client_connection_establisher robot_client_connection_establisher;
             UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
             if (session_state != UA_SESSIONSTATE_ACTIVATED) {
@@ -65,15 +66,11 @@ struct remote_robot {
             UA_Client_delete(client_);
         }
 
-        void set_current_tool(UA_UInt32 _current_tool) {
-            current_tool_ = _current_tool;
-        }
-
-        UA_UInt16 get_port() const {
+        port_t get_port() const {
             return port_;
         }
 
-        UA_UInt32 get_position() const {
+        position_t get_position() const {
             return position_;
         }
 
@@ -101,7 +98,7 @@ struct remote_robot {
             state_status_ = _state_status;
         }
 
-        void instruct(UA_UInt32 _recipe_id, UA_ClientAsyncCallCallback _callback) {
+        void instruct(recipe_id_t _recipe_id, UA_ClientAsyncCallCallback _callback) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             recipe_id_ = _recipe_id;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d", position_, port_, _recipe_id);
@@ -117,11 +114,11 @@ class controller {
 private:
     /* controller related member variables */
     UA_Server* server_;
-    UA_UInt16 port_;
+    port_t port_;
     volatile UA_Boolean running_;
     std::thread server_iterate_thread_;
     /* robot related member variables */
-    std::map<UA_UInt32, std::unique_ptr<remote_robot>, std::greater<UA_UInt32>> position_remote_robot_map_;
+    std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
     method_node_inserter receive_robot_state_inserter_;
 
     static UA_StatusCode
@@ -133,7 +130,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_robot_state(UA_UInt16 _port, UA_UInt32 _position, UA_Boolean _busy_status, UA_UInt32 _current_tool, UA_Variant* _output);
+    handle_robot_state(port_t _port, position_t _position, UA_Boolean _busy_status, UA_UInt32 _current_tool, UA_Variant* _output);
 
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
@@ -142,7 +139,7 @@ private:
     join_threads();
 
 public:
-    controller(UA_UInt16 _port);
+    controller(port_t _port);
     ~controller();
 
     void

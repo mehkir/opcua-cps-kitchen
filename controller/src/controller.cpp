@@ -3,7 +3,7 @@
 #include <string>
 #include <response_checker.hpp>
 
-controller::controller(UA_UInt16 _port) : server_(UA_Server_new()), port_(_port), running_(true) {
+controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), running_(true) {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -65,8 +65,8 @@ controller::receive_robot_state(UA_Server* _server,
         return UA_STATUSCODE_BAD;
     }
     /* Extract input arguments */
-    UA_UInt16 port = *(UA_UInt16*)_input[0].data;
-    UA_UInt32 position = *(UA_UInt16*)_input[1].data;
+    port_t port = *(port_t*)_input[0].data;
+    position_t position = *(position_t*)_input[1].data;
     UA_Boolean busy_status = *(UA_Boolean*)_input[2].data;
     UA_UInt32 current_tool = *(UA_UInt32*)_input[3].data;
     /* Extract method context */
@@ -76,16 +76,15 @@ controller::receive_robot_state(UA_Server* _server,
 }
 
 void
-controller::handle_robot_state(UA_UInt16 _port, UA_UInt32 _position, UA_Boolean _busy_status, UA_UInt32 _current_tool, UA_Variant* _output) {
+controller::handle_robot_state(port_t _port, position_t _position, UA_Boolean _busy_status, UA_UInt32 _current_tool, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (!position_remote_robot_map_.count(_position)) {
-        position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position, _busy_status, _current_tool);
-    } else {
-        remote_robot& robot = position_remote_robot_map_[_position].operator*();
-        robot.set_busy_status(_busy_status);
-        robot.set_current_tool(_current_tool);
+        position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position);
     }
-    position_remote_robot_map_[_position]->set_state_status(remote_robot::state_status::CURRENT);
+    remote_robot& robot = position_remote_robot_map_[_position].operator*();
+    robot.set_busy_status(_busy_status);
+    robot.set_current_tool(_current_tool);
+    robot.set_state_status(remote_robot::state_status::CURRENT);
 
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
         remote_robot& robot = position_remote_robot_map_[_position].operator*();
@@ -125,8 +124,8 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
         return;
     }
 
-    UA_UInt16 remote_robot_port = *(UA_UInt16*) response.get_data(0,0);
-    UA_UInt32 remote_robot_position = *(UA_UInt32*) response.get_data(0,1);
+    port_t remote_robot_port = *(port_t*) response.get_data(0,0);
+    position_t remote_robot_position = *(position_t*) response.get_data(0,1);
     UA_Boolean remote_robot_busy_status = *(UA_Boolean*) response.get_data(0,2);
 
     remote_robot* robot = static_cast<remote_robot*>(_userdata);

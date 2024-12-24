@@ -8,35 +8,37 @@
 #include <open62541/client_highlevel.h>
 #include <open62541/plugin/log_stdout.h>
 #include <thread>
-#include <unordered_map>
 #include <string>
+#include <set>
+#include <unordered_map>
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
+#include "types.hpp"
 
 struct plate {
     private:
-        const UA_UInt32 plate_id_;
-        UA_UInt32 position_;
+        const plate_id_t plate_id_;
+        position_t position_;
         UA_UInt32 placed_recipe_id_;
-        UA_Boolean busy_;
+        UA_Boolean occupied_;
     public:
-        plate(UA_UInt32 _plate_id, UA_UInt32 _position) : plate_id_(_plate_id), position_(_position), placed_recipe_id_(0), busy_(false) {
+        plate(plate_id_t _plate_id, position_t _position) : plate_id_(_plate_id), position_(_position), placed_recipe_id_(0), occupied_(false) {
         }
 
         ~plate() {
         }
 
-        UA_UInt32 get_plate_id() const {
+        plate_id_t get_plate_id() const {
             return plate_id_;
         }
 
-        void set_position(UA_UInt32 _position) {
+        void set_position(position_t _position) {
             position_ = _position;
         }
 
-        UA_UInt32 get_position() {
+        position_t get_position() {
             return position_;
         }
 
@@ -48,12 +50,12 @@ struct plate {
             return placed_recipe_id_;
         }
 
-        void set_busy_state(UA_Boolean _busy) {
-            busy_ = _busy;
+        void set_occupied(UA_Boolean _occupied) {
+            occupied_ = _occupied;
         }
 
-        UA_Boolean get_busy_state() {
-            return busy_;
+        UA_Boolean is_occupied() {
+            return occupied_;
         }
 };
 
@@ -61,13 +63,13 @@ class conveyor {
 private:
     /* conveyor related member variables */
     UA_Server* server_;
-    UA_UInt16 port_;
+    port_t port_;
     volatile UA_Boolean running_;
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
     method_node_inserter receive_finished_order_inserter_;
-    /* controller related member variables */
-    UA_Client* controller_client_;
+    std::set<plate_id_t> occupied_plates_;
+    std::unordered_map<position_t, port_t> notifications_map_;
 
     /* Places a finished order on a plate */
     static UA_StatusCode
@@ -79,13 +81,16 @@ private:
             size_t _output_size, UA_Variant *_output);
 
     void
-    move_conveyor(UA_UInt32 _steps);
+    handle_finished_order_notification(port_t _robot_port, position_t _robot_position);
+
+    void
+    move_conveyor(steps_t _steps);
 
     void
     join_threads();
 
 public:
-    conveyor(UA_UInt16 _port, UA_UInt32 _robot_count);
+    conveyor(port_t _port, UA_UInt32 _robot_count);
     ~conveyor();
 
     void

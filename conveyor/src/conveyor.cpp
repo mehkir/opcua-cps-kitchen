@@ -5,7 +5,7 @@
 #include <string>
 #include <memory>
 
-conveyor::conveyor(UA_UInt16 _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), running_(true) {
+conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), running_(true) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
@@ -58,20 +58,26 @@ conveyor::receive_finished_order_notification(UA_Server *_server,
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
     }
-    UA_UInt16 robot_port = *(UA_UInt16*)_input[0].data;
-    UA_UInt32 robot_position = *(UA_UInt32*)_input[1].data;
+    port_t robot_port = *(port_t*)_input[0].data;
+    position_t robot_position = *(position_t*)_input[1].data;
 
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
     conveyor* self = static_cast<conveyor*>(_method_context);
+    self->handle_finished_order_notification(robot_port, robot_position);
     return UA_STATUSCODE_GOOD;
-
 }
 
 void
-conveyor::move_conveyor(UA_UInt32 _steps) {
+conveyor::handle_finished_order_notification(port_t _robot_port, position_t _robot_position) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    notifications_map_[_robot_position] = _robot_port;
+}
+
+void
+conveyor::move_conveyor(steps_t _steps) {
     for (size_t i = 0; i < plates_.size(); i++) {
         int new_position = (plates_[i].get_position() + _steps) % plates_.size();
         plates_[i].set_position(new_position);
