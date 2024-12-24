@@ -14,6 +14,11 @@ conveyor::conveyor(UA_UInt16 _port, UA_UInt32 _robot_count) : server_(UA_Server_
         return;
     }
 
+    /* Setup plates */
+    for (size_t i = 0; i < _robot_count+1; i++) {
+        plates_.push_back(plate(i,i));
+    }
+    
     /* Run the conveyor server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
