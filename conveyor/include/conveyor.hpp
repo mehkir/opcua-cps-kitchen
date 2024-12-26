@@ -19,9 +19,6 @@
 #include "types.hpp"
 #include "node_ids.hpp"
 
-#define DEBOUNCE_TIME 1
-#define MOVE_TIME 1
-
 struct remote_robot {
     private:
         UA_Client* client_;
@@ -143,8 +140,10 @@ private:
     volatile UA_Boolean running_;
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
-    method_node_inserter receive_finished_order_inserter_;
+    method_node_inserter receive_finished_order_notification_inserter_;
     std::set<plate_id_t> occupied_plates_;
+    std::set<position_t> retrievable_positions_;
+    std::set<position_t> retrieved_positions_;
     std::unordered_map<position_t, plate*> position_plates_map_;
     std::unordered_map<position_t, port_t> notifications_map_;
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
@@ -159,6 +158,12 @@ private:
 
     void
     handle_finished_order_notification(port_t _robot_port, position_t _robot_position);
+
+    static void
+    retrieve_finished_orders(UA_Server* _server, void* _data);
+
+    void
+    handle_retrieve_finished_orders();
 
     void
     move_conveyor(steps_t _steps);

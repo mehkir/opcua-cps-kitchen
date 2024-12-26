@@ -4,6 +4,10 @@
 #include <string>
 #include <memory>
 #include "response_checker.hpp"
+#include "callback_scheduler.hpp"
+
+#define DEBOUNCE_TIME 1
+#define MOVE_TIME 1
 
 conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), running_(true) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -19,7 +23,17 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
         plates_.push_back(plate(i,i));
         position_plates_map_[i] = &plates_.back();
     }
-    
+
+    receive_finished_order_notification_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
+    receive_finished_order_notification_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT16);
+    receive_finished_order_notification_inserter_.add_output_argument("notification received", "notification_received", UA_TYPES_BOOLEAN);
+    status = receive_finished_order_notification_inserter_.add_method_node(server_, UA_NODEID_STRING(1, FINISHED_ORDER_NOTIFICATION), "receive finished order notification", receive_finished_order_notification, this);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Error adding the receive finished order notification method node", __FUNCTION__);
+        running_ = false;
+        return;
+    }
+
     /* Run the conveyor server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -78,11 +92,34 @@ conveyor::handle_finished_order_notification(port_t _robot_port, position_t _rob
         position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_port, _robot_position);
     }
     notifications_map_[_robot_position] = _robot_port;
+    // TODO: Schedule timer for handovers, after handovers are done, start moving and do handovers again, after move timer is expired
+    if (occupied_plates_.empty()) {
+        callback_scheduler retrieve_finished_orders_scheduler(server_, retrieve_finished_orders, this, NULL);
+        retrieve_finished_orders_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)DEBOUNCE_TIME * UA_DATETIME_SEC));
+    }
+}
+
+void
+conveyor::retrieve_finished_orders(UA_Server* _server, void* _data) {
+    if (_data == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
+        return;
+    }
+    conveyor* self = static_cast<conveyor*>(_data);
+    self->handle_retrieve_finished_orders();
+}
+
+void
+conveyor::handle_retrieve_finished_orders() {
     for (auto notification = notifications_map_.begin(); notification != notifications_map_.end(); notification++) {
         if (!position_plates_map_[notification->first]->is_occupied()){
-            remote_robot& robot = position_remote_robot_map_[_robot_position].operator*();
-            robot.handover_finished_order(handover_finished_order_called, this);
+            retrievable_positions_.insert(notification->first);
         }
+    }
+
+    for (position_t position : retrievable_positions_) {
+        remote_robot& robot = position_remote_robot_map_[position].operator*();
+        robot.handover_finished_order(handover_finished_order_called, this);
     }
 }
 
@@ -127,6 +164,11 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     p->place_recipe_id(_finished_recipe);
     p->set_occupied(true);
     occupied_plates_.insert(p->get_plate_id());
+    retrieved_positions_.insert(_remote_robot_position);
+    if(retrieved_positions_ == retrievable_positions_) {
+        retrieved_positions_.clear();
+        retrievable_positions_.clear();
+    }
 }
 
 
