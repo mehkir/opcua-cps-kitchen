@@ -169,6 +169,8 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     if(retrieved_positions_ == retrievable_positions_) {
         retrieved_positions_.clear();
         retrievable_positions_.clear();
+        callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
+        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)DEBOUNCE_TIME * UA_DATETIME_SEC));
     }
 }
 
@@ -182,6 +184,8 @@ conveyor::perform_movement(UA_Server* _server, void* _data) {
     }
     conveyor* self = static_cast<conveyor*>(_data);
     self->move_conveyor(1);
+    self->deliver_finished_order();
+    // self->determine_next_movement(); TODO: 
 }
 
 void
@@ -190,6 +194,17 @@ conveyor::move_conveyor(steps_t _steps) {
         position_t new_position = (plates_[i].get_position() + _steps) % plates_.size();
         plates_[i].set_position(new_position);
         position_plates_map_[new_position] = &plates_[i];
+    }
+}
+
+void
+conveyor::deliver_finished_order() {
+    plate* output_plate = position_plates_map_[0];
+    if(output_plate->is_occupied()) {
+        recipe_id_t recipe = output_plate->get_placed_recipe_id();
+        output_plate->place_recipe_id(0);
+        output_plate->set_occupied(false);
+        occupied_plates_.erase(output_plate->get_plate_id());
     }
 }
 

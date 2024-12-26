@@ -168,6 +168,9 @@ private:
     void
     move_conveyor(steps_t _steps);
 
+    void
+    deliver_finished_order();
+
     static void
     handover_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
