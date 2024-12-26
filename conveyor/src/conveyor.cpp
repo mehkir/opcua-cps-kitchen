@@ -160,6 +160,7 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
 void
 conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    notifications_map_.erase(_remote_robot_position);
     plate* p = position_plates_map_[_remote_robot_position];
     p->place_recipe_id(_finished_recipe);
     p->set_occupied(true);
