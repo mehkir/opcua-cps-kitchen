@@ -248,7 +248,7 @@ robot::determine_next_action() {
     if (action_queue_.size()) {
         std::string action = std::get<std::string>(action_queue_.front());
         UA_UInt32 action_duration = std::get<UA_UInt32>(action_queue_.front());
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d(%ds)", action, current_recipe_id_in_process_, action_duration);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d(%ds)", action.c_str(), current_recipe_id_in_process_, action_duration);
         callback_scheduler action_scheduler(server_, perform_action, this, NULL);
         action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)action_duration * UA_DATETIME_SEC));
     } else {
@@ -303,7 +303,7 @@ robot::perform_action(UA_Server* _server, void* _data) {
     robot* self = static_cast<robot*>(_data);
     std::string action = std::get<std::string>(self->action_queue_.front());
     UA_UInt32 action_duration = std::get<UA_UInt32>(self->action_queue_.front());
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d(%ds)", action, self->current_recipe_id_in_process_, action_duration);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d(%ds)", action.c_str(), self->current_recipe_id_in_process_, action_duration);
     self->action_queue_.pop();
     self->determine_next_action();
 }
