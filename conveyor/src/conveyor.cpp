@@ -9,7 +9,7 @@
 #define DEBOUNCE_TIME 1
 #define MOVE_TIME 1
 
-conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), running_(true) {
+conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), running_(true), state_status_(conveyor::state::IDLING) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
@@ -92,8 +92,8 @@ conveyor::handle_finished_order_notification(port_t _robot_port, position_t _rob
         position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_port, _robot_position);
     }
     notifications_map_[_robot_position] = _robot_port;
-    // TODO: Schedule timer for handovers, after handovers are done, start moving and do handovers again, after move timer is expired
-    if (occupied_plates_.empty()) {
+    if (state_status_ == conveyor::state::IDLING) {
+        state_status_ = conveyor::state::MOVING;
         callback_scheduler retrieve_finished_orders_scheduler(server_, retrieve_finished_orders, this, NULL);
         retrieve_finished_orders_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)DEBOUNCE_TIME * UA_DATETIME_SEC));
     }
@@ -170,7 +170,7 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
         retrieved_positions_.clear();
         retrievable_positions_.clear();
         callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
-        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)DEBOUNCE_TIME * UA_DATETIME_SEC));
+        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)MOVE_TIME * UA_DATETIME_SEC));
     }
 }
 
@@ -185,7 +185,7 @@ conveyor::perform_movement(UA_Server* _server, void* _data) {
     conveyor* self = static_cast<conveyor*>(_data);
     self->move_conveyor(1);
     self->deliver_finished_order();
-    // self->determine_next_movement(); TODO: 
+    self->determine_next_movement();
 }
 
 void
@@ -205,6 +205,15 @@ conveyor::deliver_finished_order() {
         output_plate->place_recipe_id(0);
         output_plate->set_occupied(false);
         occupied_plates_.erase(output_plate->get_plate_id());
+    }
+}
+
+void
+conveyor::determine_next_movement() {
+    if (occupied_plates_.empty() && notifications_map_.empty()) {
+        state_status_ = conveyor::state::IDLING;
+    } else {
+        handle_retrieve_finished_orders();
     }
 }
 

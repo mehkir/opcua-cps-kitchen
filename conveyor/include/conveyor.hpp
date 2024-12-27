@@ -133,11 +133,18 @@ struct plate {
 };
 
 class conveyor {
+
+enum state {
+    IDLING,
+    MOVING
+};
+
 private:
     /* conveyor related member variables */
     UA_Server* server_;
     port_t port_;
     volatile UA_Boolean running_;
+    state state_status_;
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
     method_node_inserter receive_finished_order_notification_inserter_;
@@ -170,6 +177,9 @@ private:
 
     void
     deliver_finished_order();
+
+    void
+    determine_next_movement();
 
     static void
     handover_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
