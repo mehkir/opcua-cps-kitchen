@@ -112,14 +112,14 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
         return;
     }
 
-    if(!response.get_output_arguments_size(0) != 3) {
+    if(response.get_output_arguments_size(0) != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         return;
     }
 
     if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
-      ||response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
-      ||response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+      || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
+      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
@@ -135,6 +135,7 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
     }
     robot->set_busy_status(remote_robot_busy_status);
     robot->set_state_status(remote_robot::state_status::CURRENT);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "ROBOT_STATE (after): Position=%d, busy=%d, state status=%d", robot->get_position(), robot->is_busy(), robot->get_state_status());
 }
 
 void

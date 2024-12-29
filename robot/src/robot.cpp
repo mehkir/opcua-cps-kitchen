@@ -126,13 +126,13 @@ robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32
     }
 
     UA_Boolean robot_state_received = false;
-    if(response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        robot_state_received = *(UA_Boolean*)response.get_data(0,0);
-        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, robot_state_received);
-    } else {
+    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
-    }
+    }   
+
+    robot_state_received = *(UA_Boolean*)response.get_data(0,0);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, robot_state_received);
     
     robot* self = static_cast<robot*>(_userdata);
     self->handle_robot_state_result(robot_state_received);
@@ -178,7 +178,7 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_Variant* _output) {
     busy_status_ = true;
     current_recipe_id_in_process_ = _recipe_id;
 
-    UA_Boolean task_received = true;
+    // UA_Boolean task_received = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
     status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[2], &busy_status_, &UA_TYPES[UA_TYPES_BOOLEAN]);
@@ -259,7 +259,7 @@ robot::determine_next_action() {
 
 void
 robot::receive_finished_order_notification_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
         return;
@@ -272,13 +272,12 @@ robot::receive_finished_order_notification_called(UA_Client* _client, void* _use
     }
 
     UA_Boolean finished_order_notification_received = false;
-    if(response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        finished_order_notification_received = *(UA_Boolean*)response.get_data(0,0);
-        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, finished_order_notification_received);
-    } else {
+    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
+    finished_order_notification_received = *(UA_Boolean*)response.get_data(0,0);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, finished_order_notification_received);
     
     robot* self = static_cast<robot*>(_userdata);
     self->handle_finished_order_notification_result(finished_order_notification_received);

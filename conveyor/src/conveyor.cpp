@@ -68,7 +68,7 @@ conveyor::receive_finished_order_notification(UA_Server *_server,
         const UA_NodeId *_object_id, void *_object_context,
         size_t _input_size, const UA_Variant *_input,
         size_t _output_size, UA_Variant *_output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_input_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
@@ -81,13 +81,16 @@ conveyor::receive_finished_order_notification(UA_Server *_server,
         return UA_STATUSCODE_BAD;
     }
     conveyor* self = static_cast<conveyor*>(_method_context);
-    self->handle_finished_order_notification(robot_port, robot_position);
+    self->handle_finished_order_notification(robot_port, robot_position, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-conveyor::handle_finished_order_notification(port_t _robot_port, position_t _robot_position) {
+conveyor::handle_finished_order_notification(port_t _robot_port, position_t _robot_position, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "FINISHED_ORDER_NOTIFICATION: Received notification from robot at position %d with port %d", _robot_position, _robot_port);
+    UA_Boolean finished_order_notification_received = true;
+    UA_Variant_setScalarCopy(_output, &finished_order_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if (!position_remote_robot_map_.count(_robot_position)) {
         position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_port, _robot_position);
     }
@@ -137,14 +140,14 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
         return;
     }
 
-    if(!response.get_output_arguments_size(0) != 3) {
+    if(response.get_output_arguments_size(0) != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         return;
     }
 
     if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
-      ||response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
-      ||response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])) {
+      || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
+      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }

@@ -164,7 +164,7 @@ private:
             size_t _output_size, UA_Variant *_output);
 
     void
-    handle_finished_order_notification(port_t _robot_port, position_t _robot_position);
+    handle_finished_order_notification(port_t _robot_port, position_t _robot_position, UA_Variant* _output);
 
     static void
     retrieve_finished_orders(UA_Server* _server, void* _data);
