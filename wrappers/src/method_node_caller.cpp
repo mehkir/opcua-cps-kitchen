@@ -19,9 +19,6 @@ method_node_caller::add_input_argument(void* _argument_value, UA_UInt32 _type_in
         UA_Variant_setScalar(&input_argument, _argument_value, &UA_TYPES[_type_index]);
     }
     input_arguments_.push_back(input_argument);
-    if(_copy) {
-        allocated_input_arguments_.push_back(&input_arguments_.back());
-    }
 }
 
 UA_StatusCode
@@ -33,9 +30,8 @@ method_node_caller::call_method_node(UA_Client* _client, UA_NodeId _method_node_
 
 void
 method_node_caller::clear_input_arguments() {
-    for(UA_Variant* allocated_input_argument : allocated_input_arguments_) {
-        UA_Variant_clear(allocated_input_argument);
+    for(UA_Variant variant : input_arguments_) {
+        UA_Variant_clear(&variant);
     }
     input_arguments_.clear();
-    allocated_input_arguments_.clear();
 }

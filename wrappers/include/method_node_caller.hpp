@@ -7,7 +7,6 @@
 class method_node_caller {
 private:
     std::vector<UA_Variant> input_arguments_;
-    std::vector<UA_Variant*> allocated_input_arguments_;
 public:
     method_node_caller();
     ~method_node_caller();
