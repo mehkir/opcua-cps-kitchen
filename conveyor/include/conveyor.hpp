@@ -175,7 +175,7 @@ struct plate {
             information_node_writer occupied_writer;
             UA_StatusCode status = occupied_writer.write_value(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), &occupied_, &UA_TYPES[UA_TYPES_BOOLEAN]);
             if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Plate position write failed", __FUNCTION__);
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Plate occupied write failed", __FUNCTION__);
             }
         }
 
