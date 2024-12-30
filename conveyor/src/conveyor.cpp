@@ -25,7 +25,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
     }
 
     receive_finished_order_notification_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
-    receive_finished_order_notification_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT16);
+    receive_finished_order_notification_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT32);
     receive_finished_order_notification_inserter_.add_output_argument("notification received", "notification_received", UA_TYPES_BOOLEAN);
     status = receive_finished_order_notification_inserter_.add_method_node(server_, UA_NODEID_STRING(1, FINISHED_ORDER_NOTIFICATION), "receive finished order notification", receive_finished_order_notification, this);
     if (status != UA_STATUSCODE_GOOD) {
@@ -68,7 +68,7 @@ conveyor::receive_finished_order_notification(UA_Server *_server,
         const UA_NodeId *_object_id, void *_object_context,
         size_t _input_size, const UA_Variant *_input,
         size_t _output_size, UA_Variant *_output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_input_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
