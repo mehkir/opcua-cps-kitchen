@@ -72,6 +72,8 @@
         "coroutine": "cpp",
         "future": "cpp",
         "iomanip": "cpp",
-        "shared_mutex": "cpp"
+        "shared_mutex": "cpp",
+        "strstream": "cpp",
+        "fstream": "cpp"
     }
 }

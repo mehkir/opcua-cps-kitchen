@@ -13,12 +13,18 @@
 #include "types.hpp"
 
 class robot {
+    enum state {
+        IDLING,
+        COOKING,
+        FINISHED,
+    };
+
 private:
     /* robot related member variables */
     UA_Server* server_;
     position_t position_;
     port_t port_;
-    UA_Boolean busy_status_;
+    robot::state state_;
     UA_UInt32 current_tool_;
     recipe_id_t current_recipe_id_in_process_;
     std::queue<std::tuple<std::string, UA_UInt32>> action_queue_;

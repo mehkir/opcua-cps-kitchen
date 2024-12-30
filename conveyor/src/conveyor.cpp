@@ -20,7 +20,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
 
     /* Setup plates */
     for (size_t i = 0; i < _robot_count+1; i++) {
-        plates_.push_back(plate(i,i));
+        plates_.push_back(plate(i,i, server_));
         position_plates_map_[i] = &plates_.back();
     }
 

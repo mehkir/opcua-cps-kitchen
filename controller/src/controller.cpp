@@ -15,7 +15,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
 
     receive_robot_state_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
     receive_robot_state_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT32);
-    receive_robot_state_inserter_.add_input_argument("robot busy status", "robot_busy_status", UA_TYPES_BOOLEAN);
+    receive_robot_state_inserter_.add_input_argument("robot status", "robot_status", UA_TYPES_UINT32);
     receive_robot_state_inserter_.add_input_argument("robot current tool", "robot_current_tool", UA_TYPES_UINT32);
     receive_robot_state_inserter_.add_output_argument("robot state received", "robot_state_received", UA_TYPES_BOOLEAN);
     status = receive_robot_state_inserter_.add_method_node(server_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), "receive robot state", receive_robot_state, this);
@@ -67,28 +67,28 @@ controller::receive_robot_state(UA_Server* _server,
     /* Extract input arguments */
     port_t port = *(port_t*)_input[0].data;
     position_t position = *(position_t*)_input[1].data;
-    UA_Boolean busy_status = *(UA_Boolean*)_input[2].data;
+    UA_UInt32 robot_state = *(UA_UInt32*)_input[2].data;
     UA_UInt32 current_tool = *(UA_UInt32*)_input[3].data;
     /* Extract method context */
     controller* self = static_cast<controller*>(_method_context);
-    self->handle_robot_state(port, position, busy_status, current_tool, _output);
+    self->handle_robot_state(port, position, robot_state, current_tool, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_robot_state(port_t _port, position_t _position, UA_Boolean _busy_status, UA_UInt32 _current_tool, UA_Variant* _output) {
+controller::handle_robot_state(port_t _port, position_t _position, UA_UInt32 _robot_state, UA_UInt32 _current_tool, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (!position_remote_robot_map_.count(_position)) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position);
     }
     remote_robot& robot = position_remote_robot_map_[_position].operator*();
-    robot.set_busy_status(_busy_status);
+    robot.set_state(remote_robot::state(_robot_state));
     robot.set_current_tool(_current_tool);
     robot.set_state_status(remote_robot::state_status::CURRENT);
 
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
         remote_robot& robot = position_remote_robot_map_[_position].operator*();
-        if (robot.get_state_status() == remote_robot::state_status::CURRENT && !robot.is_busy()) {
+        if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == remote_robot::IDLING) {
             robot.set_state_status(remote_robot::state_status::OBSOLETE);
             robot.instruct(42, receive_robot_task_called);
         }
@@ -119,23 +119,23 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
 
     if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
       || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
 
     port_t remote_robot_port = *(port_t*) response.get_data(0,0);
     position_t remote_robot_position = *(position_t*) response.get_data(0,1);
-    UA_Boolean remote_robot_busy_status = *(UA_Boolean*) response.get_data(0,2);
+    remote_robot::state remote_robot_state = *(remote_robot::state*) response.get_data(0,2);
 
     remote_robot* robot = static_cast<remote_robot*>(_userdata);
     // Sanity check
     if(robot->get_port() != remote_robot_port || robot->get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "%s: Mismatch on <port,position>. Received<%d,%d>, actually<%d,%d>", __FUNCTION__, remote_robot_port, remote_robot_position, robot->get_port(), robot->get_position());
     }
-    robot->set_busy_status(remote_robot_busy_status);
+    robot->set_state(remote_robot_state);
     robot->set_state_status(remote_robot::state_status::CURRENT);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "ROBOT_STATE (after): Position=%d, busy=%d, state status=%d", robot->get_position(), robot->is_busy(), robot->get_state_status());
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "ROBOT_STATE (after): Position=%d, state=%d, state status=%d", robot->get_position(), robot->get_state(), robot->get_state_status());
 }
 
 void

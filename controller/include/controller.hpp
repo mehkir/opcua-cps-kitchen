@@ -24,11 +24,17 @@ struct remote_robot {
         OBSOLETE
     };
 
+    enum state {
+        IDLING,
+        COOKING,
+        FINISHED,
+    };
+
     private:
         UA_Client* client_;
         const port_t port_;
         const position_t position_;
-        UA_Boolean busy_;
+        remote_robot::state state_;
         UA_UInt32 current_tool_;
         bool running_;
         std::thread client_thread_;
@@ -74,12 +80,12 @@ struct remote_robot {
             return position_;
         }
 
-        UA_Boolean is_busy() const {
-            return busy_;
+        remote_robot::state get_state() const {
+            return state_;
         }
 
-        void set_busy_status(UA_Boolean _busy_status) {
-            busy_ = _busy_status;
+        void set_state(remote_robot::state _state) {
+            state_ = _state;
         }
 
         UA_UInt32 get_current_tool() const {
@@ -130,7 +136,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_robot_state(port_t _port, position_t _position, UA_Boolean _busy_status, UA_UInt32 _current_tool, UA_Variant* _output);
+    handle_robot_state(port_t _port, position_t _position, UA_UInt32 _robot_state, UA_UInt32 _current_tool, UA_Variant* _output);
 
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);

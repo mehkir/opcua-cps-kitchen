@@ -4,6 +4,8 @@
 /* ROBOT */
 #define RECEIVE_TASK "receive_task"
 #define HANDOVER_FINSIHED_ORDER "handover_finished_order"
+#define ROBOT_STATE "robot_state"
+#define RECIPE_ID "recipe_id"
 
 /* CONVEYOR */
 #define FINISHED_ORDER_NOTIFICATION "finished_order_notification"
