@@ -86,28 +86,28 @@ struct plate {
     public:
         plate(plate_id_t _id, position_t _position, UA_Server* _conveyor) : id_(_id), position_(_position), conveyor_(_conveyor), placed_recipe_id_(0), occupied_(false) {
             information_node_inserter id_information_node;
-            std::string id_node_id = "plate_id_" + id_;
+            std::string id_node_id = "plate_id_" + std::to_string(id_);
             UA_StatusCode status = id_information_node.add_information_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(id_node_id.c_str())), "plate id", UA_TYPES_UINT32, const_cast<plate_id_t*>(&id_));
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate id information node", __FUNCTION__);
             }
 
             information_node_inserter position_information_node;
-            std::string position_node_id = "plate_position_" + id_;
+            std::string position_node_id = "plate_position_" + std::to_string(id_);
             status = position_information_node.add_information_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(position_node_id.c_str())), "plate position", UA_TYPES_UINT32, &position_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate position information node", __FUNCTION__);
             }
 
             information_node_inserter placed_recipe_id_information_node;
-            std::string placed_recipe_id_node_id = "plate_placed_recipe_id_" + id_;
+            std::string placed_recipe_id_node_id = "plate_placed_recipe_id_" + std::to_string(id_);
             status = placed_recipe_id_information_node.add_information_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(placed_recipe_id_node_id.c_str())), "placed recipe id", UA_TYPES_UINT32, &placed_recipe_id_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate placed recipe id information node", __FUNCTION__);
             }
 
             information_node_inserter occupied_information_node;
-            std::string occupied_id_node_id = "plate_occupied_" + id_;
+            std::string occupied_id_node_id = "plate_occupied_" + std::to_string(id_);
             status = occupied_information_node.add_information_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), "plate occupied status", UA_TYPES_BOOLEAN, &occupied_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate occupied information node", __FUNCTION__);
@@ -139,7 +139,7 @@ struct plate {
 
         void set_position(position_t _position) {
             position_ = _position;
-            std::string position_node_id = "plate_position_" + id_;
+            std::string position_node_id = "plate_position_" + std::to_string(id_);
             information_node_writer position_writer;
             UA_StatusCode status = position_writer.write_value(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(position_node_id.c_str())), &position_, &UA_TYPES[UA_TYPES_UINT32]);
             if(status != UA_STATUSCODE_GOOD) {
@@ -153,7 +153,7 @@ struct plate {
 
         void place_recipe_id(recipe_id_t _placed_recipe_id) {
             placed_recipe_id_ = _placed_recipe_id;
-            std::string placed_recipe_id_node_id = "plate_placed_recipe_id_" + id_;
+            std::string placed_recipe_id_node_id = "plate_placed_recipe_id_" + std::to_string(id_);
             information_node_writer placed_recipe_id_writer;
             UA_StatusCode status = placed_recipe_id_writer.write_value(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(placed_recipe_id_node_id.c_str())), &placed_recipe_id_, &UA_TYPES[UA_TYPES_UINT32]);
             if(status != UA_STATUSCODE_GOOD) {
@@ -167,7 +167,7 @@ struct plate {
 
         void set_occupied(UA_Boolean _occupied) {
             occupied_ = _occupied;
-            std::string occupied_id_node_id = "plate_occupied_" + id_;
+            std::string occupied_id_node_id = "plate_occupied_" + std::to_string(id_);
             information_node_writer occupied_writer;
             UA_StatusCode status = occupied_writer.write_value(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), &occupied_, &UA_TYPES[UA_TYPES_BOOLEAN]);
             if(status != UA_STATUSCODE_GOOD) {

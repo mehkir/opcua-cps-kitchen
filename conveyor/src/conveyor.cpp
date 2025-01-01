@@ -44,7 +44,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
     try {
         server_iterate_thread_ = std::thread([this]() {
             while(running_) {
-                UA_StatusCode status = UA_Server_run_iterate(server_, true);
+                UA_Server_run_iterate(server_, true);
             }
         });
     } catch (...) {
