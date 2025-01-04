@@ -27,7 +27,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
     receive_finished_order_notification_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
     receive_finished_order_notification_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT32);
     receive_finished_order_notification_inserter_.add_output_argument("notification received", "notification_received", UA_TYPES_BOOLEAN);
-    status = receive_finished_order_notification_inserter_.add_method_node(server_, UA_NODEID_STRING(1, FINISHED_ORDER_NOTIFICATION), "receive finished order notification", receive_finished_order_notification, this);
+    status = receive_finished_order_notification_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), "receive finished order notification", receive_finished_order_notification, this);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Error adding the receive finished order notification method node", __FUNCTION__);
         running_ = false;

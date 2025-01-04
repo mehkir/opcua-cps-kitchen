@@ -20,6 +20,8 @@
 #include "information_node_inserter.hpp"
 #include "information_node_writer.hpp"
 
+using namespace cps_kitchen;
+
 struct remote_robot {
     private:
         UA_Client* client_;
@@ -68,7 +70,7 @@ struct remote_robot {
         void handover_finished_order(UA_ClientAsyncCallCallback _callback, void* _userdata) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "HANDOVER: Retrieve finished order from robot on position %d with port %d", position_, port_);
-            UA_StatusCode status = handover_finished_order_caller_.call_method_node(client_, UA_NODEID_STRING(1, HANDOVER_FINSIHED_ORDER), _callback, _userdata);
+            UA_StatusCode status = handover_finished_order_caller_.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(HANDOVER_FINSIHED_ORDER)), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;

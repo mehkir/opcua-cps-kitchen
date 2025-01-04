@@ -12,6 +12,8 @@
 #include "method_node_inserter.hpp"
 #include "types.hpp"
 
+using namespace cps_kitchen;
+
 class robot {
     enum state {
         IDLING,

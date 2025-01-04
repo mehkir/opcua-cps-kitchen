@@ -18,7 +18,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
     receive_robot_state_inserter_.add_input_argument("robot status", "robot_status", UA_TYPES_UINT32);
     receive_robot_state_inserter_.add_input_argument("robot current tool", "robot_current_tool", UA_TYPES_UINT32);
     receive_robot_state_inserter_.add_output_argument("robot state received", "robot_state_received", UA_TYPES_BOOLEAN);
-    status = receive_robot_state_inserter_.add_method_node(server_, UA_NODEID_STRING(1, RECEIVE_ROBOT_STATE), "receive robot state", receive_robot_state, this);
+    status = receive_robot_state_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), "receive robot state", receive_robot_state, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the receive robot state method node");
         running_ = false;
