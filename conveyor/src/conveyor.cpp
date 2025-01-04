@@ -202,7 +202,7 @@ conveyor::move_conveyor(steps_t _steps) {
 
 void
 conveyor::deliver_finished_order() {
-    plate* output_plate = position_plates_map_[0];
+    plate* output_plate = position_plates_map_[OUTPUT_POSITION];
     if(output_plate->is_occupied()) {
         recipe_id_t recipe = output_plate->get_placed_recipe_id();
         output_plate->place_recipe_id(0);
