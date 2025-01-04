@@ -2,10 +2,16 @@
 #define ROBOT_TOOLS_HPP
 
 enum robot_tools {
-    KNIFE,
+    FRYER,
+    PAN,
+    POT,
+    PEELER,
+    CUTTER,
+    CRUSHER,
+    MASHER,
     MIXER,
     HEATER,
-    WHISK
+    STIRRER
 };
 
 #endif
