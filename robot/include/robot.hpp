@@ -15,7 +15,7 @@
 using namespace cps_kitchen;
 
 class robot {
-    enum state {
+    enum class state {
         IDLING,
         COOKING,
         FINISHED,
@@ -85,6 +85,9 @@ private:
 
     void
     join_threads();
+
+    const char*
+    state_to_string(state _state);
 
 public:
     robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port);

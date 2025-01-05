@@ -88,7 +88,7 @@ controller::handle_robot_state(port_t _port, position_t _position, UA_UInt32 _ro
 
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
         remote_robot& robot = position_remote_robot_map_[_position].operator*();
-        if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == remote_robot::IDLING) {
+        if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == remote_robot::state::IDLING) {
             robot.set_state_status(remote_robot::state_status::OBSOLETE);
             robot.instruct(42, receive_robot_task_called);
         }
@@ -135,7 +135,7 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
     }
     robot->set_state(remote_robot_state);
     robot->set_state_status(remote_robot::state_status::CURRENT);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "ROBOT_STATE (after): Position=%d, state=%d, state status=%d", robot->get_position(), robot->get_state(), robot->get_state_status());
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "ROBOT_STATE (after): Position=%d, state=%s, state status=%s", robot->get_position(), remote_robot::remote_robot_state_to_string(robot->get_state()), remote_robot::remote_robot_state_status_to_string(robot->get_state_status()));
 }
 
 void

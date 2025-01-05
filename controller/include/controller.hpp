@@ -20,12 +20,12 @@
 using namespace cps_kitchen;
 
 struct remote_robot {
-    enum state_status {
+    enum class state_status {
         CURRENT,
         OBSOLETE
     };
 
-    enum state {
+    enum class state {
         IDLING,
         COOKING,
         FINISHED,
@@ -41,7 +41,7 @@ struct remote_robot {
         std::thread client_thread_;
         method_node_caller receive_robot_task_caller_;
         recipe_id_t recipe_id_;
-        state_status state_status_;
+        remote_robot::state_status state_status_;
 
     public:
         remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), running_(true) {
@@ -113,6 +113,25 @@ struct remote_robot {
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
+            }
+        }
+
+        static const char*
+        remote_robot_state_to_string(remote_robot::state _state) {
+            switch (_state) {
+                case remote_robot::state::IDLING: return "IDLING";
+                case remote_robot::state::COOKING: return "COOKING";
+                case remote_robot::state::FINISHED: return "FINISHED";
+                default: return "Unimplemented item";
+            }
+        }
+
+        static const char*
+        remote_robot_state_status_to_string(remote_robot::state_status _state_status) {
+            switch (_state_status) {
+                case remote_robot::state_status::CURRENT: return "CURRENT";
+                case remote_robot::state_status::OBSOLETE: return "OBSOLETE";
+                default: return "Unimplemented item";
             }
         }
 };

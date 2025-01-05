@@ -267,7 +267,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot state write failed", __FUNCTION__);
         running_ = false;
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%d)", port_, state_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, state_to_string(state_));
     status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed sending robot state to controller", __FUNCTION__);
@@ -368,11 +368,21 @@ robot::join_threads() {
         conveyor_client_iterate_thread_.join();
 }
 
+const char*
+robot::state_to_string(robot::state _state) {
+    switch (_state) {
+    case robot::state::IDLING: return "IDLING";
+    case robot::state::COOKING: return "COOKING";
+    case robot::state::FINISHED: return "FINISHED";
+    default: return "Unimplemented item";
+    }
+}
+
 void
 robot::start() {
     if (!running_)
         return;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%d)", port_, state_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, state_to_string(state_));
     UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
