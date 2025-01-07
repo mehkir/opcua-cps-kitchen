@@ -1,7 +1,7 @@
 #ifndef ROBOT_TOOLS_HPP
 #define ROBOT_TOOLS_HPP
 
-enum robot_tools {
+enum class robot_tools {
     FRYER,
     PAN,
     POT,
@@ -10,8 +10,11 @@ enum robot_tools {
     CRUSHER,
     MASHER,
     MIXER,
-    HEATER,
-    STIRRER
+    STIRRER,
+    INGREDIENT_DISPENSER,
+    LAYERING_DISPENSER,
+    OVEN,
+    WHISK
 };
 
 #endif

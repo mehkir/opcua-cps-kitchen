@@ -46,16 +46,6 @@ struct robot_action {
         bool recipe_timed_;
 };
 
-    // public:
-    //     robot_action() {
-    //     }
-    //     ~robot_action() {
-    //     }
-    // prívate:
-    //     std::string name_;
-    //     robot_tools required_robot_tool_;
-    //     duration_t duration_;
-
 class robot_actions {
     public:
         static robot_actions* get_instance();
@@ -65,6 +55,8 @@ class robot_actions {
         static robot_actions* instance_;
         static std::mutex mutex_;
         std::unordered_map<std::string, robot_action> action_map_;
+        bool has_action(const std::string _action_name) const;
+        robot_action get_robot_action(const std::string _action_name) const;
 };
 
 #endif // ROBOT_ACTIONS

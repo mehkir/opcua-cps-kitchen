@@ -1,0 +1,175 @@
+{
+    "1" : {
+        "name" : "pumpkin soup",
+        "instructions" : [
+            {
+                "action" : "peel",
+                "ingredient" : "pumpkin"
+            },
+            {
+                "action" : "peel",
+                "ingredient" : "carrot"
+            },
+            {
+                "action" : "peel",
+                "ingredient" : "ginger"
+            },
+            {
+                "action" : "peel",
+                "ingredient" : "onion"
+            },
+            {
+                "action" : "cut",
+                "ingredient" : "pumpkin"
+            },
+            {
+                "action" : "cut",
+                "ingredient" : "carrot"
+            },
+            {
+                "action" : "cut",
+                "ingredient" : "ginger"
+            },
+            {
+                "action" : "cut",
+                "ingredient" : "onion"
+            },
+            {
+                "action" : "braise",
+                "ingredient" : "pumpkin, carrot, ginger, onion"
+            },
+            {
+                "action" : "boil",
+                "ingredient" : "pumpkin, carrot, ginger",
+                "duration" : 10
+            },
+            {
+                "action" : "mash",
+                "ingredient" : "pumpkin, carrot, ginger"
+            },
+            {
+                "action" : "stir",
+                "ingredient" : "coconut milk"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "salt"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "pepper"
+            },
+            {
+                "action" : "pour",
+                "ingredient" : "soy sauce"
+            },
+            {
+                "action" : "pour",
+                "ingredient" : "lemon juice"
+            }
+        ]
+    },
+    "2" : {
+        "name" : "potato broccoli casserole",
+        "instructions" : [
+            {
+                "action" : "peel",
+                "ingredient" : "potato"
+            },
+            {
+                "action" : "cut",
+                "ingredient" : "potato"
+            },
+            {
+                "action" : "cut",
+                "ingredient" : "broccoli"
+            },
+            {
+                "action" : "cut",
+                "ingredient" : "onion"
+            },
+            {
+                "action" : "boil",
+                "ingredient" : "potato"
+            },
+            {
+                "action" : "boil",
+                "ingredient" : "broccoli"
+            },
+            {
+                "action" : "fry",
+                "ingredient" : "onion"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "flour"
+            },
+            {
+                "action" : "pour",
+                "ingredient" : "cream"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "nutmeg"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "paprika powder"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "salt"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "pepper"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "chilli"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "cheese"
+            },
+            {
+                "action" : "bake",
+                "ingredient" : "casserole",
+                "duration" :  15
+            }
+        ]
+    },
+    "3" : {
+        "name" : "grape dessert",
+        "instructions" : [
+            {
+                "action" : "whip",
+                "ingredient" : "cream, sugar, vanilla sugar"
+            },
+            {
+                "action" : "mix",
+                "ingredient" : "quark, mascarpone"
+            },
+            {
+                "action" : "mix",
+                "ingredient" : "both mixtures"
+            },
+            {
+                "action" : "crush",
+                "ingredient" : "cookies"
+            },
+            {
+                "action" : "layer",
+                "ingredient" : "grapes"
+            },
+            {
+                "action" : "layer",
+                "ingredient" : "cream"
+            },
+            {
+                "action" : "sprinkle",
+                "ingredient" : "cookies"
+            }
+        ]
+    }
+}
