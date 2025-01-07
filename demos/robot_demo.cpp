@@ -93,7 +93,7 @@ int main(int argc, char* argv[]) {
     }
 
     node_value_subscriber clock_tick_subscriber;
-    clock_tick_subscriber.subscribe_node_value(clock_client, UA_NODEID_STRING(1, "clock_tick"), clock_tick_notification_callback, NULL);
+    clock_tick_subscriber.subscribe_node_value(clock_client, UA_NODEID_STRING(1, const_cast<char*>("clock_tick")), clock_tick_notification_callback, NULL);
 
     srand(time(NULL));
     next_clock_tick_ = rand() % 1000;
@@ -105,7 +105,7 @@ int main(int argc, char* argv[]) {
     UA_Variant_init(&inputs[2]);
     UA_Variant_setScalar(&inputs[2], &next_clock_tick_, &UA_TYPES[UA_TYPES_UINT64]);
     UA_UInt32 request_id = 0;
-    UA_Client_call_async(clock_client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_STRING(1, "receive_tick_ack"), 3, inputs, receive_tick_ack_called, NULL, &request_id);
+    UA_Client_call_async(clock_client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_STRING(1, const_cast<char*>("receive_tick_ack")), 3, inputs, receive_tick_ack_called, NULL, &request_id);
 
     /* Run client iterate asynchronously */
     std::thread client_iterate_thread([clock_client]() {

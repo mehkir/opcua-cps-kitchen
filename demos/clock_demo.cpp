@@ -54,7 +54,7 @@ receive_tick_ack (UA_Server *server,
         clock_tick_ = next_clock_tick_;
         UA_Boolean ack_received = true;
         UA_Variant_setScalarCopy(output, &ack_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
-        UA_Server_writeValue(server, UA_NODEID_STRING(1, "clock_tick"), new_clock_tick);
+        UA_Server_writeValue(server, UA_NODEID_STRING(1, const_cast<char*>("clock_tick")), new_clock_tick);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "New clock tick is: %lu", clock_tick_);
     }
     return UA_STATUSCODE_GOOD;
@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
     }
 
     information_node_inserter info_node_inserter;
-    status = info_node_inserter.add_information_node(server, UA_NODEID_STRING(1, "clock_tick"), "the clock tick", UA_TYPES_UINT64, &clock_tick_);
+    status = info_node_inserter.add_information_node(server, UA_NODEID_STRING(1, const_cast<char*>("clock_tick")), "the clock tick", UA_TYPES_UINT64, &clock_tick_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding information node");
         return EXIT_FAILURE;
@@ -103,7 +103,7 @@ int main(int argc, char* argv[]) {
     receive_tick_ack_inserter.add_input_argument("current tick of the client", "current_client_tick", UA_TYPES_UINT64);
     receive_tick_ack_inserter.add_input_argument("next tick of the tick client", "next_tick", UA_TYPES_UINT64);
     receive_tick_ack_inserter.add_output_argument("ack received", "ack_received", UA_TYPES_BOOLEAN);
-    status = receive_tick_ack_inserter.add_method_node(server, UA_NODEID_STRING(1,"receive_tick_ack"), "receive tick ack", receive_tick_ack);
+    status = receive_tick_ack_inserter.add_method_node(server, UA_NODEID_STRING(1, const_cast<char*>("receive_tick_ack")), "receive tick ack", receive_tick_ack);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding method node");
         return EXIT_FAILURE;
