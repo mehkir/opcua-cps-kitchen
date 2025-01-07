@@ -1,12 +1,12 @@
 #include <signal.h>
-#include <open62541/plugin/log_stdout.h>
+#include <iostream>
+
 #include "controller.hpp"
-#include <cstdlib>
 
 controller* controller_instance_;
 
 static void stop_handler(int sig) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "received ctrl-c");
+    std::cout << "received ctrl-c" << std::endl;
     controller_instance_->stop();
 }
 

@@ -1,11 +1,12 @@
-#include "robot.hpp"
 #include <signal.h>
-#include <open62541/plugin/log_stdout.h>
+#include <iostream>
+
+#include "robot.hpp"
 
 robot* robot_instance_;
 
 static void stop_handler(int sig) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "received ctrl-c");
+    std::cout << "received ctrl-c" << std::endl;
     robot_instance_->stop();
 }
 
