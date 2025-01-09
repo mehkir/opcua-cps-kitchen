@@ -4,68 +4,68 @@
         "instructions" : [
             {
                 "action" : "peel",
-                "ingredient" : "pumpkin"
+                "ingredients" : "pumpkin"
             },
             {
                 "action" : "peel",
-                "ingredient" : "carrot"
+                "ingredients" : "carrot"
             },
             {
                 "action" : "peel",
-                "ingredient" : "ginger"
+                "ingredients" : "ginger"
             },
             {
                 "action" : "peel",
-                "ingredient" : "onion"
+                "ingredients" : "onion"
             },
             {
                 "action" : "cut",
-                "ingredient" : "pumpkin"
+                "ingredients" : "pumpkin"
             },
             {
                 "action" : "cut",
-                "ingredient" : "carrot"
+                "ingredients" : "carrot"
             },
             {
                 "action" : "cut",
-                "ingredient" : "ginger"
+                "ingredients" : "ginger"
             },
             {
                 "action" : "cut",
-                "ingredient" : "onion"
+                "ingredients" : "onion"
             },
             {
                 "action" : "braise",
-                "ingredient" : "pumpkin, carrot, ginger, onion"
+                "ingredients" : "pumpkin, carrot, ginger, onion"
             },
             {
                 "action" : "boil",
-                "ingredient" : "pumpkin, carrot, ginger",
+                "ingredients" : "pumpkin, carrot, ginger",
                 "duration" : 10
             },
             {
                 "action" : "mash",
-                "ingredient" : "pumpkin, carrot, ginger"
+                "ingredients" : "pumpkin, carrot, ginger"
             },
             {
                 "action" : "stir",
-                "ingredient" : "coconut milk"
+                "ingredients" : "coconut milk"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "salt"
+                "ingredients" : "salt"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "pepper"
+                "ingredients" : "pepper"
             },
             {
                 "action" : "pour",
-                "ingredient" : "soy sauce"
+                "ingredients" : "soy sauce"
             },
             {
                 "action" : "pour",
-                "ingredient" : "lemon juice"
+                "ingredients" : "lemon juice"
             }
         ]
     },
@@ -74,67 +74,67 @@
         "instructions" : [
             {
                 "action" : "peel",
-                "ingredient" : "potato"
+                "ingredients" : "potato"
             },
             {
                 "action" : "cut",
-                "ingredient" : "potato"
+                "ingredients" : "potato"
             },
             {
                 "action" : "cut",
-                "ingredient" : "broccoli"
+                "ingredients" : "broccoli"
             },
             {
                 "action" : "cut",
-                "ingredient" : "onion"
+                "ingredients" : "onion"
             },
             {
                 "action" : "boil",
-                "ingredient" : "potato"
+                "ingredients" : "potato"
             },
             {
                 "action" : "boil",
-                "ingredient" : "broccoli"
+                "ingredients" : "broccoli"
             },
             {
                 "action" : "fry",
-                "ingredient" : "onion"
+                "ingredients" : "onion"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "flour"
+                "ingredients" : "flour"
             },
             {
                 "action" : "pour",
-                "ingredient" : "cream"
+                "ingredients" : "cream"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "nutmeg"
+                "ingredients" : "nutmeg"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "paprika powder"
+                "ingredients" : "paprika powder"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "salt"
+                "ingredients" : "salt"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "pepper"
+                "ingredients" : "pepper"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "chilli"
+                "ingredients" : "chilli"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "cheese"
+                "ingredients" : "cheese"
             },
             {
                 "action" : "bake",
-                "ingredient" : "casserole",
+                "ingredients" : "casserole",
                 "duration" :  15
             }
         ]
@@ -144,31 +144,31 @@
         "instructions" : [
             {
                 "action" : "whip",
-                "ingredient" : "cream, sugar, vanilla sugar"
+                "ingredients" : "cream, sugar, vanilla sugar"
             },
             {
                 "action" : "mix",
-                "ingredient" : "quark, mascarpone"
+                "ingredients" : "quark, mascarpone"
             },
             {
                 "action" : "mix",
-                "ingredient" : "both mixtures"
+                "ingredients" : "both mixtures"
             },
             {
                 "action" : "crush",
-                "ingredient" : "cookies"
+                "ingredients" : "cookies"
             },
             {
                 "action" : "layer",
-                "ingredient" : "grapes"
+                "ingredients" : "grapes"
             },
             {
                 "action" : "layer",
-                "ingredient" : "cream"
+                "ingredients" : "cream"
             },
             {
                 "action" : "sprinkle",
-                "ingredient" : "cookies"
+                "ingredients" : "cookies"
             }
         ]
     }
