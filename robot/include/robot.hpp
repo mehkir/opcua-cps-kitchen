@@ -11,6 +11,7 @@
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "types.hpp"
+#include "robot_tools.hpp"
 
 using namespace cps_kitchen;
 
@@ -88,6 +89,9 @@ private:
 
     const char*
     state_to_string(state _state);
+
+    const char*
+    robot_tools_to_string(robot_tools _tool);
 
 public:
     robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port);
