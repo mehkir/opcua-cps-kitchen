@@ -13,6 +13,7 @@
 #define LAYER "layer"
 #define BOIL "boil"
 #define BAKE "bake"
+#define FRY "fry"
 
 #define PEELING_TIME 5
 #define CUTTING_TIME 3
@@ -25,6 +26,7 @@
 #define MIXING_TIME 3
 #define CRUSHING_TIME 2
 #define LAYERING_TIME 2
+#define FRYING_TIME 3
 
 robot_actions* robot_actions::instance_;
 std::mutex robot_actions::mutex_;
@@ -50,6 +52,7 @@ robot_actions::robot_actions() {
     action_map_[MIX] = std::make_shared<autonomous_action>(MIX, robot_tools::MIXER, MIXING_TIME);
     action_map_[CRUSH] = std::make_shared<autonomous_action>(CRUSH, robot_tools::CRUSHER, CRUSHING_TIME);
     action_map_[LAYER] = std::make_shared<autonomous_action>(LAYER, robot_tools::LAYERING_DISPENSER, LAYERING_TIME);
+    action_map_[FRY] = std::make_shared<autonomous_action>(FRY, robot_tools::LAYERING_DISPENSER, FRYING_TIME);
     // recipe timed actions
     action_map_[BOIL] = std::make_shared<recipe_timed_action>(BOIL, robot_tools::POT);
     action_map_[BAKE] = std::make_shared<recipe_timed_action>(BAKE, robot_tools::OVEN);

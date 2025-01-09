@@ -23,6 +23,8 @@ recipe_parser::recipe_parser(std::string _recipe_path) {
     for (size_t recipe_id = 1; recipe_id <= recipes.size(); recipe_id++) {
         std::string dish_name = recipes[std::to_string(recipe_id)][DISH_NAME_KEY].asString();
         std::queue<robot_action> action_queue;
+        duration_t cooking_time = 0;
+        duration_t retooling_time = 0;
         for (auto instruction : recipes[std::to_string(recipe_id)][INSTRUCTIONS_KEY]) {
             if (!instruction.isMember(ACTION_KEY)) {
                 std::string error_string = "There is a missing action for recipe_id " + std::to_string(recipe_id);
@@ -57,9 +59,13 @@ recipe_parser::recipe_parser(std::string _recipe_path) {
                 action_time = instruction[DURATION_KEY].asUInt();
                 required_tool = recipe_timed_act->get_required_tool();
             }
+            cooking_time += action_time;
+            if (!action_queue.empty()) {
+                retooling_time += required_tool != action_queue.back().get_required_tool() ? RETOOLING_TIME : 0;
+            }
             action_queue.push(robot_action(action_name, required_tool, instruction[INGREDIENTS_KEY].asString(), action_time));
         }
-        recipe_map_[recipe_id] = recipe(recipe_id, dish_name, action_queue);
+        recipe_map_[recipe_id] = std::make_unique<recipe>(recipe_id, dish_name, action_queue, cooking_time, retooling_time);
     }
 }
 
@@ -71,5 +77,5 @@ bool recipe_parser::has_recipe(const cps_kitchen::recipe_id_t _recipe_id) const 
 }
 
 recipe recipe_parser::get_recipe(cps_kitchen::recipe_id_t _recipe) {
-    return recipe_map_.at(_recipe);
+    return recipe_map_.at(_recipe).operator*();
 }

@@ -1,5 +1,5 @@
-#ifndef ROBOT_ACTIONS.HPP
-#define ROBOT_ACTIONS.HPP
+#ifndef ROBOT_ACTIONS_HPP
+#define ROBOT_ACTIONS_HPP
 
 #include <mutex>
 #include <unordered_map>
@@ -7,6 +7,8 @@
 #include <memory>
 #include "robot_tools.hpp"
 #include "types.hpp"
+
+#define RETOOLING_TIME 1
 
 using namespace cps_kitchen;
 
@@ -43,7 +45,7 @@ struct robot_action : public action {
         std::string get_ingredients() const {
             return ingredients_;
         }
-        
+
         duration_t
         get_action_duration() const {
             return duration_;
@@ -113,4 +115,4 @@ class robot_actions {
         std::unordered_map<std::string, std::shared_ptr<action>> action_map_;
 };
 
-#endif // ROBOT_ACTIONS
+#endif // ROBOT_ACTIONS_HPP

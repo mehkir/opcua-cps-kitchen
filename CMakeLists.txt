@@ -4,6 +4,7 @@ project(opcua_cps_kitchen)
 set(CMAKE_CXX_STANDARD 17)
 
 add_subdirectory(wrappers)
+add_subdirectory(recipe)
 add_subdirectory(robot)
 add_subdirectory(demos)
 add_subdirectory(controller)
@@ -21,3 +22,7 @@ target_include_directories(start_controller_instance PUBLIC ${PROJECT_BINARY_DIR
 add_executable(start_conveyor_instance start_conveyor_instance.cpp)
 target_link_libraries(start_conveyor_instance PUBLIC conveyor_lib open62541)
 target_include_directories(start_conveyor_instance PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/conveyor/include)
+
+add_executable(recipe_testframe recipe_testframe.cpp)
+target_link_libraries(recipe_testframe PUBLIC recipe_lib)
+target_include_directories(recipe_testframe PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/recipe/include)

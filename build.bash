@@ -6,3 +6,4 @@ $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/de
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_robot_instance -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_controller_instance -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_conveyor_instance -- -j$(nproc)
+$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target recipe_testframe -- -j$(nproc)

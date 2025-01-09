@@ -90,11 +90,13 @@
             },
             {
                 "action" : "boil",
-                "ingredients" : "potato"
+                "ingredients" : "potato",
+                "duration" : 10
             },
             {
                 "action" : "boil",
-                "ingredients" : "broccoli"
+                "ingredients" : "broccoli",
+                "duration" : 10
             },
             {
                 "action" : "fry",
