@@ -21,9 +21,10 @@ struct robot_action : public action {
     private:
         std::string name_;
         robot_tools required_tool_;
+        std::string ingredients_;
         duration_t duration_;
     public:
-        robot_action(std::string _name, robot_tools _required_tool, duration_t _duration) : name_(_name), required_tool_(_required_tool), duration_(_duration) {
+        robot_action(std::string _name, robot_tools _required_tool, std::string _ingredients, duration_t _duration) : name_(_name), required_tool_(_required_tool), ingredients_(_ingredients), duration_(_duration) {
         }
         
         ~robot_action() {
@@ -39,6 +40,10 @@ struct robot_action : public action {
             return required_tool_;
         }
 
+        std::string get_ingredients() const {
+            return ingredients_;
+        }
+        
         duration_t
         get_action_duration() const {
             return duration_;
@@ -77,7 +82,6 @@ struct recipe_timed_action : public action {
     private:
         std::string name_;
         robot_tools required_tool_;
-        duration_t duration_;
     public:
         recipe_timed_action(std::string _name, robot_tools _required_tool) : name_(_name), required_tool_(_required_tool) {
         }
@@ -93,15 +97,6 @@ struct recipe_timed_action : public action {
         robot_tools
         get_required_tool() const {
             return required_tool_;
-        }
-
-        duration_t
-        get_action_duration() const {
-            return duration_;
-        }
-
-        void set_action_duration(duration_t _duration) {
-            duration_ = _duration;
         }
 };
 

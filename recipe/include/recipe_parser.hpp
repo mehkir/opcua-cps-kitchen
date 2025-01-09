@@ -15,6 +15,18 @@ struct recipe {
         recipe(recipe_id_t _recipe_id, std::string _dish_name, std::queue<robot_action> _action_queue) : recipe_id_(_recipe_id), dish_name_(_dish_name), action_queue_(_action_queue){
         }
 
+        recipe_id_t get_recipe_id() {
+            return recipe_id_;
+        }
+
+        std::string get_dish_name() {
+            return dish_name_;
+        }
+
+        std::queue<robot_action> get_action_queue() {
+            return action_queue_;
+        }
+
 };
 
 class recipe_parser {
