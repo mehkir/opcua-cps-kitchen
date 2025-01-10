@@ -12,7 +12,9 @@
 #include "information_node_inserter.hpp"
 #include "information_node_writer.hpp"
 
-robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) : server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true), state_(robot::state::IDLING), current_tool_(0), current_recipe_id_in_process_(0) {
+#define RECIPE_PATH "recipes.json"
+
+robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) : server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true), state_(robot::state::IDLING), current_tool_(0), current_recipe_id_in_process_(0), recipe_parser_(RECIPE_PATH) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     status = UA_ServerConfig_setMinimal(server_config, port_, NULL);

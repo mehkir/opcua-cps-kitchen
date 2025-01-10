@@ -3,7 +3,9 @@
 #include <string>
 #include <response_checker.hpp>
 
-controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), running_(true) {
+#define RECIPE_PATH "recipes.json"
+
+controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), running_(true), recipe_parser_(RECIPE_PATH) {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -90,7 +92,7 @@ controller::handle_robot_state(port_t _port, position_t _position, UA_UInt32 _ro
         remote_robot& robot = position_remote_robot_map_[_position].operator*();
         if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == remote_robot::state::IDLING) {
             robot.set_state_status(remote_robot::state_status::OBSOLETE);
-            robot.instruct(42, receive_robot_task_called);
+            robot.instruct(1, receive_robot_task_called);
         }
     }
     UA_Boolean robot_state_received = true;

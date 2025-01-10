@@ -16,6 +16,7 @@
 #include "client_connection_establisher.hpp"
 #include "information_node_inserter.hpp"
 #include "types.hpp"
+#include "recipe_parser.hpp"
 
 using namespace cps_kitchen;
 
@@ -146,6 +147,8 @@ private:
     /* robot related member variables */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
     method_node_inserter receive_robot_state_inserter_;
+    /* recipe related member variables */
+    recipe_parser recipe_parser_;
 
     static UA_StatusCode
     receive_robot_state(UA_Server* _server,

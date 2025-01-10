@@ -12,6 +12,7 @@
 #include "method_node_inserter.hpp"
 #include "types.hpp"
 #include "robot_tools.hpp"
+#include "recipe_parser.hpp"
 
 using namespace cps_kitchen;
 
@@ -43,6 +44,8 @@ private:
     UA_Client* conveyor_client_;
     method_node_caller receive_finished_order_notification_caller_;
     std::thread conveyor_client_iterate_thread_;
+    /* recipe related member variables */
+    recipe_parser recipe_parser_;
     
     static void
     receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
