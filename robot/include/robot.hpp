@@ -29,9 +29,13 @@ private:
     position_t position_;
     port_t port_;
     robot::state state_;
-    UA_UInt32 current_tool_;
-    recipe_id_t current_recipe_id_in_process_;
-    std::queue<std::tuple<std::string, UA_UInt32>> action_queue_;
+    robot_tools current_tool_;
+    recipe_id_t recipe_id_in_process_;
+    UA_String dish_in_process_;
+    UA_String action_in_process_;
+    UA_String ingredients_in_process_;
+    duration_t overall_time_;
+    std::queue<robot_action> action_queue_;
     volatile UA_Boolean running_;
     method_node_inserter receive_task_inserter_;
     method_node_inserter handover_finished_order_inserter_;
@@ -87,14 +91,14 @@ private:
     static void
     perform_action(UA_Server* _server, void* _data);
 
+    static void
+    retool(UA_Server* _server, void* _data);
+
     void
     join_threads();
 
     const char*
     state_to_string(state _state);
-
-    const char*
-    robot_tools_to_string(robot_tools _tool);
 
 public:
     robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port);

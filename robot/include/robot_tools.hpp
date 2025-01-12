@@ -14,7 +14,8 @@ enum class robot_tools {
     INGREDIENT_DISPENSER,
     LAYERING_DISPENSER,
     OVEN,
-    WHISK
+    WHISK,
+    ROBOT_TOOLS_COUNT = WHISK+1
 };
 
 static const char* robot_tools_to_string(robot_tools _robot_tool) {
