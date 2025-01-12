@@ -6,7 +6,7 @@ callback_scheduler::callback_scheduler(UA_Server* _server, UA_ServerCallback _ca
 callback_scheduler::~callback_scheduler() {
 }
 
-void 
+UA_StatusCode 
 callback_scheduler::schedule_from_now(UA_DateTime _expiry_time) {
-    UA_Server_addTimedCallback(server_, callback_, data_, _expiry_time, callback_id_);
+    return UA_Server_addTimedCallback(server_, callback_, data_, _expiry_time, callback_id_);
 }

@@ -13,7 +13,7 @@ private:
 public:
     callback_scheduler(UA_Server* _server, UA_ServerCallback _callback, void* _data, UA_UInt64* _callback_id);
     ~callback_scheduler();
-    void schedule_from_now(UA_DateTime _expiry_time);
+    UA_StatusCode schedule_from_now(UA_DateTime _expiry_time);
 };
 
 #endif // CALLBACK_SCHEDULER_HPP
