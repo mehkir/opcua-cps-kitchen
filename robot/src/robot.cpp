@@ -16,8 +16,8 @@
 
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
         server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
-        state_(robot::state::IDLING), current_tool_(robot_tools::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), dish_in_process_(UA_STRING("None")), action_in_process_(UA_STRING("None")),
-        ingredients_in_process_(UA_STRING("None")), overall_time_(0), recipe_parser_(RECIPE_PATH) {
+        state_(robot::state::IDLING), current_tool_(robot_tools::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), dish_in_process_(UA_STRING(const_cast<char*>("None"))), action_in_process_(UA_STRING(const_cast<char*>("None"))),
+        ingredients_in_process_(UA_STRING(const_cast<char*>("None"))), overall_time_(0), recipe_parser_(RECIPE_PATH) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -216,7 +216,7 @@ robot::receive_task(UA_Server *_server,
 
     if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
-        return;
+        return UA_STATUSCODE_BAD;
     }
     recipe_id_t recipe_id = *(recipe_id_t*)_input[0].data;
 
@@ -395,21 +395,21 @@ robot::determine_next_action() {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot state write failed", __FUNCTION__);
             running_ = false;
         }
-        dish_in_process_ = UA_STRING("None");
+        dish_in_process_ = UA_STRING(const_cast<char*>("None"));
         information_node_writer dish_name_writer;
         status = dish_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), &dish_in_process_, &UA_TYPES[UA_TYPES_STRING]);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Dish name write failed", __FUNCTION__);
             running_ = false;
         }
-        action_in_process_ = UA_STRING("None");
+        action_in_process_ = UA_STRING(const_cast<char*>("None"));
         information_node_writer action_name_writer;
-        UA_StatusCode status = action_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), &action_in_process_, &UA_TYPES[UA_TYPES_STRING]);
+        status = action_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), &action_in_process_, &UA_TYPES[UA_TYPES_STRING]);
         if (status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Action name write failed", __FUNCTION__);
             running_ = false;
         }
-        ingredients_in_process_ = UA_STRING("None");
+        ingredients_in_process_ = UA_STRING(const_cast<char*>("None"));
         information_node_writer ingredients_writer;
         status = ingredients_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), &ingredients_in_process_, &UA_TYPES[UA_TYPES_STRING]);
         if (status != UA_STATUSCODE_GOOD) {
@@ -478,7 +478,7 @@ robot::perform_action(UA_Server* _server, void* _data) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Overall time write failed", __FUNCTION__);
         self->running_ = false;
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ds", robot_act.get_name().c_str(), robot_act.get_ingredients().c_str(), self->recipe_id_in_process_, action_duration);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ds", robot_act.get_name().c_str(), self->recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
     self->action_queue_.pop();
     self->determine_next_action();
 }
