@@ -1,0 +1,3 @@
+add_executable(information_node_tester information_node_tester.cpp)
+target_link_libraries(information_node_tester PUBLIC wrappers_lib open62541)
+target_include_directories(information_node_tester PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
