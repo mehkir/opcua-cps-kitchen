@@ -23,7 +23,7 @@ static void change_string(UA_Server* _server, void *data) {
         running = false;
     }
     UA_String string_value = *(UA_String*) str_value_reader.get_variant()->data;
-    std::string new_str = std::string((char*) string_value.data, string_value.length) + " " + std::to_string(counter);
+    std::string new_str = std::string((char*) string_value.data, string_value.length) + ", " + std::to_string(counter);
     UA_String new_string_value = UA_STRING(const_cast<char*>(new_str.c_str()));
     information_node_writer str_writer;
     str_writer.write_value(_server, UA_NODEID_STRING(1, const_cast<char*>("str_node")), &new_string_value, &UA_TYPES[UA_TYPES_STRING]);
