@@ -16,8 +16,8 @@
 
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
         server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
-        state_(robot::state::IDLING), current_tool_(robot_tools::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), dish_in_process_(UA_STRING(const_cast<char*>("None"))), action_in_process_(UA_STRING(const_cast<char*>("None"))),
-        ingredients_in_process_(UA_STRING(const_cast<char*>("None"))), overall_time_(0), recipe_parser_(RECIPE_PATH) {
+        state_(robot::state::IDLING), current_tool_(robot_tools::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), dish_in_process_("None"), action_in_process_("None"),
+        ingredients_in_process_("None"), overall_time_(0), recipe_parser_(RECIPE_PATH) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -65,23 +65,26 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     }
 
     information_node_inserter dish_name_information_node;
-    status = dish_name_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), "dish name", UA_TYPES_STRING, &dish_in_process_);
+    UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
+    status = dish_name_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), "dish name", UA_TYPES_STRING, &dish_in_process);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the dish name information node", __FUNCTION__);
         running_ = false;
         return;
     }
 
+    UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
     information_node_inserter action_name_information_node;
-    status = action_name_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), "action name", UA_TYPES_STRING, &action_in_process_);
+    status = action_name_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), "action name", UA_TYPES_STRING, &action_in_process);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the action name information node", __FUNCTION__);
         running_ = false;
         return;
     }
 
+    UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
     information_node_inserter ingredients_information_node;
-    status = ingredients_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), "ingredients", UA_TYPES_STRING, &ingredients_in_process_);
+    status = ingredients_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), "ingredients", UA_TYPES_STRING, &ingredients_in_process);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the ingredients information node", __FUNCTION__);
         running_ = false;
@@ -267,9 +270,10 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_Variant* _output) {
     }
 
     recipe current_recipe = recipe_parser_.get_recipe(recipe_id_in_process_);
-    dish_in_process_ = UA_STRING(const_cast<char*>(current_recipe.get_dish_name().c_str()));
+    dish_in_process_ = current_recipe.get_dish_name();
+    UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
     information_node_writer dish_name_writer;
-    status = dish_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), &dish_in_process_, &UA_TYPES[UA_TYPES_STRING]);
+    status = dish_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), &dish_in_process, &UA_TYPES[UA_TYPES_STRING]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Dish name write failed", __FUNCTION__);
         running_ = false;
@@ -364,16 +368,18 @@ robot::determine_next_action() {
                 running_ = false;
             }
         } else {
-            action_in_process_ = UA_STRING(const_cast<char*>(robot_act.get_name().c_str()));
+            action_in_process_ = robot_act.get_name();
+            UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
             information_node_writer action_name_writer;
-            UA_StatusCode status = action_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), &action_in_process_, &UA_TYPES[UA_TYPES_STRING]);
+            UA_StatusCode status = action_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), &action_in_process, &UA_TYPES[UA_TYPES_STRING]);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Action name write failed", __FUNCTION__);
                 running_ = false;
             }
-            ingredients_in_process_ = UA_STRING(const_cast<char*>(robot_act.get_ingredients().c_str()));
+            ingredients_in_process_ = robot_act.get_ingredients();
+            UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
             information_node_writer ingredients_writer;
-            status = ingredients_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), &ingredients_in_process_, &UA_TYPES[UA_TYPES_STRING]);
+            status = ingredients_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), &ingredients_in_process, &UA_TYPES[UA_TYPES_STRING]);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Ingredients write failed", __FUNCTION__);
                 running_ = false;
@@ -395,23 +401,26 @@ robot::determine_next_action() {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot state write failed", __FUNCTION__);
             running_ = false;
         }
-        dish_in_process_ = UA_STRING(const_cast<char*>("None"));
+        dish_in_process_ = "None";
+        UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
         information_node_writer dish_name_writer;
-        status = dish_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), &dish_in_process_, &UA_TYPES[UA_TYPES_STRING]);
+        status = dish_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), &dish_in_process, &UA_TYPES[UA_TYPES_STRING]);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Dish name write failed", __FUNCTION__);
             running_ = false;
         }
-        action_in_process_ = UA_STRING(const_cast<char*>("None"));
+        action_in_process_ = "None";
+        UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
         information_node_writer action_name_writer;
-        status = action_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), &action_in_process_, &UA_TYPES[UA_TYPES_STRING]);
+        status = action_name_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), &action_in_process, &UA_TYPES[UA_TYPES_STRING]);
         if (status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Action name write failed", __FUNCTION__);
             running_ = false;
         }
-        ingredients_in_process_ = UA_STRING(const_cast<char*>("None"));
+        ingredients_in_process_ = "None";
+        UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
         information_node_writer ingredients_writer;
-        status = ingredients_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), &ingredients_in_process_, &UA_TYPES[UA_TYPES_STRING]);
+        status = ingredients_writer.write_value(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), &ingredients_in_process, &UA_TYPES[UA_TYPES_STRING]);
         if (status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Ingredients write failed", __FUNCTION__);
             running_ = false;

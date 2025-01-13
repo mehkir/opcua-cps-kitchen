@@ -31,9 +31,9 @@ private:
     robot::state state_;
     robot_tools current_tool_;
     recipe_id_t recipe_id_in_process_;
-    UA_String dish_in_process_;
-    UA_String action_in_process_;
-    UA_String ingredients_in_process_;
+    std::string dish_in_process_;
+    std::string action_in_process_;
+    std::string ingredients_in_process_;
     duration_t overall_time_;
     std::queue<robot_action> action_queue_;
     volatile UA_Boolean running_;
