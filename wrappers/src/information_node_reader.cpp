@@ -2,6 +2,7 @@
 
 
 information_node_reader::information_node_reader() {
+    UA_Variant_init(&variant_);
 }
 
 information_node_reader::~information_node_reader() {
