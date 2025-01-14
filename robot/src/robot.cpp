@@ -188,7 +188,6 @@ robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32
     }   
 
     UA_Boolean robot_state_received = *(UA_Boolean*)response.get_data(0,0);
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, robot_state_received);
     
     robot* self = static_cast<robot*>(_userdata);
     self->handle_robot_state_result(robot_state_received);
@@ -197,9 +196,7 @@ robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32
 void
 robot::handle_robot_state_result(UA_Boolean _robot_state_received) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (_robot_state_received) {
-        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s Controller received state successfully", __FUNCTION__);
-    } else {
+    if (!_robot_state_received) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Controller returned false", __FUNCTION__);
     }
 }
