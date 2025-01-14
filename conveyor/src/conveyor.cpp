@@ -168,6 +168,7 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
 void
 conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d with port %d passed recipe ID %d", _remote_robot_position, _remote_robot_port, _finished_recipe);
     notifications_map_.erase(_remote_robot_position);
     plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
     p.place_recipe_id(_finished_recipe);
@@ -220,8 +221,10 @@ void
 conveyor::determine_next_movement() {
     if (occupied_plates_.empty() && notifications_map_.empty()) {
         state_status_ = conveyor::state::IDLING;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: No occupied plates or notifications, idling now");
     } else {
         handle_retrieve_finished_orders();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: There are still finished orders to deliver or retrieve");
     }
 }
 
