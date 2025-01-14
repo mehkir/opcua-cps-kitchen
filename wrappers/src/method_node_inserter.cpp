@@ -15,7 +15,7 @@ void method_node_inserter::add_input_argument(std::string _description, std::str
     }
     UA_Argument input_argument;
     UA_Argument_init(&input_argument);
-    input_argument.description = UA_LOCALIZEDTEXT("en-US", const_cast<char*>(_description.c_str()));
+    input_argument.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
     input_argument.name = UA_STRING(const_cast<char*>(_name.c_str()));
     input_argument.dataType = UA_TYPES[_type_index].typeId;
     input_argument.valueRank = UA_VALUERANK_SCALAR;
@@ -28,7 +28,7 @@ void method_node_inserter::add_output_argument(std::string _description, std::st
     }
     UA_Argument output_argument;
     UA_Argument_init(&output_argument);
-    output_argument.description = UA_LOCALIZEDTEXT("en-US", const_cast<char*>(_description.c_str()));
+    output_argument.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
     output_argument.name = UA_STRING(const_cast<char*>(_name.c_str()));
     output_argument.dataType = UA_TYPES[_type_index].typeId;
     output_argument.valueRank = UA_VALUERANK_SCALAR;
@@ -44,8 +44,8 @@ UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_NodeI
     method_attributes_ = UA_MethodAttributes_default;
     std::string description = "desc.:" + _browse_name;
     std::string display_name = "disp.:" + _browse_name;
-    method_attributes_.description = UA_LOCALIZEDTEXT("en-US", const_cast<char*>(description.c_str()));
-    method_attributes_.displayName = UA_LOCALIZEDTEXT("en-US", const_cast<char*>(display_name.c_str()));
+    method_attributes_.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(description.c_str()));
+    method_attributes_.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(display_name.c_str()));
     method_attributes_.executable = true;
     method_attributes_.userExecutable = true;
     status_code = UA_Server_addMethodNode(_server, _method_node_id,

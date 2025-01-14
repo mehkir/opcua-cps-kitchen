@@ -10,8 +10,8 @@ UA_StatusCode information_node_inserter::add_information_node(UA_Server* _server
     /* Define the attribute and value of the variable node */
     UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
     UA_Variant_setScalar(&variable_attributes.value, _value, &UA_TYPES[_type_index]);
-    variable_attributes.description = UA_LOCALIZEDTEXT("en-US", const_cast<char*>(_browse_name.c_str()));
-    variable_attributes.displayName = UA_LOCALIZEDTEXT("en-US", const_cast<char*>(_browse_name.c_str()));
+    variable_attributes.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_browse_name.c_str()));
+    variable_attributes.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_browse_name.c_str()));
     variable_attributes.dataType = UA_TYPES[_type_index].typeId;
     variable_attributes.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
 
