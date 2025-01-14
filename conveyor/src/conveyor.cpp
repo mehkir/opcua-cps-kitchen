@@ -21,7 +21,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
     /* Setup plates */
     for (size_t i = 0; i < _robot_count+1; i++) {
         plates_.push_back(plate(i,i, server_));
-        position_plates_map_[i] = &plates_.back();
+        position_plate_id_map_[i] = i;
     }
 
     receive_finished_order_notification_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
@@ -91,7 +91,7 @@ conveyor::handle_finished_order_notification(port_t _robot_port, position_t _rob
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "FINISHED_ORDER_NOTIFICATION: Received notification from robot at position %d with port %d", _robot_position, _robot_port);
     UA_Boolean finished_order_notification_received = true;
     UA_Variant_setScalarCopy(_output, &finished_order_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
-    if (!position_remote_robot_map_.count(_robot_position)) {
+    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_port, _robot_position);
     }
     notifications_map_[_robot_position] = _robot_port;
@@ -115,9 +115,14 @@ conveyor::retrieve_finished_orders(UA_Server* _server, void* _data) {
 void
 conveyor::handle_retrieve_finished_orders() {
     for (auto notification = notifications_map_.begin(); notification != notifications_map_.end(); notification++) {
-        if (!position_plates_map_[notification->first]->is_occupied()){
+        if (!plates_[position_plate_id_map_[notification->first]].is_occupied()){
             retrievable_positions_.insert(notification->first);
         }
+    }
+
+    if (retrievable_positions_.empty() && !occupied_plates_.empty()) {
+        callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
+        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)MOVE_TIME * UA_DATETIME_SEC));
     }
 
     for (position_t position : retrievable_positions_) {
@@ -164,10 +169,10 @@ void
 conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     notifications_map_.erase(_remote_robot_position);
-    plate* p = position_plates_map_[_remote_robot_position];
-    p->place_recipe_id(_finished_recipe);
-    p->set_occupied(true);
-    occupied_plates_.insert(p->get_plate_id());
+    plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
+    p.place_recipe_id(_finished_recipe);
+    p.set_occupied(true);
+    occupied_plates_.insert(p.get_plate_id());
     retrieved_positions_.insert(_remote_robot_position);
     if(retrieved_positions_ == retrievable_positions_) {
         retrieved_positions_.clear();
@@ -196,18 +201,18 @@ conveyor::move_conveyor(steps_t _steps) {
     for (size_t i = 0; i < plates_.size(); i++) {
         position_t new_position = (plates_[i].get_position() + _steps) % plates_.size();
         plates_[i].set_position(new_position);
-        position_plates_map_[new_position] = &plates_[i];
+        position_plate_id_map_[new_position] = plates_[i].get_plate_id();
     }
 }
 
 void
 conveyor::deliver_finished_order() {
-    plate* output_plate = position_plates_map_[OUTPUT_POSITION];
-    if(output_plate->is_occupied()) {
-        recipe_id_t recipe = output_plate->get_placed_recipe_id();
-        output_plate->place_recipe_id(0);
-        output_plate->set_occupied(false);
-        occupied_plates_.erase(output_plate->get_plate_id());
+    plate& output_plate = plates_[position_plate_id_map_[OUTPUT_POSITION]];
+    if(output_plate.is_occupied()) {
+        recipe_id_t recipe = output_plate.get_placed_recipe_id();
+        output_plate.place_recipe_id(0);
+        output_plate.set_occupied(false);
+        occupied_plates_.erase(output_plate.get_plate_id());
     }
 }
 

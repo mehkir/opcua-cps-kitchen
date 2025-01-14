@@ -201,7 +201,7 @@ private:
     std::set<plate_id_t> occupied_plates_;
     std::set<position_t> retrievable_positions_;
     std::set<position_t> retrieved_positions_;
-    std::unordered_map<position_t, plate*> position_plates_map_;
+    std::unordered_map<position_t, plate_id_t> position_plate_id_map_;
     std::unordered_map<position_t, port_t> notifications_map_;
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
 
