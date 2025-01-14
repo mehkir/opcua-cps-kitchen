@@ -2,6 +2,7 @@
 #include <open62541/server_config_default.h>
 #include <string>
 #include <response_checker.hpp>
+#include <random>
 
 #define RECIPE_PATH "recipes.json"
 
@@ -80,7 +81,7 @@ controller::receive_robot_state(UA_Server* _server,
 void
 controller::handle_robot_state(port_t _port, position_t _position, UA_UInt32 _robot_state, UA_UInt32 _current_tool, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (!position_remote_robot_map_.count(_position)) {
+    if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position);
     }
     remote_robot& robot = position_remote_robot_map_[_position].operator*();
@@ -88,11 +89,15 @@ controller::handle_robot_state(port_t _port, position_t _position, UA_UInt32 _ro
     robot.set_current_tool(_current_tool);
     robot.set_state_status(remote_robot::state_status::CURRENT);
 
+    std::random_device random_device;
+    std::mt19937 mersenne_twister(random_device());
+    std::uniform_int_distribution<std::uint32_t> distribution(1, 3);
+
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
         remote_robot& robot = position_remote_robot_map_[_position].operator*();
         if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == remote_robot::state::IDLING) {
             robot.set_state_status(remote_robot::state_status::OBSOLETE);
-            robot.instruct(1, receive_robot_task_called);
+            robot.instruct(distribution(mersenne_twister), receive_robot_task_called);
         }
     }
     UA_Boolean robot_state_received = true;
