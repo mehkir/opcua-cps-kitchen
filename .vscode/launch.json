@@ -7,7 +7,7 @@
             "request": "launch",
             // Resolved by CMake Tools:
             "program": "${workspaceFolder}/build/start_conveyor_instance",
-            "args": ["3000","4000","1","5000","6000"],
+            "args": ["6000","4"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
