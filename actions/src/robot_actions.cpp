@@ -15,18 +15,18 @@
 #define BAKE "bake"
 #define FRY "fry"
 
-#define PEELING_TIME 5
-#define CUTTING_TIME 3
-#define BRAISING_TIME 8
-#define MASHING_TIME 5
-#define STIRRING_TIME 3
-#define SPRINKLING_TIME 1
-#define POURING_TIME 1
-#define WHIPPING_TIME 3
-#define MIXING_TIME 3
-#define CRUSHING_TIME 2
-#define LAYERING_TIME 2
-#define FRYING_TIME 3
+#define PEELING_TIME 5LL
+#define CUTTING_TIME 3LL
+#define BRAISING_TIME 8LL
+#define MASHING_TIME 5LL
+#define STIRRING_TIME 3LL
+#define SPRINKLING_TIME 1LL
+#define POURING_TIME 1LL
+#define WHIPPING_TIME 3LL
+#define MIXING_TIME 3LL
+#define CRUSHING_TIME 2LL
+#define LAYERING_TIME 2LL
+#define FRYING_TIME 3LL
 
 robot_actions* robot_actions::instance_;
 std::mutex robot_actions::mutex_;

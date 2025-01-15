@@ -5,9 +5,10 @@
 #include <memory>
 #include "response_checker.hpp"
 #include "callback_scheduler.hpp"
+#include "time_unit.hpp"
 
-#define DEBOUNCE_TIME 1
-#define MOVE_TIME 1
+#define DEBOUNCE_TIME 1LL
+#define MOVE_TIME 1LL
 
 conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), running_(true), state_status_(conveyor::state::IDLING) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -98,7 +99,7 @@ conveyor::handle_finished_order_notification(port_t _robot_port, position_t _rob
     if (state_status_ == conveyor::state::IDLING) {
         state_status_ = conveyor::state::MOVING;
         callback_scheduler retrieve_finished_orders_scheduler(server_, retrieve_finished_orders, this, NULL);
-        retrieve_finished_orders_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)DEBOUNCE_TIME * UA_DATETIME_SEC));
+        retrieve_finished_orders_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (DEBOUNCE_TIME * TIME_UNIT));
     }
 }
 
@@ -122,7 +123,7 @@ conveyor::handle_retrieve_finished_orders() {
 
     if (retrievable_positions_.empty() && !occupied_plates_.empty()) {
         callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
-        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)MOVE_TIME * UA_DATETIME_SEC));
+        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
     }
 
     for (position_t position : retrievable_positions_) {
@@ -179,7 +180,7 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
         retrieved_positions_.clear();
         retrievable_positions_.clear();
         callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
-        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)MOVE_TIME * UA_DATETIME_SEC));
+        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
     }
 }
 

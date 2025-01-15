@@ -8,7 +8,7 @@
 #include "robot_tools.hpp"
 #include "types.hpp"
 
-#define RETOOLING_TIME 1
+#define RETOOLING_TIME 1LL
 
 using namespace cps_kitchen;
 

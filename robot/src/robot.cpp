@@ -11,6 +11,7 @@
 #include "callback_scheduler.hpp"
 #include "information_node_inserter.hpp"
 #include "information_node_writer.hpp"
+#include "time_unit.hpp"
 
 #define RECIPE_PATH "recipes.json"
 
@@ -359,7 +360,7 @@ robot::determine_next_action() {
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Retooling current tool %s to %s", robot_tools_to_string(current_tool_), robot_tools_to_string(required_tool));
             callback_scheduler retool_scheduler(server_, retool, this, NULL);
-            UA_StatusCode status = retool_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)RETOOLING_TIME * UA_DATETIME_SEC));
+            UA_StatusCode status = retool_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (RETOOLING_TIME * TIME_UNIT));
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
                 running_ = false;
@@ -384,7 +385,7 @@ robot::determine_next_action() {
             duration_t action_duration = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ds", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
             callback_scheduler action_scheduler(server_, perform_action, this, NULL);
-            status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + ((long long)action_duration * UA_DATETIME_SEC));
+            status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (action_duration * TIME_UNIT));
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling perform action", __FUNCTION__);
                 running_ = false;
