@@ -94,7 +94,7 @@ controller::handle_robot_state(port_t _port, position_t _position, UA_UInt32 _ro
     std::uniform_int_distribution<std::uint32_t> distribution(1, 3);
 
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
-        remote_robot& robot = position_remote_robot_map_[_position].operator*();
+        remote_robot& robot = position_remote_robot->second.operator*();
         if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == remote_robot::state::IDLING) {
             robot.set_state_status(remote_robot::state_status::OBSOLETE);
             robot.instruct(distribution(mersenne_twister), receive_robot_task_called);
