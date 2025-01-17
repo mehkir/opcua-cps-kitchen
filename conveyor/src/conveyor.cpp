@@ -139,15 +139,19 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
         return;
     }
+    conveyor* self = static_cast<conveyor*>(_userdata);
+
     response_checker response(_response);
     UA_StatusCode status_code = response.get_service_result();;
     if(status_code != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
+        self->running_ = false;
         return;
     }
 
     if(response.get_output_arguments_size(0) != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        self->running_ = false;
         return;
     }
 
@@ -155,6 +159,7 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
       || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
       || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        self->running_ = false;
         return;
     }
 
@@ -162,7 +167,6 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
     position_t remote_robot_position = *(position_t*) response.get_data(0,1);
     recipe_id_t finished_recipe = *(recipe_id_t*) response.get_data(0,2);
 
-    conveyor* self = static_cast<conveyor*>(_userdata);
     self->handle_handover_finished_order(remote_robot_port, remote_robot_position, finished_recipe);
 }
 
