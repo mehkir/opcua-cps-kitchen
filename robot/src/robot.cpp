@@ -520,7 +520,7 @@ robot::join_threads() {
 }
 
 const char*
-robot_state_to_string(robot_state _state) {
+robot::robot_state_to_string(robot_state _state) {
     switch (_state) {
     case robot_state::IDLING: return "IDLING";
     case robot_state::COOKING: return "COOKING";
