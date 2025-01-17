@@ -17,7 +17,7 @@
 
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
         server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
-        state_(robot::state::IDLING), current_tool_(robot_tools::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), dish_in_process_("None"), action_in_process_("None"),
+        state_(robot::state::IDLING), current_tool_(robot_tool::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), dish_in_process_("None"), action_in_process_("None"),
         ingredients_in_process_("None"), overall_time_(0), recipe_parser_(RECIPE_PATH) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -356,9 +356,9 @@ void
 robot::determine_next_action() {
     if (action_queue_.size()) {
         robot_action robot_act = action_queue_.front();
-        robot_tools required_tool = robot_act.get_required_tool();
+        robot_tool required_tool = robot_act.get_required_tool();
         if (required_tool != current_tool_) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Retooling current tool %s to %s", robot_tools_to_string(current_tool_), robot_tools_to_string(required_tool));
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             callback_scheduler retool_scheduler(server_, retool, this, NULL);
             UA_StatusCode status = retool_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (RETOOLING_TIME * TIME_UNIT));
             if (status != UA_STATUSCODE_GOOD) {
@@ -505,7 +505,7 @@ robot::retool(UA_Server* _server, void* _data) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Overall time write failed", __FUNCTION__);
         self->running_ = false;
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Current tool now is %s", robot_tools_to_string(self->current_tool_));
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Current tool now is %s", robot_tool_to_string(self->current_tool_));
     self->determine_next_action();
 }
 

@@ -12,7 +12,7 @@ int main (int argc, char* argv[]) {
             robot_action robot_act = action_queue.front();
             action_queue.pop();
             std::cout << "Action name: " << robot_act.get_name() << std::endl;
-            std::cout << "Required tool: " << robot_tools_to_string(robot_act.get_required_tool()) << std::endl;
+            std::cout << "Required tool: " << robot_tool_to_string(robot_act.get_required_tool()) << std::endl;
             std::cout << "Ingredients: " << robot_act.get_ingredients() << std::endl;
             std::cout << "Duration: " << robot_act.get_action_duration() << std::endl;
         }

@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <string>
 #include <memory>
-#include "robot_tools.hpp"
+#include "robot_tool.hpp"
 #include "types.hpp"
 
 #define RETOOLING_TIME 1LL
@@ -22,11 +22,11 @@ struct action {
 struct robot_action : public action {
     private:
         std::string name_;
-        robot_tools required_tool_;
+        robot_tool required_tool_;
         std::string ingredients_;
         duration_t duration_;
     public:
-        robot_action(std::string _name, robot_tools _required_tool, std::string _ingredients, duration_t _duration) : name_(_name), required_tool_(_required_tool), ingredients_(_ingredients), duration_(_duration) {
+        robot_action(std::string _name, robot_tool _required_tool, std::string _ingredients, duration_t _duration) : name_(_name), required_tool_(_required_tool), ingredients_(_ingredients), duration_(_duration) {
         }
         
         ~robot_action() {
@@ -37,7 +37,7 @@ struct robot_action : public action {
             return name_;
         }
 
-        robot_tools
+        robot_tool
         get_required_tool() const {
             return required_tool_;
         }
@@ -55,10 +55,10 @@ struct robot_action : public action {
 struct autonomous_action : public action {
     private:
         std::string name_;
-        robot_tools required_tool_;
+        robot_tool required_tool_;
         duration_t duration_;
     public:
-        autonomous_action(std::string _name, robot_tools _required_tool, duration_t _duration) : name_(_name), required_tool_(_required_tool), duration_(_duration) {
+        autonomous_action(std::string _name, robot_tool _required_tool, duration_t _duration) : name_(_name), required_tool_(_required_tool), duration_(_duration) {
         }
 
         ~autonomous_action() {
@@ -69,7 +69,7 @@ struct autonomous_action : public action {
             return name_;
         }
 
-        robot_tools
+        robot_tool
         get_required_tool() const {
             return required_tool_;
         }
@@ -83,9 +83,9 @@ struct autonomous_action : public action {
 struct recipe_timed_action : public action {
     private:
         std::string name_;
-        robot_tools required_tool_;
+        robot_tool required_tool_;
     public:
-        recipe_timed_action(std::string _name, robot_tools _required_tool) : name_(_name), required_tool_(_required_tool) {
+        recipe_timed_action(std::string _name, robot_tool _required_tool) : name_(_name), required_tool_(_required_tool) {
         }
 
         ~recipe_timed_action() {
@@ -96,7 +96,7 @@ struct recipe_timed_action : public action {
             return name_;
         }
 
-        robot_tools
+        robot_tool
         get_required_tool() const {
             return required_tool_;
         }

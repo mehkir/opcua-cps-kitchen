@@ -41,21 +41,21 @@ robot_actions* robot_actions::get_instance() {
 
 robot_actions::robot_actions() {
     // autonomous timed actions
-    action_map_[PEEL] = std::make_shared<autonomous_action>(PEEL, robot_tools::PEELER, PEELING_TIME);
-    action_map_[CUT] = std::make_shared<autonomous_action>(CUT, robot_tools::CUTTER, CUTTING_TIME);
-    action_map_[BRAISE] = std::make_shared<autonomous_action>(BRAISE, robot_tools::PAN, BRAISING_TIME);
-    action_map_[MASH] = std::make_shared<autonomous_action>(MASH, robot_tools::MASHER, MASHING_TIME);
-    action_map_[STIR] = std::make_shared<autonomous_action>(STIR, robot_tools::STIRRER, STIRRING_TIME);
-    action_map_[SPRINKLE] = std::make_shared<autonomous_action>(SPRINKLE, robot_tools::INGREDIENT_DISPENSER, SPRINKLING_TIME);
-    action_map_[POUR] = std::make_shared<autonomous_action>(POUR, robot_tools::INGREDIENT_DISPENSER, POURING_TIME);
-    action_map_[WHIP] = std::make_shared<autonomous_action>(WHIP, robot_tools::WHISK, WHIPPING_TIME);
-    action_map_[MIX] = std::make_shared<autonomous_action>(MIX, robot_tools::MIXER, MIXING_TIME);
-    action_map_[CRUSH] = std::make_shared<autonomous_action>(CRUSH, robot_tools::CRUSHER, CRUSHING_TIME);
-    action_map_[LAYER] = std::make_shared<autonomous_action>(LAYER, robot_tools::LAYERING_DISPENSER, LAYERING_TIME);
-    action_map_[FRY] = std::make_shared<autonomous_action>(FRY, robot_tools::LAYERING_DISPENSER, FRYING_TIME);
+    action_map_[PEEL] = std::make_shared<autonomous_action>(PEEL, robot_tool::PEELER, PEELING_TIME);
+    action_map_[CUT] = std::make_shared<autonomous_action>(CUT, robot_tool::CUTTER, CUTTING_TIME);
+    action_map_[BRAISE] = std::make_shared<autonomous_action>(BRAISE, robot_tool::PAN, BRAISING_TIME);
+    action_map_[MASH] = std::make_shared<autonomous_action>(MASH, robot_tool::MASHER, MASHING_TIME);
+    action_map_[STIR] = std::make_shared<autonomous_action>(STIR, robot_tool::STIRRER, STIRRING_TIME);
+    action_map_[SPRINKLE] = std::make_shared<autonomous_action>(SPRINKLE, robot_tool::INGREDIENT_DISPENSER, SPRINKLING_TIME);
+    action_map_[POUR] = std::make_shared<autonomous_action>(POUR, robot_tool::INGREDIENT_DISPENSER, POURING_TIME);
+    action_map_[WHIP] = std::make_shared<autonomous_action>(WHIP, robot_tool::WHISK, WHIPPING_TIME);
+    action_map_[MIX] = std::make_shared<autonomous_action>(MIX, robot_tool::MIXER, MIXING_TIME);
+    action_map_[CRUSH] = std::make_shared<autonomous_action>(CRUSH, robot_tool::CRUSHER, CRUSHING_TIME);
+    action_map_[LAYER] = std::make_shared<autonomous_action>(LAYER, robot_tool::LAYERING_DISPENSER, LAYERING_TIME);
+    action_map_[FRY] = std::make_shared<autonomous_action>(FRY, robot_tool::FRYER, FRYING_TIME);
     // recipe timed actions
-    action_map_[BOIL] = std::make_shared<recipe_timed_action>(BOIL, robot_tools::POT);
-    action_map_[BAKE] = std::make_shared<recipe_timed_action>(BAKE, robot_tools::OVEN);
+    action_map_[BOIL] = std::make_shared<recipe_timed_action>(BOIL, robot_tool::POT);
+    action_map_[BAKE] = std::make_shared<recipe_timed_action>(BAKE, robot_tool::OVEN);
 }
 
 robot_actions::~robot_actions() {

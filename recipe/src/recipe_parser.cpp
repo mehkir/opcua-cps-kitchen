@@ -51,7 +51,7 @@ recipe_parser::recipe_parser(std::string _recipe_path) {
                 throw std::invalid_argument(error_string);   
             }
             duration_t action_time;
-            robot_tools required_tool;
+            robot_tool required_tool;
             if (autonomous_act != nullptr) {
                 action_time = autonomous_act->get_action_duration();
                 required_tool = autonomous_act->get_required_tool();

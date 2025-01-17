@@ -11,7 +11,7 @@
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "types.hpp"
-#include "robot_tools.hpp"
+#include "robot_tool.hpp"
 #include "recipe_parser.hpp"
 
 using namespace cps_kitchen;
@@ -29,7 +29,7 @@ private:
     position_t position_;
     port_t port_;
     robot::state state_;
-    robot_tools current_tool_;
+    robot_tool current_tool_;
     recipe_id_t recipe_id_in_process_;
     std::string dish_in_process_;
     std::string action_in_process_;

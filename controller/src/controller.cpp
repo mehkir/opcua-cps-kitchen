@@ -71,7 +71,7 @@ controller::receive_robot_state(UA_Server* _server,
     port_t port = *(port_t*)_input[0].data;
     position_t position = *(position_t*)_input[1].data;
     remote_robot::state robot_state = *(remote_robot::state*)_input[2].data;
-    robot_tools current_tool = *(robot_tools*)_input[3].data;
+    robot_tool current_tool = *(robot_tool*)_input[3].data;
     /* Extract method context */
     controller* self = static_cast<controller*>(_method_context);
     self->handle_robot_state(port, position, robot_state, current_tool, _output);
@@ -79,7 +79,7 @@ controller::receive_robot_state(UA_Server* _server,
 }
 
 void
-controller::handle_robot_state(port_t _port, position_t _position, remote_robot::state _robot_state, robot_tools _current_tool, UA_Variant* _output) {
+controller::handle_robot_state(port_t _port, position_t _position, remote_robot::state _robot_state, robot_tool _current_tool, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position);
