@@ -17,6 +17,7 @@
 #include "information_node_inserter.hpp"
 #include "types.hpp"
 #include "recipe_parser.hpp"
+#include "robot_tools.hpp"
 
 using namespace cps_kitchen;
 
@@ -37,7 +38,7 @@ struct remote_robot {
         const port_t port_;
         const position_t position_;
         remote_robot::state state_;
-        UA_UInt32 current_tool_;
+        robot_tools current_tool_;
         bool running_;
         std::thread client_thread_;
         method_node_caller receive_robot_task_caller_;
@@ -90,11 +91,11 @@ struct remote_robot {
             state_ = _state;
         }
 
-        UA_UInt32 get_current_tool() const {
+        robot_tools get_current_tool() const {
             return current_tool_;
         }
 
-        void set_current_tool(UA_UInt32 _current_tool) {
+        void set_current_tool(robot_tools _current_tool) {
             current_tool_ = _current_tool;
         }
 
@@ -159,7 +160,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_robot_state(port_t _port, position_t _position, UA_UInt32 _robot_state, UA_UInt32 _current_tool, UA_Variant* _output);
+    handle_robot_state(port_t _port, position_t _position, remote_robot::state _robot_state, robot_tools _current_tool, UA_Variant* _output);
 
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);

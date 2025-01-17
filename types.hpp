@@ -9,6 +9,6 @@ namespace cps_kitchen {
     typedef UA_UInt32 plate_id_t;
     typedef UA_UInt32 steps_t;
     typedef UA_UInt32 recipe_id_t;
-    typedef UA_UInt32 duration_t;
+    typedef long long duration_t;
 };
 #endif // TYPES_HPP
