@@ -14,6 +14,7 @@
 #include "robot_state.hpp"
 #include "robot_tool.hpp"
 #include "recipe_parser.hpp"
+#include "session_id.hpp"
 
 using namespace cps_kitchen;
 
@@ -27,6 +28,7 @@ private:
     robot_state state_;
     robot_tool current_tool_;
     recipe_id_t recipe_id_in_process_;
+    session_id session_id_;
     std::string dish_in_process_;
     std::string action_in_process_;
     std::string ingredients_in_process_;
@@ -62,7 +64,7 @@ private:
             size_t _output_size, UA_Variant *_output);
     
     void
-    handle_receive_task(recipe_id_t _recipe_id, UA_Variant* _output);
+    handle_receive_task(recipe_id_t _recipe_id, session_id _session_id, UA_Variant* _output);
 
     static UA_StatusCode
     handover_finished_order(UA_Server *_server,

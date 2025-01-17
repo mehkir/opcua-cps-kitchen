@@ -8,9 +8,9 @@ typedef UA_UInt32 message_counter_t;
 
 struct session_id {
     private:
+    public:
         session_id_t id_;
         message_counter_t message_counter_;
-    public:
         session_id(session_id_t _id, message_counter_t _message_counter) : id_(_id), message_counter_(_message_counter) {
         }
 
@@ -39,6 +39,15 @@ struct session_id {
 
         bool operator== (const session_id& _session_id) const {
             return id_ == _session_id.id_ && message_counter_ == _session_id.message_counter_;
+        }
+
+        void increment_id() {
+            id_++;
+            message_counter_ = 0;
+        }
+
+        void increment_message_counter() {
+            message_counter_++;
         }
 };
 

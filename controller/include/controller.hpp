@@ -19,6 +19,7 @@
 #include "recipe_parser.hpp"
 #include "robot_state.hpp"
 #include "robot_tool.hpp"
+#include "session_id.hpp"
 
 using namespace cps_kitchen;
 
@@ -39,9 +40,10 @@ struct remote_robot {
         method_node_caller receive_robot_task_caller_;
         recipe_id_t recipe_id_;
         remote_robot::state_status state_status_;
+        session_id session_id_;
 
     public:
-        remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), running_(true) {
+        remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), session_id_(0,0), running_(true) {
             client_connection_establisher robot_client_connection_establisher;
             UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
             if (session_state != UA_SESSIONSTATE_ACTIVATED) {
@@ -51,6 +53,8 @@ struct remote_robot {
             }
 
             receive_robot_task_caller_.add_input_argument(&recipe_id_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_input_argument(&session_id_.id_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_input_argument(&session_id_.message_counter_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
@@ -100,6 +104,10 @@ struct remote_robot {
 
         void set_state_status(state_status _state_status) {
             state_status_ = _state_status;
+        }
+
+        session_id& get_session_id() {
+            return session_id_;
         }
 
         void instruct(recipe_id_t _recipe_id, UA_ClientAsyncCallCallback _callback) {
@@ -155,7 +163,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_robot_state(port_t _port, position_t _position, robot_state _remote_robot_state, robot_tool _current_remote_robot_tool, UA_Variant* _output);
+    handle_robot_state(port_t _port, position_t _position, robot_state _remote_robot_state, robot_tool _current_remote_robot_tool, session_id _session_id, UA_Variant* _output);
 
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);

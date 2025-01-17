@@ -17,7 +17,7 @@
 
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
         server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
-        state_(robot_state::IDLING), current_tool_(robot_tool::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), dish_in_process_("None"), action_in_process_("None"),
+        state_(robot_state::IDLING), current_tool_(robot_tool::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), session_id_(0,0), dish_in_process_("None"), action_in_process_("None"),
         ingredients_in_process_("None"), overall_time_(0), recipe_parser_(RECIPE_PATH) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -29,9 +29,13 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     }
 
     receive_task_inserter_.add_input_argument("recipe id", "recipe_id", UA_TYPES_UINT32);
+    receive_task_inserter_.add_input_argument("session id", "session_id", UA_TYPES_UINT32);
+    receive_task_inserter_.add_input_argument("message counter", "message_counter", UA_TYPES_UINT32);
     receive_task_inserter_.add_output_argument("robot port", "robot_port", UA_TYPES_UINT16);
     receive_task_inserter_.add_output_argument("robot position", "robot_position", UA_TYPES_UINT32);
-    receive_task_inserter_.add_output_argument("robot status", "robot_status", UA_TYPES_UINT32);
+    receive_task_inserter_.add_output_argument("robot state", "robot_state", UA_TYPES_UINT32);
+    receive_task_inserter_.add_output_argument("session id", "session_id", UA_TYPES_UINT32);
+    receive_task_inserter_.add_output_argument("message counter", "message_counter", UA_TYPES_UINT32);
     status = receive_task_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), "receive robot task", receive_task, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the receive robot task method node", __FUNCTION__);
@@ -133,6 +137,8 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         receive_robot_state_caller_.add_input_argument(&position_, UA_TYPES_UINT32);
         receive_robot_state_caller_.add_input_argument(&state_, UA_TYPES_UINT32);
         receive_robot_state_caller_.add_input_argument(&current_tool_, UA_TYPES_UINT32);
+        receive_robot_state_caller_.add_input_argument(&session_id_.id_, UA_TYPES_UINT32);
+        receive_robot_state_caller_.add_input_argument(&session_id_.message_counter_, UA_TYPES_UINT32);
 
         controller_client_iterate_thread_ = std::thread([this]() {
             while(running_) {
@@ -210,29 +216,35 @@ robot::receive_task(UA_Server *_server,
             size_t _input_size, const UA_Variant *_input,
             size_t _output_size, UA_Variant *_output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_input_size != 1) {
+    if(_input_size != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
 
-    if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32])) {
+    UA_StatusCode status = !UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32]);
+    status |= !UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32]);
+    status |= !UA_Variant_hasScalarType(&_input[2], &UA_TYPES[UA_TYPES_UINT32]);
+    if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
     recipe_id_t recipe_id = *(recipe_id_t*)_input[0].data;
+    session_id_t id = *(session_id_t*)_input[1].data;
+    message_counter_t message_counter = *(message_counter_t*)_input[2].data;
 
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
     robot* self = static_cast<robot*>(_method_context);
-    self->handle_receive_task(recipe_id, _output);
+    self->handle_receive_task(recipe_id, session_id(id, message_counter), _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-robot::handle_receive_task(recipe_id_t _recipe_id, UA_Variant* _output) {
+robot::handle_receive_task(recipe_id_t _recipe_id, session_id _session_id, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    session_id_ = _session_id;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Received instruction(recipe_id=%d)", _recipe_id);
     if (state_ != robot_state::IDLING) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is still busy", __FUNCTION__);
@@ -259,9 +271,12 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_Variant* _output) {
         running_ = false;
     }
 
+    session_id_.increment_message_counter();
     status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
     status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[2], &state_, &UA_TYPES[UA_TYPES_UINT32]);
+    status |= UA_Variant_setScalarCopy(&_output[3], &session_id_.id_, &UA_TYPES[UA_TYPES_UINT32]);
+    status |= UA_Variant_setScalarCopy(&_output[4], &session_id_.message_counter_, &UA_TYPES[UA_TYPES_UINT32]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
         running_ = false;
@@ -336,6 +351,8 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot state write failed", __FUNCTION__);
         running_ = false;
     }
+
+    session_id_.increment_message_counter();
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, robot_state_to_string(state_));
     status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
@@ -534,6 +551,7 @@ robot::start() {
     if (!running_)
         return;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, robot_state_to_string(state_));
+    session_id_.increment_message_counter();
     UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
