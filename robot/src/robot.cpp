@@ -383,7 +383,7 @@ robot::determine_next_action() {
                 running_ = false;
             }
             duration_t action_duration = robot_act.get_action_duration();
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ds", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %lld", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
             callback_scheduler action_scheduler(server_, perform_action, this, NULL);
             status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (action_duration * TIME_UNIT));
             if (status != UA_STATUSCODE_GOOD) {
@@ -485,7 +485,7 @@ robot::perform_action(UA_Server* _server, void* _data) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Overall time write failed", __FUNCTION__);
         self->running_ = false;
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ds", robot_act.get_name().c_str(), self->recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %lld", robot_act.get_name().c_str(), self->recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
     self->action_queue_.pop();
     self->determine_next_action();
 }
