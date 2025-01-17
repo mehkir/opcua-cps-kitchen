@@ -11,24 +11,20 @@
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "types.hpp"
+#include "robot_state.hpp"
 #include "robot_tool.hpp"
 #include "recipe_parser.hpp"
 
 using namespace cps_kitchen;
 
 class robot {
-    enum class state {
-        IDLING,
-        COOKING,
-        FINISHED,
-    };
 
 private:
     /* robot related member variables */
     UA_Server* server_;
     position_t position_;
     port_t port_;
-    robot::state state_;
+    robot_state state_;
     robot_tool current_tool_;
     recipe_id_t recipe_id_in_process_;
     std::string dish_in_process_;
@@ -98,7 +94,7 @@ private:
     join_threads();
 
     const char*
-    state_to_string(state _state);
+    robot_state_to_string(robot_state _state);
 
 public:
     robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port);

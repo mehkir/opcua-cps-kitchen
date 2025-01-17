@@ -17,6 +17,7 @@
 #include "information_node_inserter.hpp"
 #include "types.hpp"
 #include "recipe_parser.hpp"
+#include "robot_state.hpp"
 #include "robot_tool.hpp"
 
 using namespace cps_kitchen;
@@ -27,17 +28,11 @@ struct remote_robot {
         OBSOLETE
     };
 
-    enum class state {
-        IDLING,
-        COOKING,
-        FINISHED,
-    };
-
     private:
         UA_Client* client_;
         const port_t port_;
         const position_t position_;
-        remote_robot::state state_;
+        robot_state state_;
         robot_tool current_tool_;
         bool running_;
         std::thread client_thread_;
@@ -83,11 +78,11 @@ struct remote_robot {
             return position_;
         }
 
-        remote_robot::state get_state() const {
+        robot_state get_state() const {
             return state_;
         }
 
-        void set_state(remote_robot::state _state) {
+        void set_state(robot_state _state) {
             state_ = _state;
         }
 
@@ -119,11 +114,11 @@ struct remote_robot {
         }
 
         static const char*
-        remote_robot_state_to_string(remote_robot::state _state) {
+        remote_robot_state_to_string(robot_state _state) {
             switch (_state) {
-                case remote_robot::state::IDLING: return "IDLING";
-                case remote_robot::state::COOKING: return "COOKING";
-                case remote_robot::state::FINISHED: return "FINISHED";
+                case robot_state::IDLING: return "IDLING";
+                case robot_state::COOKING: return "COOKING";
+                case robot_state::FINISHED: return "FINISHED";
                 default: return "Unimplemented item";
             }
         }
@@ -160,7 +155,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     void
-    handle_robot_state(port_t _port, position_t _position, remote_robot::state _robot_state, robot_tool _current_tool, UA_Variant* _output);
+    handle_robot_state(port_t _port, position_t _position, robot_state _remote_robot_state, robot_tool _current_remote_robot_tool, UA_Variant* _output);
 
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);

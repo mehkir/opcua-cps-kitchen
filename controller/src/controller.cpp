@@ -70,23 +70,23 @@ controller::receive_robot_state(UA_Server* _server,
     /* Extract input arguments */
     port_t port = *(port_t*)_input[0].data;
     position_t position = *(position_t*)_input[1].data;
-    remote_robot::state robot_state = *(remote_robot::state*)_input[2].data;
-    robot_tool current_tool = *(robot_tool*)_input[3].data;
+    robot_state remote_robot_state = *(robot_state*)_input[2].data;
+    robot_tool current_remote_robot_tool = *(robot_tool*)_input[3].data;
     /* Extract method context */
     controller* self = static_cast<controller*>(_method_context);
-    self->handle_robot_state(port, position, robot_state, current_tool, _output);
+    self->handle_robot_state(port, position, remote_robot_state, current_remote_robot_tool, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_robot_state(port_t _port, position_t _position, remote_robot::state _robot_state, robot_tool _current_tool, UA_Variant* _output) {
+controller::handle_robot_state(port_t _port, position_t _position, robot_state _remote_robot_state, robot_tool _current_remote_robot_tool, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position);
     }
     remote_robot& robot = position_remote_robot_map_[_position].operator*();
-    robot.set_state(_robot_state);
-    robot.set_current_tool(_current_tool);
+    robot.set_state(_remote_robot_state);
+    robot.set_current_tool(_current_remote_robot_tool);
     robot.set_state_status(remote_robot::state_status::CURRENT);
 
     std::random_device random_device;
@@ -95,7 +95,7 @@ controller::handle_robot_state(port_t _port, position_t _position, remote_robot:
 
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
         remote_robot& robot = position_remote_robot->second.operator*();
-        if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == remote_robot::state::IDLING) {
+        if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == robot_state::IDLING) {
             robot.set_state_status(remote_robot::state_status::OBSOLETE);
             robot.instruct(distribution(mersenne_twister), receive_robot_task_called);
         }
@@ -133,7 +133,7 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
 
     port_t remote_robot_port = *(port_t*) response.get_data(0,0);
     position_t remote_robot_position = *(position_t*) response.get_data(0,1);
-    remote_robot::state remote_robot_state = *(remote_robot::state*) response.get_data(0,2);
+    robot_state remote_robot_state = *(robot_state*) response.get_data(0,2);
 
     remote_robot* robot = static_cast<remote_robot*>(_userdata);
     // Sanity check

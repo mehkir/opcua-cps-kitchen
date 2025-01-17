@@ -37,4 +37,4 @@ static const char* robot_tool_to_string(robot_tool _robot_tool) {
     }
 }
 
-#endif
+#endif // ROBOT_TOOL_HPP
