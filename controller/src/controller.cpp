@@ -102,7 +102,7 @@ controller::handle_robot_state(port_t _port, position_t _position, robot_state _
     }
     remote_robot& robot = position_remote_robot_map_[_position].operator*();
     if (robot.get_session_id() > _session_id) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad session id", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad session id, this should not happen", __FUNCTION__);
         running_ = false;
         return;
     }
