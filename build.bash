@@ -11,3 +11,4 @@ $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_conveyor_instance -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target recipe_testframe -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target session_id_testframe -- -j$(nproc)
+$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target statistics-writer-main -- -j$(nproc)

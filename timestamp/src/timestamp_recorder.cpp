@@ -23,7 +23,7 @@ timestamp_recorder::timestamp_recorder() {
 timestamp_recorder::~timestamp_recorder() {
 }
 
-void timestamp_recorder::record_timestamp(Timepoint _timepoint) {
+void timestamp_recorder::record_timestamp(timepoint _timepoint) {
     if(timestamps_.count(_timepoint)) {
         std::string error_string = "There is already a timestamp for the key: " + timepoint_to_string(_timepoint);
         throw std::runtime_error(error_string);
@@ -43,18 +43,18 @@ void timestamp_recorder::write_timestamps() {
     }
     timepoints_file.open(filename.str());
     //Write header
-    for(size_t timepoint_count = 0; timepoint_count < static_cast<size_t>(Timepoint::TIMEPOINT_COUNT); timepoint_count++) {
-        timepoints_file << timepoint_to_string(Timepoint(timepoint_count));
-        if(timepoint_count < static_cast<size_t>(Timepoint::TIMEPOINT_COUNT)-1) {
+    for(size_t timepoint_count = 0; timepoint_count < static_cast<size_t>(timepoint::TIMEPOINT_COUNT); timepoint_count++) {
+        timepoints_file << timepoint_to_string(timepoint(timepoint_count));
+        if(timepoint_count < static_cast<size_t>(timepoint::TIMEPOINT_COUNT)-1) {
             timepoints_file << ",";
         } else {
             timepoints_file << "\n";
         }
     }
     //Write values
-    for(size_t timepoint_count = 0; timepoint_count < static_cast<size_t>(Timepoint::TIMEPOINT_COUNT); timepoint_count++) {
-        timepoints_file << timestamps_[Timepoint(timepoint_count)].time_since_epoch().count();
-        if(timepoint_count < static_cast<size_t>(Timepoint::TIMEPOINT_COUNT)-1) {
+    for(size_t timepoint_count = 0; timepoint_count < static_cast<size_t>(timepoint::TIMEPOINT_COUNT); timepoint_count++) {
+        timepoints_file << timestamps_[timepoint(timepoint_count)].time_since_epoch().count();
+        if(timepoint_count < static_cast<size_t>(timepoint::TIMEPOINT_COUNT)-1) {
             timepoints_file << ",";
         } else {
             timepoints_file << "\n";
@@ -63,10 +63,10 @@ void timestamp_recorder::write_timestamps() {
     timepoints_file.close();
 }
 
-std::string timestamp_recorder::timepoint_to_string(Timepoint _timepoint) {
+std::string timestamp_recorder::timepoint_to_string(timepoint _timepoint) {
     switch (_timepoint) {
-    case Timepoint::JOB_START: return "JOB_START";
-    case Timepoint::JOB_END: return "JOB_END";
+    case timepoint::JOB_START: return "JOB_START";
+    case timepoint::JOB_END: return "JOB_END";
     default: std::runtime_error("Unimplemented timepoint");
     }
 }

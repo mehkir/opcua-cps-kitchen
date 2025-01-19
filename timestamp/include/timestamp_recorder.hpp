@@ -5,7 +5,7 @@
 #include <mutex>
 #include <chrono>
     
-    enum class Timepoint {
+    enum class timepoint {
         JOB_START,
         JOB_END,
         TIMEPOINT_COUNT = JOB_END + 1
@@ -16,13 +16,13 @@
     private:
         static std::mutex mutex_;
         static timestamp_recorder* instance_;
-        std::map<Timepoint,std::chrono::time_point<std::chrono::system_clock>> timestamps_;
+        std::map<timepoint,std::chrono::time_point<std::chrono::system_clock>> timestamps_;
         timestamp_recorder();
         ~timestamp_recorder();
-        std::string timepoint_to_string(Timepoint _timepoint);
+        std::string timepoint_to_string(timepoint _timepoint);
     public:
         static timestamp_recorder* get_instance();
-        void record_timestamp(Timepoint _timepoint);
+        void record_timestamp(timepoint _timepoint);
         void write_timestamps();
     };
 

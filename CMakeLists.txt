@@ -1,8 +1,9 @@
 cmake_minimum_required(VERSION 3.24)
 project(opcua_cps_kitchen)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 23)
 
+add_subdirectory(statistics)
 add_subdirectory(wrappers)
 add_subdirectory(demos)
 add_subdirectory(tests)
@@ -23,3 +24,7 @@ target_include_directories(start_controller_instance PUBLIC ${PROJECT_BINARY_DIR
 add_executable(start_conveyor_instance start_conveyor_instance.cpp)
 target_link_libraries(start_conveyor_instance PUBLIC conveyor_lib open62541)
 target_include_directories(start_conveyor_instance PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/conveyor/include)
+
+add_executable(statistics-writer-main statistics-writer-main.cpp)
+target_link_libraries(statistics-writer-main PUBLIC statistics_lib)
+target_include_directories(statistics-writer-main PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/statistics/include)
