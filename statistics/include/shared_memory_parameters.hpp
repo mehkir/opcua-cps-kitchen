@@ -49,7 +49,7 @@ enum class time_metric {
     TIME_METRIC_COUNT = JOB_END+1
 };
 
-static std::string time_metric_to_string(time_metric _time_metric) {
+inline std::string time_metric_to_string(time_metric _time_metric) {
     switch (_time_metric) {
         case time_metric::JOB_START: return "JOB_START";
         case time_metric::JOB_END: return "JOB_END";
