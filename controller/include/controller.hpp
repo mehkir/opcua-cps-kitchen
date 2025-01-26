@@ -154,6 +154,22 @@ private:
     /* recipe related member variables */
     recipe_parser recipe_parser_;
 
+    /**
+     * @brief Extracts the robot state parameters
+     * 
+     * @param _server the server instance from which this method is called
+     * @param _session_id 
+     * @param _session_context 
+     * @param _method_id 
+     * @param _method_context the node context data passed to the method node
+     * @param _object_id 
+     * @param _object_context 
+     * @param _input_size the count of the input parameters
+     * @param _input the input pointer of the input parameters
+     * @param _output_size the allocated output size
+     * @param _output the output pointer to store return parameters
+     * @return UA_StatusCode 
+     */
     static UA_StatusCode
     receive_robot_state(UA_Server* _server,
             const UA_NodeId* _session_id, void* _session_context,
@@ -162,9 +178,27 @@ private:
             size_t _input_size, const UA_Variant* _input,
             size_t _output_size, UA_Variant* _output);
 
+    /**
+     * @brief Assigns the next task according to the current available robot states
+     * 
+     * @param _port the port of the remote robot
+     * @param _position the position of the remote robot
+     * @param _remote_robot_state  the state of the remote robot
+     * @param _current_remote_robot_tool the current tool of the remote robot
+     * @param _session_id the session id of the remote robot
+     * @param _output the output pointer to store return parameters
+     */
     void
     handle_robot_state(port_t _port, position_t _position, robot_state _remote_robot_state, robot_tool _current_remote_robot_tool, session_id _session_id, UA_Variant* _output);
 
+    /**
+     * @brief Callback called after robot is instructed. Extracts the returned robot state parameters
+     * 
+     * @param _client the client instance from which this method is called
+     * @param _userdata the userdata passed to the instruct call
+     * @param _request_id 
+     * @param _response the pointer to the returned parameters
+     */
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
