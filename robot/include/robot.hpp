@@ -174,7 +174,7 @@ private:
      * @brief Timed callback to indicate retooling completion and to update the current tool and overall time.
      * 
      * @param _server the server instance from which this method is called
-     * @param _data the data passed to the scheduling call
+     * @param _data the robot instance passed to the scheduling call
      */
     static void
     retool(UA_Server* _server, void* _data);
