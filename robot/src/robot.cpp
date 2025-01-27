@@ -353,7 +353,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     }
 
     session_id_.increment_message_counter();
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, robot_state_to_string(state_));
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, robot_state_to_string(state_).c_str());
     status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed sending robot state to controller", __FUNCTION__);
@@ -536,7 +536,7 @@ robot::join_threads() {
         conveyor_client_iterate_thread_.join();
 }
 
-const char*
+std::string
 robot::robot_state_to_string(robot_state _state) {
     switch (_state) {
     case robot_state::IDLING: return "IDLING";
@@ -550,7 +550,7 @@ void
 robot::start() {
     if (!running_)
         return;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, robot_state_to_string(state_));
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, robot_state_to_string(state_).c_str());
     session_id_.increment_message_counter();
     UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), receive_robot_state_called, this);
     if(status != UA_STATUSCODE_GOOD) {
