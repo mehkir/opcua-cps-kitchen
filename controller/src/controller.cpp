@@ -177,7 +177,7 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
     robot->get_session_id().message_counter_ = message_counter;
     robot->set_state(remote_robot_state);
     robot->set_state_status(remote_robot::state_status::CURRENT);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "ROBOT_STATE (after): Position=%d, state=%s, state status=%s", robot->get_position(), remote_robot::remote_robot_state_to_string(robot->get_state()), remote_robot::remote_robot_state_status_to_string(robot->get_state_status()));
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "ROBOT_STATE (after): Position=%d, state=%s, state status=%s", robot->get_position(), robot_state_to_string(robot->get_state()).c_str(), remote_robot::remote_robot_state_status_to_string(robot->get_state_status()).c_str());
 }
 
 void

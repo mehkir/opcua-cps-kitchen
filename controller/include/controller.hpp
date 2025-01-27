@@ -43,6 +43,12 @@ struct remote_robot {
         session_id session_id_;
 
     public:
+        /**
+         * @brief Construct a new remote robot object.
+         * 
+         * @param _port the port of the remote robot
+         * @param _position the position of the remote robot at the conveyor
+         */
         remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), session_id_(0,0), running_(true) {
             client_connection_establisher robot_client_connection_establisher;
             UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
@@ -67,6 +73,10 @@ struct remote_robot {
             });
         }
 
+        /**
+         * @brief Destroy the remote robot object.
+         * 
+         */
         ~remote_robot() {
             running_ = false;
             if (client_thread_.joinable())
@@ -110,6 +120,12 @@ struct remote_robot {
             return session_id_;
         }
 
+        /**
+         * @brief Instructs the remote robot to process a dish.
+         * 
+         * @param _recipe_id the recipe ID of the dish
+         * @param _callback the callback called after the robot is instructed
+         */
         void instruct(recipe_id_t _recipe_id, UA_ClientAsyncCallCallback _callback) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             recipe_id_ = _recipe_id;
@@ -121,17 +137,13 @@ struct remote_robot {
             }
         }
 
-        static const char*
-        remote_robot_state_to_string(robot_state _state) {
-            switch (_state) {
-                case robot_state::IDLING: return "IDLING";
-                case robot_state::COOKING: return "COOKING";
-                case robot_state::FINISHED: return "FINISHED";
-                default: return "Unimplemented item";
-            }
-        }
-
-        static const char*
+        /**
+         * @brief Returns the corresponding string for a robot state status.
+         * 
+         * @param _state_status the robot`s state status
+         * @return std::string the corresponding string
+         */
+        static std::string
         remote_robot_state_status_to_string(remote_robot::state_status _state_status) {
             switch (_state_status) {
                 case remote_robot::state_status::CURRENT: return "CURRENT";
@@ -155,7 +167,7 @@ private:
     recipe_parser recipe_parser_;
 
     /**
-     * @brief Extracts the robot state parameters
+     * @brief Extracts the robot state parameters.
      * 
      * @param _server the server instance from which this method is called
      * @param _session_id 
@@ -179,7 +191,7 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     /**
-     * @brief Assigns the next task according to the current available robot states
+     * @brief Assigns the next task according to the current available robot states.
      * 
      * @param _port the port of the remote robot
      * @param _position the position of the remote robot
@@ -192,7 +204,7 @@ private:
     handle_robot_state(port_t _port, position_t _position, robot_state _remote_robot_state, robot_tool _current_remote_robot_tool, session_id _session_id, UA_Variant* _output);
 
     /**
-     * @brief Callback called after robot is instructed. Extracts the returned robot state parameters
+     * @brief Callback called after robot is instructed. Extracts the returned robot state parameters.
      * 
      * @param _client the client instance from which this method is called
      * @param _userdata the userdata passed to the instruct call
@@ -202,16 +214,38 @@ private:
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
+    /**
+     * @brief Joins all started threads.
+     * 
+     */
     void
     join_threads();
 
 public:
+    /**
+     * @brief Construct a new controller object.
+     * 
+     * @param _port the controller port
+     */
     controller(port_t _port);
+
+    /**
+     * @brief Destroy the controller object.
+     * 
+     */
     ~controller();
 
+    /**
+     * @brief Checks if initialization was successful and joins all started threads.
+     * 
+     */
     void
     start();
 
+    /**
+     * @brief Stops the controller and shuts it down.
+     * 
+     */
     void
     stop();
 };

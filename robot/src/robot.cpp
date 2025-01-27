@@ -536,16 +536,6 @@ robot::join_threads() {
         conveyor_client_iterate_thread_.join();
 }
 
-std::string
-robot::robot_state_to_string(robot_state _state) {
-    switch (_state) {
-    case robot_state::IDLING: return "IDLING";
-    case robot_state::COOKING: return "COOKING";
-    case robot_state::FINISHED: return "FINISHED";
-    default: return "Unimplemented item";
-    }
-}
-
 void
 robot::start() {
     if (!running_)

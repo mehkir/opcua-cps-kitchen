@@ -186,15 +186,6 @@ private:
     void
     join_threads();
 
-    /**
-     * @brief Returns the corresponding string for a robot state.
-     * 
-     * @param _state the robot state
-     * @return std::string 
-     */
-    std::string
-    robot_state_to_string(robot_state _state);
-
 public:
     /**
      * @brief Construct a new robot object.
@@ -213,7 +204,7 @@ public:
     ~robot();
 
     /**
-     * @brief Sends the initial robot states and joins threads.
+     * @brief Checks if initialization was successful, sends the initial robot states and joins all started threads.
      * 
      */
     void
