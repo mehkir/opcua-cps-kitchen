@@ -2,8 +2,10 @@
 #define NODE_IDS_HPP
 
 /* ROBOT */
+// method nodes
 #define RECEIVE_TASK "receive_task"
 #define HANDOVER_FINISHED_ORDER "handover_finished_order"
+// information nodes
 #define ROBOT_STATE "robot_state"
 #define RECIPE_ID "recipe_id"
 #define DISH_NAME "dish_name"
@@ -12,9 +14,11 @@
 #define OVERALL_TIME "overall_time"
 
 /* CONVEYOR */
+// method nodes
 #define FINISHED_ORDER_NOTIFICATION "finished_order_notification"
 
 /* CONTROLLER */
+// method nodes
 #define RECEIVE_ROBOT_STATE "receive_robot_state"
 
 #endif // NODE_IDS_HPP

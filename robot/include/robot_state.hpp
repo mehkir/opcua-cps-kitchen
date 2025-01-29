@@ -1,6 +1,8 @@
 #ifndef ROBOT_STATE_HPP
 #define ROBOT_STATE_HPP
 
+#include <string>
+
 enum class robot_state {
     IDLING,
     COOKING,
