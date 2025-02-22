@@ -10,6 +10,7 @@ private:
 public:
     capability_parser(std::string _capabilities_path);
     ~capability_parser();
+    bool is_capable_to(std::string _action_name);
 };
 
 #endif // CAPABILITY_PARSER_HPP

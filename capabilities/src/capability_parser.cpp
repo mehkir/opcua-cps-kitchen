@@ -21,3 +21,7 @@ capability_parser::capability_parser(std::string _capabilities_path) {
 
 capability_parser::~capability_parser() {
 }
+
+bool capability_parser::is_capable_to(std::string _action_name) {
+    return capabilities_.find(_action_name) != capabilities_.end();
+}
