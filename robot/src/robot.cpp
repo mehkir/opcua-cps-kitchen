@@ -14,11 +14,12 @@
 #include "time_unit.hpp"
 
 #define RECIPE_PATH "recipes.json"
+#define CAPABILITIES_PATH "./capabilities/"
 
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
         server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
         state_(robot_state::IDLING), current_tool_(robot_tool::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), session_id_(0,0), dish_in_process_("None"), action_in_process_("None"),
-        ingredients_in_process_("None"), overall_time_(0), recipe_parser_(RECIPE_PATH) {
+        ingredients_in_process_("None"), overall_time_(0), recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -374,6 +375,10 @@ robot::determine_next_action() {
     if (action_queue_.size()) {
         robot_action robot_act = action_queue_.front();
         robot_tool required_tool = robot_act.get_required_tool();
+        if (!capability_parser_.is_capable_to(robot_act.get_name())) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name());
+            running_ = false;
+        }
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             callback_scheduler retool_scheduler(server_, retool, this, NULL);

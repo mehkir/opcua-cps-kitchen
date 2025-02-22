@@ -15,6 +15,7 @@
 #include "robot_tool.hpp"
 #include "recipe_parser.hpp"
 #include "session_id.hpp"
+#include "capability_parser.hpp"
 
 using namespace cps_kitchen;
 
@@ -38,6 +39,8 @@ private:
     method_node_inserter receive_task_inserter_;
     method_node_inserter handover_finished_order_inserter_;
     std::thread server_iterate_thread_;
+    recipe_parser recipe_parser_;
+    capability_parser capability_parser_;
     /* controller related member variables */
     UA_Client* controller_client_;
     method_node_caller receive_robot_state_caller_;
@@ -46,8 +49,6 @@ private:
     UA_Client* conveyor_client_;
     method_node_caller receive_finished_order_notification_caller_;
     std::thread conveyor_client_iterate_thread_;
-    /* recipe related member variables */
-    recipe_parser recipe_parser_;
     
     /**
      * @brief Callback called after controller received robot states. Extracts the controller response.

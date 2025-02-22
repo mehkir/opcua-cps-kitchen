@@ -4,9 +4,10 @@
 #include <jsoncpp/json/json.h>
 #include <fstream>
 
-capability_parser::capability_parser(std::string _capabilities_path) {
+capability_parser::capability_parser(std::string _capabilities_path, position_t _robot_position) {
     robot_actions* actions = robot_actions::get_instance();
-    std::ifstream ifs_capabilities(_capabilities_path);
+    std::string capabilities_file_path = _capabilities_path + "r" + std::to_string(_robot_position) + ".json";
+    std::ifstream ifs_capabilities(capabilities_file_path);
     Json::Value capabilities;
     Json::Reader reader;
     reader.parse(ifs_capabilities, capabilities);
