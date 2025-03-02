@@ -376,6 +376,7 @@ robot::determine_next_action() {
         robot_action robot_act = action_queue_.front();
         robot_tool required_tool = robot_act.get_required_tool();
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
+            // TODO: Ask controller with which position to assign the partial finished meal
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name());
             running_ = false;
         }
