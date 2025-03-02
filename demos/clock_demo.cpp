@@ -92,7 +92,7 @@ int main(int argc, char* argv[]) {
     }
 
     information_node_inserter info_node_inserter;
-    status = info_node_inserter.add_variable_node(server, UA_NODEID_STRING(1, const_cast<char*>("clock_tick")), "the clock tick", UA_TYPES_UINT64, &clock_tick_);
+    status = info_node_inserter.add_scalar_node(server, UA_NODEID_STRING(1, const_cast<char*>("clock_tick")), "the clock tick", UA_TYPES_UINT64, &clock_tick_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding information node");
         return EXIT_FAILURE;
