@@ -112,28 +112,28 @@ struct plate {
         plate(plate_id_t _id, position_t _position, UA_Server* _conveyor) : id_(_id), position_(_position), conveyor_(_conveyor), placed_recipe_id_(0), occupied_(false) {
             information_node_inserter id_information_node;
             std::string id_node_id = "plate_id_" + std::to_string(id_);
-            UA_StatusCode status = id_information_node.add_information_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(id_node_id.c_str())), "plate id", UA_TYPES_UINT32, const_cast<plate_id_t*>(&id_));
+            UA_StatusCode status = id_information_node.add_variable_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(id_node_id.c_str())), "plate id", UA_TYPES_UINT32, const_cast<plate_id_t*>(&id_));
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate id information node", __FUNCTION__);
             }
 
             information_node_inserter position_information_node;
             std::string position_node_id = "plate_position_" + std::to_string(id_);
-            status = position_information_node.add_information_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(position_node_id.c_str())), "plate position", UA_TYPES_UINT32, &position_);
+            status = position_information_node.add_variable_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(position_node_id.c_str())), "plate position", UA_TYPES_UINT32, &position_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate position information node", __FUNCTION__);
             }
 
             information_node_inserter placed_recipe_id_information_node;
             std::string placed_recipe_id_node_id = "plate_placed_recipe_id_" + std::to_string(id_);
-            status = placed_recipe_id_information_node.add_information_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(placed_recipe_id_node_id.c_str())), "placed recipe id", UA_TYPES_UINT32, &placed_recipe_id_);
+            status = placed_recipe_id_information_node.add_variable_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(placed_recipe_id_node_id.c_str())), "placed recipe id", UA_TYPES_UINT32, &placed_recipe_id_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate placed recipe id information node", __FUNCTION__);
             }
 
             information_node_inserter occupied_information_node;
             std::string occupied_id_node_id = "plate_occupied_" + std::to_string(id_);
-            status = occupied_information_node.add_information_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), "plate occupied status", UA_TYPES_BOOLEAN, &occupied_);
+            status = occupied_information_node.add_variable_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), "plate occupied status", UA_TYPES_BOOLEAN, &occupied_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate occupied information node", __FUNCTION__);
             }

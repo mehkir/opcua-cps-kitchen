@@ -6,7 +6,7 @@ information_node_inserter::information_node_inserter() {
 information_node_inserter::~information_node_inserter() {
 }
 
-UA_StatusCode information_node_inserter::add_information_node(UA_Server* _server, UA_NodeId _node_id, std::string _browse_name, UA_UInt32 _type_index, void* _value) {
+UA_StatusCode information_node_inserter::add_variable_node(UA_Server* _server, UA_NodeId _node_id, std::string _browse_name, UA_UInt32 _type_index, void* _value) {
     /* Define the attribute and value of the variable node */
     UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
     UA_Variant_setScalar(&variable_attributes.value, _value, &UA_TYPES[_type_index]);

@@ -56,7 +56,7 @@ int main(int argc, char* argv[]) {
 
     UA_String string_value = UA_STRING(const_cast<char*>("I got a story to tell and this is it"));
     information_node_inserter str_inserter;
-    status = str_inserter.add_information_node(server, UA_NODEID_STRING(1, const_cast<char*>("str_node")), "str node", UA_TYPES_STRING, &string_value);
+    status = str_inserter.add_variable_node(server, UA_NODEID_STRING(1, const_cast<char*>("str_node")), "str node", UA_TYPES_STRING, &string_value);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding string value information node");
         running = false;

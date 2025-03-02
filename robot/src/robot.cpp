@@ -55,7 +55,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     }
 
     information_node_inserter robot_state_information_node;
-    status = robot_state_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(ROBOT_STATE)), "robot state", UA_TYPES_UINT32, &state_);
+    status = robot_state_information_node.add_variable_node(server_, UA_NODEID_STRING(1, const_cast<char*>(ROBOT_STATE)), "robot state", UA_TYPES_UINT32, &state_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the robot state information node", __FUNCTION__);
         running_ = false;
@@ -63,7 +63,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     }
 
     information_node_inserter recipe_id_information_node;
-    status = recipe_id_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(RECIPE_ID)), "recipe id", UA_TYPES_UINT32, &recipe_id_in_process_);
+    status = recipe_id_information_node.add_variable_node(server_, UA_NODEID_STRING(1, const_cast<char*>(RECIPE_ID)), "recipe id", UA_TYPES_UINT32, &recipe_id_in_process_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the recipe id information node", __FUNCTION__);
         running_ = false;
@@ -72,7 +72,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
 
     information_node_inserter dish_name_information_node;
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
-    status = dish_name_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), "dish name", UA_TYPES_STRING, &dish_in_process);
+    status = dish_name_information_node.add_variable_node(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), "dish name", UA_TYPES_STRING, &dish_in_process);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the dish name information node", __FUNCTION__);
         running_ = false;
@@ -81,7 +81,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
 
     UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
     information_node_inserter action_name_information_node;
-    status = action_name_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), "action name", UA_TYPES_STRING, &action_in_process);
+    status = action_name_information_node.add_variable_node(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), "action name", UA_TYPES_STRING, &action_in_process);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the action name information node", __FUNCTION__);
         running_ = false;
@@ -90,7 +90,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
 
     UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
     information_node_inserter ingredients_information_node;
-    status = ingredients_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), "ingredients", UA_TYPES_STRING, &ingredients_in_process);
+    status = ingredients_information_node.add_variable_node(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), "ingredients", UA_TYPES_STRING, &ingredients_in_process);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the ingredients information node", __FUNCTION__);
         running_ = false;
@@ -98,7 +98,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     }
 
     information_node_inserter overall_time_information_node;
-    status = overall_time_information_node.add_information_node(server_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), "overall time", UA_TYPES_UINT32, &overall_time_);
+    status = overall_time_information_node.add_variable_node(server_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), "overall time", UA_TYPES_UINT32, &overall_time_);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the overall time information node", __FUNCTION__);
         running_ = false;
@@ -377,7 +377,7 @@ robot::determine_next_action() {
         robot_tool required_tool = robot_act.get_required_tool();
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             // TODO: Ask controller with which position to assign the partial finished meal
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name());
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
             running_ = false;
         }
         if (required_tool != current_tool_) {
