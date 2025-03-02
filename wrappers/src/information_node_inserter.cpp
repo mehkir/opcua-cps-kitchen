@@ -10,10 +10,21 @@ UA_StatusCode information_node_inserter::add_scalar_node(UA_Server* _server, UA_
     /* Define the attribute and value of the variable node */
     UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
     UA_Variant_setScalar(&variable_attributes.value, _value, &UA_TYPES[_type_index]);
-    variable_attributes.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_browse_name.c_str()));
-    variable_attributes.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_browse_name.c_str()));
-    variable_attributes.dataType = UA_TYPES[_type_index].typeId;
-    variable_attributes.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
+    return add_variable_node(_server, variable_attributes, _node_id, _browse_name, _type_index);
+}
+
+UA_StatusCode information_node_inserter::add_array_node(UA_Server* _server, UA_NodeId _node_id, std::string _browse_name, UA_UInt32 _type_index, void* _array, size_t _array_size) {
+    /* Define the attribute and value of the variable node */
+    UA_VariableAttributes variable_attributes = UA_VariableAttributes_default;
+    UA_Variant_setArray(&variable_attributes.value, _array, _array_size, &UA_TYPES[_type_index]);
+    return add_variable_node(_server, variable_attributes, _node_id, _browse_name, _type_index);
+}
+
+UA_StatusCode information_node_inserter::add_variable_node(UA_Server* _server, UA_VariableAttributes& _variable_attributes, UA_NodeId _node_id, std::string _browse_name, UA_UInt32 _type_index) {
+    _variable_attributes.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_browse_name.c_str()));
+    _variable_attributes.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_browse_name.c_str()));
+    _variable_attributes.dataType = UA_TYPES[_type_index].typeId;
+    _variable_attributes.accessLevel = UA_ACCESSLEVELMASK_READ | UA_ACCESSLEVELMASK_WRITE;
 
     /* Define where the node shall be added with which browsename */
     UA_NodeId requested_new_node_id = _node_id;
@@ -26,10 +37,6 @@ UA_StatusCode information_node_inserter::add_scalar_node(UA_Server* _server, UA_
     UA_StatusCode status_code =
     UA_Server_addVariableNode(_server, requested_new_node_id,
         parent_node_id, reference_type_id, browse_name,
-        type_definition, variable_attributes, NULL, NULL);
+        type_definition, _variable_attributes, NULL, NULL);
     return status_code;
-}
-
-UA_StatusCode information_node_inserter::add_array_node(UA_Server* _server, UA_NodeId _node_id, std::string _browse_name, UA_UInt32 _type_index, void* _array, size_t _array_size) {
-    UA_Server_addObjectNode()
 }
