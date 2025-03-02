@@ -11,7 +11,7 @@ capability_parser::capability_parser(std::string _capabilities_path, position_t 
     Json::Value capabilities;
     Json::Reader reader;
     reader.parse(ifs_capabilities, capabilities);
-    for (auto capability : capabilities) {
+    for (auto capability : capabilities["capabilities"]) {
         if (!actions->has_action(capability.asString())) {
             std::string error_string = capability.asString() + " is not a valid action";
             throw std::invalid_argument(error_string);
