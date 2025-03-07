@@ -134,6 +134,17 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     }
 
     if (controller_session_state == UA_SESSIONSTATE_ACTIVATED) {
+        register_robot_caller_.add_input_argument(&port_, UA_TYPES_UINT16);
+        register_robot_caller_.add_input_argument(&position_, UA_TYPES_UINT32);
+        std::unordered_set<std::string> capabilities = capability_parser_.get_capabilities();
+        capabilities_ = (UA_String*) UA_Array_new(capabilities.size(), &UA_TYPES[UA_TYPES_STRING]);
+        int i = 0;
+        for (std::string capability : capabilities) {
+            capabilities_[i] = UA_STRING_ALLOC(capability.c_str());
+            i++;
+        }
+        
+
         receive_robot_state_caller_.add_input_argument(&port_, UA_TYPES_UINT16);
         receive_robot_state_caller_.add_input_argument(&position_, UA_TYPES_UINT32);
         receive_robot_state_caller_.add_input_argument(&state_, UA_TYPES_UINT32);
@@ -365,6 +376,8 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
 robot::~robot() {
     running_ = false;
     join_threads();
+    UA_String_clear(capabilities_);
+    UA_String_delete(capabilities_);
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
     UA_Client_delete(controller_client_);

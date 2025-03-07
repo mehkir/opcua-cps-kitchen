@@ -41,8 +41,10 @@ private:
     std::thread server_iterate_thread_;
     recipe_parser recipe_parser_;
     capability_parser capability_parser_;
+    UA_String* capabilities_;
     /* controller related member variables */
     UA_Client* controller_client_;
+    method_node_caller register_robot_caller_;
     method_node_caller receive_robot_state_caller_;
     std::thread controller_client_iterate_thread_;
     /* conveyor related member variables */
