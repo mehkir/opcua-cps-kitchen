@@ -377,8 +377,9 @@ robot::determine_next_action() {
         robot_tool required_tool = robot_act.get_required_tool();
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             // TODO: Ask controller with which position to assign the partial finished meal
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
-            running_ = false;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
+            // running_ = false;
+            return;
         }
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));

@@ -19,6 +19,7 @@
 
 /* CONTROLLER */
 // method nodes
+#define REGISTER_ROBOT "register_robot"
 #define RECEIVE_ROBOT_STATE "receive_robot_state"
 
 #endif // NODE_IDS_HPP

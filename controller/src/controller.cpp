@@ -30,6 +30,17 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
         return;
     }
 
+    register_robot_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
+    register_robot_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT32);
+    register_robot_inserter_.add_input_argument("robot capabilities", "robot_capabilities", UA_TYPES_STRING);
+    register_robot_inserter_.add_output_argument("capabilities received", "capabilities_received", UA_TYPES_BOOLEAN);
+    status = register_robot_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(REGISTER_ROBOT)), "register robot", register_robot, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the register robot method node");
+        running_ = false;
+        return;
+    }
+
     /* Run the controller server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -55,6 +66,51 @@ controller::~controller() {
     join_threads();
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
+}
+
+UA_StatusCode
+controller::register_robot(UA_Server* _server,
+        const UA_NodeId* _session_id, void* _session_context,
+        const UA_NodeId* _method_id, void* _method_context,
+        const UA_NodeId* _object_id, void* _object_context,
+        size_t _input_size, const UA_Variant* _input,
+        size_t _output_size, UA_Variant* _output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_input_size != 3) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+    
+    UA_StatusCode status = !UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT16]);
+    status |= !UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32]);
+    status |= !UA_Variant_hasArrayType(&_input[2], &UA_TYPES[UA_TYPES_STRING]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+
+    /* Extract input arguments */
+    port_t port = *(port_t*)_input[0].data;
+    position_t position = *(position_t*)_input[1].data;
+    std::unordered_set<std::string> remote_robot_capabilities;
+    for (size_t i = 0; i <= _input[2].arrayLength; i++) {
+        UA_String capability = ((UA_String*)_input[2].data)[i];
+        remote_robot_capabilities.insert(std::string((char*) capability.data, capability.length));
+    }
+    /* Extract method context */
+    controller* self = static_cast<controller*>(_method_context);
+    self->handle_robot_registration(port, position, remote_robot_capabilities, _output);
+    return UA_STATUSCODE_GOOD;
+}
+
+void
+controller::handle_robot_registration(port_t _port, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
+        position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position, _remote_robot_capabilities);
+    }
+    bool capabilities_received = true;
+    UA_Variant_setScalarCopy(_output, &capabilities_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
 
 UA_StatusCode
@@ -98,7 +154,8 @@ void
 controller::handle_robot_state(port_t _port, position_t _position, robot_state _remote_robot_state, robot_tool _current_remote_robot_tool, session_id _session_id, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d must register first", __FUNCTION__, _position);
+        return;
     }
     remote_robot& robot = position_remote_robot_map_[_position].operator*();
     if (robot.get_session_id() > _session_id) {
@@ -115,13 +172,16 @@ controller::handle_robot_state(port_t _port, position_t _position, robot_state _
     std::random_device random_device;
     std::mt19937 mersenne_twister(random_device());
     std::uniform_int_distribution<std::uint32_t> distribution(1, 3);
+    cps_kitchen::recipe_id_t recipe_id = distribution(mersenne_twister);
+    std::string first_action = recipe_parser_.get_recipe(recipe_id).get_action_queue().front().get_name();
 
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
         remote_robot& robot = position_remote_robot->second.operator*();
-        if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == robot_state::IDLING) {
+        if (robot.get_state_status() == remote_robot::state_status::CURRENT && robot.get_state() == robot_state::IDLING && robot.is_capable_to(first_action)) {
             robot.set_state_status(remote_robot::state_status::OBSOLETE);
             robot.get_session_id().increment_id();
             robot.instruct(distribution(mersenne_twister), receive_robot_task_called);
+            break;
         }
     }
     UA_Boolean robot_state_received = true;

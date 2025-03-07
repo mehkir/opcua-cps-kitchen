@@ -7,7 +7,7 @@
 #include <open62541/plugin/log_stdout.h>
 #include <thread>
 #include <map>
-#include <set>
+#include <unordered_set>
 #include <memory>
 #include "node_value_subscriber.hpp"
 #include "node_ids.hpp"
@@ -33,6 +33,7 @@ struct remote_robot {
         UA_Client* client_;
         const port_t port_;
         const position_t position_;
+        std::unordered_set<std::string> capabilities_;
         robot_state state_;
         robot_tool current_tool_;
         bool running_;
@@ -49,7 +50,7 @@ struct remote_robot {
          * @param _port the port of the remote robot
          * @param _position the position of the remote robot at the conveyor
          */
-        remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), session_id_(0,0), running_(true) {
+        remote_robot(port_t _port, position_t _position, std::unordered_set<std::string> _capabilities) :  port_(_port), position_(_position), capabilities_(_capabilities), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), session_id_(0,0), running_(true) {
             client_connection_establisher robot_client_connection_establisher;
             UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
             if (session_state != UA_SESSIONSTATE_ACTIVATED) {
@@ -90,6 +91,10 @@ struct remote_robot {
 
         position_t get_position() const {
             return position_;
+        }
+
+        bool is_capable_to(std::string _capability) const {
+            return capabilities_.find(_capability) != capabilities_.end();
         }
 
         robot_state get_state() const {
@@ -163,8 +168,44 @@ private:
     /* robot related member variables */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
     method_node_inserter receive_robot_state_inserter_;
+    method_node_inserter register_robot_inserter_;
     /* recipe related member variables */
     recipe_parser recipe_parser_;
+
+    /**
+     * @brief Register robot.
+     * 
+     * @param _server the server instance from which this method is called
+     * @param _session_id 
+     * @param _session_context 
+     * @param _method_id 
+     * @param _method_context the node context data passed to the method node
+     * @param _object_id 
+     * @param _object_context 
+     * @param _input_size the count of the input parameters
+     * @param _input the input pointer of the input parameters
+     * @param _output_size the allocated output size
+     * @param _output the output pointer to store return parameters
+     * @return UA_StatusCode 
+     */
+    static UA_StatusCode
+    register_robot(UA_Server* _server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Registers a remote robot.
+     * 
+     * @param _port the port of the remote robot
+     * @param _position the position of the remote robot
+     * @param _remote_robot_capabilities the capabilities of the remote robot
+     * @param _output the output pointer to store return parameters
+     */
+    void
+    handle_robot_registration(port_t _port, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output);
 
     /**
      * @brief Extracts the robot state parameters.
