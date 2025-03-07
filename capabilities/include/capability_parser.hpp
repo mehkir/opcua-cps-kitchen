@@ -14,6 +14,7 @@ public:
     capability_parser(std::string _capabilities_path, position_t _robot_position);
     ~capability_parser();
     bool is_capable_to(std::string _action_name);
+    std::unordered_set<std::string> get_capabilities();
 };
 
 #endif // CAPABILITY_PARSER_HPP
