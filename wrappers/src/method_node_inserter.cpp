@@ -18,7 +18,7 @@ void method_node_inserter::add_input_argument(std::string _description, std::str
     input_argument.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
     input_argument.name = UA_STRING(const_cast<char*>(_name.c_str()));
     input_argument.dataType = UA_TYPES[_type_index].typeId;
-    input_argument.valueRank = UA_VALUERANK_SCALAR;
+    input_argument.valueRank = UA_VALUERANK_ANY;
     input_arguments_.push_back(input_argument);
 }
 
@@ -31,7 +31,7 @@ void method_node_inserter::add_output_argument(std::string _description, std::st
     output_argument.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
     output_argument.name = UA_STRING(const_cast<char*>(_name.c_str()));
     output_argument.dataType = UA_TYPES[_type_index].typeId;
-    output_argument.valueRank = UA_VALUERANK_SCALAR;
+    output_argument.valueRank = UA_VALUERANK_ANY;
     output_arguments_.push_back(output_argument);
 }
 
