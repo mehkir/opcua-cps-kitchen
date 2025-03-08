@@ -143,8 +143,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
             capabilities_[i] = UA_STRING_ALLOC(capability.c_str());
             i++;
         }
-        // TODO: Add array input arg
-        
+        register_robot_caller_.add_array_input_argument(capabilities_, capabilities.size(), UA_TYPES_STRING);        
 
         receive_robot_state_caller_.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
         receive_robot_state_caller_.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
