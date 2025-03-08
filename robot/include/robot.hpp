@@ -51,7 +51,27 @@ private:
     UA_Client* conveyor_client_;
     method_node_caller receive_finished_order_notification_caller_;
     std::thread conveyor_client_iterate_thread_;
-    
+
+    /**
+     * @brief Callback called after controller received robot registration. Extracts the controller response.
+     * 
+     * @param _client the client instance from which this method is called
+     * @param _userdata the userdata passed to the receive robot state call
+     * @param _request_id 
+     * @param _response the pointer to the returned parameters
+     */
+    static void
+    register_robot_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    /**
+     * @brief Handles the controller response from register_robot_called method to indicate if the robot registration is received successfully.
+     * The robot sends its state to the controller on success.
+     * 
+     * @param _register_robot_received response if robot registration is received successfully
+     */
+    void
+    handle_register_robot_result(UA_Boolean _register_robot_received);
+
     /**
      * @brief Callback called after controller received robot states. Extracts the controller response.
      * 

@@ -189,14 +189,14 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
 }
 
 void
-robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+robot::register_robot_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_userdata == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
         return;
     }
     response_checker response(_response);
-    UA_StatusCode status_code = response.get_service_result();;
+    UA_StatusCode status_code = response.get_service_result();
     if(status_code != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
         return;
@@ -204,10 +204,45 @@ robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32
     if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
-    }   
+    }
+    UA_Boolean register_robot_received = *(UA_Boolean*)response.get_data(0,0);
+    robot* self = static_cast<robot*>(_userdata);
+    self->handle_register_robot_result(register_robot_received);
+}
 
+void
+robot::handle_register_robot_result(UA_Boolean _register_robot_received) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (!_register_robot_received) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Controller returned false", __FUNCTION__);
+        return;
+    }
+    session_id_.increment_message_counter();
+    UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), receive_robot_state_called, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
+        running_ = false;
+    }
+}
+
+void
+robot::receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_userdata == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
+        return;
+    }
+    response_checker response(_response);
+    UA_StatusCode status_code = response.get_service_result();
+    if(status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
+        return;
+    }
+    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        return;
+    }
     UA_Boolean robot_state_received = *(UA_Boolean*)response.get_data(0,0);
-    
     robot* self = static_cast<robot*>(_userdata);
     self->handle_robot_state_result(robot_state_received);
 }
@@ -477,7 +512,7 @@ robot::receive_finished_order_notification_called(UA_Client* _client, void* _use
         return;
     }
     response_checker response(_response);
-    UA_StatusCode status_code = response.get_service_result();;
+    UA_StatusCode status_code = response.get_service_result();
     if(status_code != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
         return;
@@ -560,10 +595,9 @@ robot::start() {
     if (!running_)
         return;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "STATES: Send state(port=%d, robot_state=%s)", port_, robot_state_to_string(state_).c_str());
-    session_id_.increment_message_counter();
-    UA_StatusCode status = receive_robot_state_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_ROBOT_STATE)), receive_robot_state_called, this);
+    UA_StatusCode status = register_robot_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(REGISTER_ROBOT)), register_robot_called, this);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the receive robot state method node", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
         running_ = false;
     }
     join_threads();
