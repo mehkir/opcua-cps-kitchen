@@ -13,10 +13,17 @@ public:
     ~method_node_caller();
 
     void
-    add_input_argument(void* _argument_value, UA_UInt32 _type_index, bool _copy = false);
+    add_scalar_input_argument(void* _argument_value, UA_UInt32 _type_index, bool _copy = false);
+
+    void
+    add_array_input_argument(void* _argument_value, size_t _array_size, UA_UInt32 _type_index, bool _copy = false);
 
     UA_StatusCode
     call_method_node(UA_Client* _client, UA_NodeId _method_node_id, UA_ClientAsyncCallCallback _callback, void* _userdata);
+
+private:
+    void
+    add_input_argument(UA_Variant& _input_argument, bool _copy);
 
     void
     clear_input_arguments();

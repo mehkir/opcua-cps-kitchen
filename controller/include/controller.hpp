@@ -59,9 +59,9 @@ struct remote_robot {
                 return;
             }
 
-            receive_robot_task_caller_.add_input_argument(&recipe_id_, UA_TYPES_UINT32);
-            receive_robot_task_caller_.add_input_argument(&session_id_.id_, UA_TYPES_UINT32);
-            receive_robot_task_caller_.add_input_argument(&session_id_.message_counter_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_scalar_input_argument(&session_id_.id_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_scalar_input_argument(&session_id_.message_counter_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {

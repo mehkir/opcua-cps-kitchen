@@ -10,7 +10,7 @@ method_node_caller::~method_node_caller() {
 }
 
 void
-method_node_caller::add_input_argument(void* _argument_value, UA_UInt32 _type_index, bool _copy) {
+method_node_caller::add_scalar_input_argument(void* _argument_value, UA_UInt32 _type_index, bool _copy) {
     UA_Variant input_argument;
     UA_Variant_init(&input_argument);
     if(_copy) {
@@ -18,7 +18,24 @@ method_node_caller::add_input_argument(void* _argument_value, UA_UInt32 _type_in
     } else {
         UA_Variant_setScalar(&input_argument, _argument_value, &UA_TYPES[_type_index]);
     }
-    input_arguments_.push_back(input_argument);
+    add_input_argument(input_argument, _copy);
+}
+
+void
+method_node_caller::add_array_input_argument(void* _argument_value, size_t _array_size, UA_UInt32 _type_index, bool _copy) {
+    UA_Variant input_argument;
+    UA_Variant_init(&input_argument);
+    if(_copy) {
+        UA_Variant_setArrayCopy(&input_argument, _argument_value, _array_size, &UA_TYPES[_type_index]);
+    } else {
+        UA_Variant_setArray(&input_argument, _argument_value, _array_size, &UA_TYPES[_type_index]);
+    }
+    add_input_argument(input_argument, _copy);
+}
+
+void
+method_node_caller::add_input_argument(UA_Variant& _input_argument, bool _copy) {
+    input_arguments_.push_back(_input_argument);
     if(_copy) {
         deep_copy_input_arguments_.push_back(&input_arguments_.back());
     }
