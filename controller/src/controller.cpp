@@ -106,6 +106,13 @@ controller::register_robot(UA_Server* _server,
 void
 controller::handle_robot_registration(port_t _port, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    std::string capabilites_str = "Capabilities of robot at position " + std::to_string(_position) + "[";
+    for (std::string capability : _remote_robot_capabilities) {
+        capabilites_str += capability + ", ";
+    }
+    capabilites_str.erase(capabilites_str.end()-2, capabilites_str.end());
+    capabilites_str += "]";
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_port, _position, _remote_robot_capabilities);
     }
