@@ -61,7 +61,7 @@
             "request": "launch",
             // Resolved by CMake Tools:
             "program": "${workspaceFolder}/build/start_controller_instance",
-            "args": ["6000","4000","1","3000"],
+            "args": ["5000"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
