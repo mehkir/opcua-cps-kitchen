@@ -93,7 +93,7 @@ controller::register_robot(UA_Server* _server,
     port_t port = *(port_t*)_input[0].data;
     position_t position = *(position_t*)_input[1].data;
     std::unordered_set<std::string> remote_robot_capabilities;
-    for (size_t i = 0; i <= _input[2].arrayLength; i++) {
+    for (size_t i = 0; i < _input[2].arrayLength; i++) {
         UA_String capability = ((UA_String*)_input[2].data)[i];
         remote_robot_capabilities.insert(std::string((char*) capability.data, capability.length));
     }
