@@ -12,6 +12,7 @@
 #define ACTION_NAME "action_name"
 #define INGREDIENTS "ingredients"
 #define OVERALL_TIME "overall_time"
+#define LAST_EQUIPPED_TOOL "last_equipped_tool"
 
 /* CONVEYOR */
 // method nodes
@@ -20,6 +21,6 @@
 /* CONTROLLER */
 // method nodes
 #define REGISTER_ROBOT "register_robot"
-#define RECEIVE_ROBOT_STATE "receive_robot_state"
+#define CHOOSE_NEXT_ROBOT "choose_next_robot"
 
 #endif // NODE_IDS_HPP

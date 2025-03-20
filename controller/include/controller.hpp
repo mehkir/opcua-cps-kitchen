@@ -24,24 +24,18 @@
 using namespace cps_kitchen;
 
 struct remote_robot {
-    enum class state_status {
-        CURRENT,
-        OBSOLETE
-    };
-
     private:
         UA_Client* client_;
         const port_t port_;
         const position_t position_;
         std::unordered_set<std::string> capabilities_;
         robot_state state_;
-        robot_tool current_tool_;
+        robot_tool last_equipped_tool_;
         bool running_;
         std::thread client_thread_;
         method_node_caller receive_robot_task_caller_;
         recipe_id_t recipe_id_;
-        remote_robot::state_status state_status_;
-        session_id session_id_;
+        UA_UInt32 processed_steps_;
 
     public:
         /**
@@ -50,7 +44,7 @@ struct remote_robot {
          * @param _port the port of the remote robot
          * @param _position the position of the remote robot at the conveyor
          */
-        remote_robot(port_t _port, position_t _position, std::unordered_set<std::string> _capabilities) :  port_(_port), position_(_position), capabilities_(_capabilities), client_(UA_Client_new()), state_status_(state_status::OBSOLETE), session_id_(0,0), running_(true) {
+        remote_robot(port_t _port, position_t _position, std::unordered_set<std::string> _capabilities) :  port_(_port), position_(_position), capabilities_(_capabilities), client_(UA_Client_new()), running_(true) {
             client_connection_establisher robot_client_connection_establisher;
             UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
             if (session_state != UA_SESSIONSTATE_ACTIVATED) {
@@ -60,8 +54,7 @@ struct remote_robot {
             }
 
             receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
-            receive_robot_task_caller_.add_scalar_input_argument(&session_id_.id_, UA_TYPES_UINT32);
-            receive_robot_task_caller_.add_scalar_input_argument(&session_id_.message_counter_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
@@ -97,32 +90,12 @@ struct remote_robot {
             return capabilities_.find(_capability) != capabilities_.end();
         }
 
-        robot_state get_state() const {
-            return state_;
+        robot_tool get_last_equipped_tool() const {
+            return last_equipped_tool_;
         }
 
-        void set_state(robot_state _state) {
-            state_ = _state;
-        }
-
-        robot_tool get_current_tool() const {
-            return current_tool_;
-        }
-
-        void set_current_tool(robot_tool _current_tool) {
-            current_tool_ = _current_tool;
-        }
-
-        state_status get_state_status() const {
-            return state_status_;
-        }
-
-        void set_state_status(state_status _state_status) {
-            state_status_ = _state_status;
-        }
-
-        session_id& get_session_id() {
-            return session_id_;
+        void set_last_equipped_tool(robot_tool _last_equipped_tool) {
+            last_equipped_tool_ = _last_equipped_tool;
         }
 
         /**
@@ -131,10 +104,11 @@ struct remote_robot {
          * @param _recipe_id the recipe ID of the dish
          * @param _callback the callback called after the robot is instructed
          */
-        void instruct(recipe_id_t _recipe_id, UA_ClientAsyncCallCallback _callback) {
+        void instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             recipe_id_ = _recipe_id;
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d", position_, port_, _recipe_id);
+            processed_steps_ = _processed_steps;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d from step %d", position_, port_, _recipe_id, _processed_steps);
             UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, this);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
@@ -167,7 +141,7 @@ private:
     std::thread server_iterate_thread_;
     /* robot related member variables */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
-    method_node_inserter receive_robot_state_inserter_;
+    method_node_inserter choose_next_robot_inserter_;
     method_node_inserter register_robot_inserter_;
     /* recipe related member variables */
     recipe_parser recipe_parser_;
@@ -208,7 +182,7 @@ private:
     handle_robot_registration(port_t _port, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output);
 
     /**
-     * @brief Extracts the robot state parameters.
+     * @brief Extracts the received robot and recipe parameters.
      * 
      * @param _server the server instance from which this method is called
      * @param _session_id 
@@ -224,7 +198,7 @@ private:
      * @return UA_StatusCode 
      */
     static UA_StatusCode
-    receive_robot_state(UA_Server* _server,
+    choose_next_robot(UA_Server* _server,
             const UA_NodeId* _session_id, void* _session_context,
             const UA_NodeId* _method_id, void* _method_context,
             const UA_NodeId* _object_id, void* _object_context,
@@ -232,17 +206,15 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     /**
-     * @brief Assigns the next task according to the current available robot states.
+     * @brief Chooses the next suitable robot
      * 
      * @param _port the port of the remote robot
      * @param _position the position of the remote robot
-     * @param _remote_robot_state  the state of the remote robot
-     * @param _current_remote_robot_tool the current tool of the remote robot
-     * @param _session_id the session id of the remote robot
-     * @param _output the output pointer to store return parameters
+     * @param _recipe_id the recipe id of the partial finished order
+     * @param _processed_steps the steps until the recipe is processed
      */
     void
-    handle_robot_state(port_t _port, position_t _position, robot_state _remote_robot_state, robot_tool _current_remote_robot_tool, session_id _session_id, UA_Variant* _output);
+    handle_next_robot_request(port_t _port, position_t _position, recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
 
     /**
      * @brief Callback called after robot is instructed. Extracts the returned robot state parameters.
