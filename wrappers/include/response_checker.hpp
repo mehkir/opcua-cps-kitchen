@@ -20,7 +20,17 @@ public:
      */
     ~response_checker();
 
+    /**
+     * @brief Checks if the scalar value at the given indicies equals the given data type
+     * 
+     * @param _results_index the results index for the output array in the results array
+     * @param _output_index the index of the data in the output array
+     * @param _type the given type to compare against
+     * @return true if the scalar value equals the data type
+     * @return false if the scalar value does not equal the data type
+     */
     bool has_scalar_type(size_t _results_index, size_t _output_index, const UA_DataType* _type);
+
     /**
      * @brief Returns the size of the results array
      * 
@@ -31,7 +41,7 @@ public:
     /**
      * @brief Returns the size of the output array at the given results array index
      * 
-     * @param _results_index the results index
+     * @param _results_index the results index for the output array in the results array
      * @return size_t the size of the output array
      */
     size_t get_output_arguments_size(size_t _results_index);

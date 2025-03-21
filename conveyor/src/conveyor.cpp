@@ -149,7 +149,7 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
         return;
     }
 
-    if(response.get_output_arguments_size(0) != 3) {
+    if(response.get_output_arguments_size(0) != 6) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         self->running_ = false;
         return;
@@ -157,7 +157,10 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
 
     if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
       || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])) {
+      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])
+      || !response.has_scalar_type(0, 3, &UA_TYPES[UA_TYPES_UINT32])
+      || !response.has_scalar_type(0, 4, &UA_TYPES[UA_TYPES_UINT16])
+      || !response.has_scalar_type(0, 5, &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         self->running_ = false;
         return;
@@ -166,18 +169,22 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
     port_t remote_robot_port = *(port_t*) response.get_data(0,0);
     position_t remote_robot_position = *(position_t*) response.get_data(0,1);
     recipe_id_t finished_recipe = *(recipe_id_t*) response.get_data(0,2);
+    UA_UInt32 processed_steps = *(UA_UInt32*) response.get_data(0,3);
+    port_t next_remote_robot_port = *(port_t*) response.get_data(0,4);
+    position_t next_remote_robot_position = *(position_t*) response.get_data(0,5);
 
-    self->handle_handover_finished_order(remote_robot_port, remote_robot_position, finished_recipe);
+    self->handle_handover_finished_order(remote_robot_port, remote_robot_position, finished_recipe, processed_steps, next_remote_robot_port, next_remote_robot_position);
 }
 
 void
-conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe) {
+conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, port_t _next_remote_robot_port, position_t _next_remote_robot_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d with port %d passed recipe ID %d", _remote_robot_position, _remote_robot_port, _finished_recipe);
     notifications_map_.erase(_remote_robot_position);
     plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
     p.place_recipe_id(_finished_recipe);
     p.set_occupied(true);
+    // TODO: add next suitable robot parameters to plates
     occupied_plates_.insert(p.get_plate_id());
     retrieved_positions_.insert(_remote_robot_position);
     if(retrieved_positions_ == retrievable_positions_) {

@@ -3,6 +3,10 @@
 
 #include <string>
 
+/**
+ * @brief The robot state
+ * 
+ */
 enum class robot_state {
     IDLING,
     COOKING,

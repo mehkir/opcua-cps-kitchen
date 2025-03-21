@@ -342,9 +342,12 @@ private:
      * @param _remote_robot_port the port from which the finished dish is retrieved
      * @param _remote_robot_position the position on which the finished dish is retrieved
      * @param _finished_recipe the recipe id of the finished dish
+     * @param _processed_steps the steps count processed so far
+     * @param _next_remote_robot_port the port of the next suitable robot
+     * @param _next_remote_robot_position the position of the next suitable robot
      */
     void
-    handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe);
+    handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, port_t _next_remote_robot_port, position_t _next_remote_robot_position);
 
     /**
      * @brief Timed callback to call move_conveyor, deliver_finished_order and determine_next_movement.
