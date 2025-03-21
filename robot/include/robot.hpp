@@ -11,10 +11,8 @@
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "types.hpp"
-#include "robot_state.hpp"
 #include "robot_tool.hpp"
 #include "recipe_parser.hpp"
-#include "session_id.hpp"
 #include "capability_parser.hpp"
 
 using namespace cps_kitchen;
@@ -26,10 +24,11 @@ private:
     UA_Server* server_;
     position_t position_;
     port_t port_;
-    robot_state state_;
     robot_tool current_tool_;
     recipe_id_t recipe_id_in_process_;
-    session_id session_id_;
+    UA_UInt32 processed_steps_of_recipe_id_in_process_;
+    port_t next_suitable_robot_port_for_recipe_id_in_process_;
+    position_t next_suitable_robot_position_for_recipe_id_in_process_;
     std::string dish_in_process_;
     std::string action_in_process_;
     std::string ingredients_in_process_;
@@ -45,7 +44,7 @@ private:
     /* controller related member variables */
     UA_Client* controller_client_;
     method_node_caller register_robot_caller_;
-    method_node_caller receive_robot_state_caller_;
+    method_node_caller choose_next_robot_caller_;
     std::thread controller_client_iterate_thread_;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
@@ -73,7 +72,7 @@ private:
     handle_register_robot_result(UA_Boolean _register_robot_received);
 
     /**
-     * @brief Callback called after controller received robot states. Extracts the controller response.
+     * @brief Callback called after controller received choose next robot request. Extracts the controller response.
      * 
      * @param _client the client instance from which this method is called
      * @param _userdata the userdata passed to the receive robot state call
@@ -81,15 +80,16 @@ private:
      * @param _response the pointer to the returned parameters
      */
     static void
-    receive_robot_state_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+    choose_next_robot_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
     /**
-     * @brief Handles the controller response from receive_robot_state_called method to indicate if the robot state is not received successfully.
+     * @brief Handles the controller response from choose_next_robot_called method to tell the conveyor where to deliver the plate next during the handover.
      * 
-     * @param _robot_state_received response if robot state is received successfully
+     * @param _target_port next suitable robot's port
+     * @param _target_position next suitable robot's position
      */
     void
-    handle_robot_state_result(UA_Boolean _robot_state_received);
+    handle_choose_next_robot_result(port_t _target_port, position_t _target_position);
 
     /**
      * @brief Extracts the instruction parameters.
@@ -119,11 +119,11 @@ private:
      * @brief Handles the extracted instruction parameters from the receive_task method and processes the ordered dish.
      * 
      * @param _recipe_id the recipe ID of the dish to prepare
-     * @param _session_id the session ID between the controller and robot
+     * @param _processed_steps the processed steps of the recipe ID so far
      * @param _output the output pointer to store return parameters
      */
     void
-    handle_receive_task(recipe_id_t _recipe_id, session_id _session_id, UA_Variant* _output);
+    handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
 
     /**
      * @brief Initiates the handover of the finished order.
@@ -201,6 +201,18 @@ private:
      */
     static void
     retool(UA_Server* _server, void* _data);
+
+    /**
+     * @brief Updates an information node
+     * 
+     * @param _server the server 
+     * @param _ns_index the namespace index
+     * @param _node_name the node name
+     * @param _value the value
+     * @param _type_index the type index of the data type
+     */
+    void
+    update_information_node(UA_Server* _server, UA_UInt16 _ns_index, std::string _node_name, void* _value, UA_UInt32 _type_index);
 
     /**
      * @brief Joins all started threads.

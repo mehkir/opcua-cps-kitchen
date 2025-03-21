@@ -1,5 +1,11 @@
 #include "../include/information_node_writer.hpp"
 
+information_node_writer::information_node_writer() {
+}
+
+information_node_writer::~information_node_writer() {
+}
+
 UA_StatusCode
 information_node_writer::write_value(UA_Server* _server, UA_NodeId _node_id, void* _value, const UA_DataType* _type) {
     UA_Variant variant;

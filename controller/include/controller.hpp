@@ -102,6 +102,7 @@ struct remote_robot {
          * @brief Instructs the remote robot to process a dish.
          * 
          * @param _recipe_id the recipe ID of the dish
+         * @param _processed_steps the processed steps of the recipe ID so far
          * @param _callback the callback called after the robot is instructed
          */
         void instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback) {
@@ -113,21 +114,6 @@ struct remote_robot {
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
-            }
-        }
-
-        /**
-         * @brief Returns the corresponding string for a robot state status.
-         * 
-         * @param _state_status the robot`s state status
-         * @return std::string the corresponding string
-         */
-        static std::string
-        remote_robot_state_status_to_string(remote_robot::state_status _state_status) {
-            switch (_state_status) {
-                case remote_robot::state_status::CURRENT: return "CURRENT";
-                case remote_robot::state_status::OBSOLETE: return "OBSOLETE";
-                default: return "Unimplemented item";
             }
         }
 };

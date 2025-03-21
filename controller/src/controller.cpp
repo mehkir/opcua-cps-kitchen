@@ -20,6 +20,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
     choose_next_robot_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT32);
     choose_next_robot_inserter_.add_input_argument("recipe id", "recipe_id", UA_TYPES_UINT32);
     choose_next_robot_inserter_.add_input_argument("processed steps", "processed_steps", UA_TYPES_UINT32);
+    choose_next_robot_inserter_.add_output_argument("next suitable robot port", "next_suitable_robot_port", UA_TYPES_UINT16);
     choose_next_robot_inserter_.add_output_argument("next suitable robot position", "next_suitable_robot_position", UA_TYPES_UINT32);
     status = choose_next_robot_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(CHOOSE_NEXT_ROBOT)), "choose next robot", choose_next_robot, this);
     if(status != UA_STATUSCODE_GOOD) {
@@ -162,26 +163,41 @@ controller::handle_next_robot_request(port_t _port, position_t _position, recipe
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d must register first", __FUNCTION__, _position);
         return;
     }
-    remote_robot& robot = position_remote_robot_map_[_position].operator*();
 
-    std::random_device random_device;
-    std::mt19937 mersenne_twister(random_device());
-    std::uniform_int_distribution<std::uint32_t> distribution(1, 3);
-    cps_kitchen::recipe_id_t recipe_id = distribution(mersenne_twister);
-    std::string first_action = recipe_parser_.get_recipe(recipe_id).get_action_queue().front().get_name();
-    UA_UInt32 random_uint = distribution(mersenne_twister);
+    // std::random_device random_device;
+    // std::mt19937 mersenne_twister(random_device());
+    // std::uniform_int_distribution<std::uint32_t> distribution(1, 3);
+    // cps_kitchen::recipe_id_t recipe_id = distribution(mersenne_twister);
+    // std::string first_action = recipe_parser_.get_recipe(recipe_id).get_action_queue().front().get_name();
+    // UA_UInt32 random_uint = distribution(mersenne_twister);
 
+    std::queue<robot_action> recipe_action_queue = recipe_parser_.get_recipe(_recipe_id).get_action_queue();
+    for (size_t i = 0; i < _processed_steps; i++) {
+        recipe_action_queue.pop();
+    }
+    std::string next_action = recipe_action_queue.front().get_name();
+    remote_robot* next_suitable_robot = NULL;
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
-        remote_robot& robot = position_remote_robot->second.operator*();
-        if (robot.is_capable_to(first_action)) {
-            robot.set_state_status(remote_robot::state_status::OBSOLETE);
-            robot.get_session_id().increment_id();
-            robot.instruct(_recipe_id, _processed_steps);
+        remote_robot* robot = position_remote_robot->second.get();
+        if (robot->is_capable_to(next_action)) {
+            next_suitable_robot = robot;
+            // robot.instruct(_recipe_id, _processed_steps, receive_robot_task_called);
             break;
         }
     }
-    position_t choose_next_robot_request_received = true;
-    UA_Variant_setScalarCopy(_output, &choose_next_robot_request_received, &UA_TYPES[UA_TYPES_UINT32]);
+    port_t next_suitable_robot_port = 0;
+    position_t next_suitable_robot_position = 0;
+    if (next_suitable_robot != NULL) {
+        next_suitable_robot_port = next_suitable_robot->get_port();
+        next_suitable_robot_position = next_suitable_robot->get_position();
+    }
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &next_suitable_robot_port, &UA_TYPES[UA_TYPES_UINT16]);
+    status |= UA_Variant_setScalarCopy(&_output[1], &next_suitable_robot_position, &UA_TYPES[UA_TYPES_UINT32]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+        running_ = false;
+        return;
+    }
 }
 
 void
@@ -199,41 +215,29 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
         return;
     }
 
-    if(response.get_output_arguments_size(0) != 5) {
+    if(response.get_output_arguments_size(0) != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         return;
     }
 
     if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
       || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 3, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 4, &UA_TYPES[UA_TYPES_UINT32])) {
+      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
 
     port_t remote_robot_port = *(port_t*) response.get_data(0,0);
     position_t remote_robot_position = *(position_t*) response.get_data(0,1);
-    robot_state remote_robot_state = *(robot_state*) response.get_data(0,2);
-    session_id_t id = *(session_id_t*) response.get_data(0,3);
-    message_counter_t message_counter = *(message_counter_t*) response.get_data(0,4);
+    UA_Boolean result = *(position_t*) response.get_data(0,2);
 
     remote_robot* robot = static_cast<remote_robot*>(_userdata);
     // Sanity check
     if(robot->get_port() != remote_robot_port || robot->get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "%s: Mismatch on <port,position>. Received<%d,%d>, actually<%d,%d>", __FUNCTION__, remote_robot_port, remote_robot_position, robot->get_port(), robot->get_position());
     }
-
-    if (session_id(id, message_counter) < robot->get_session_id()) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Received state lies behind and is therefore ignored", __FUNCTION__);
-        return;
-    }
-    robot->get_session_id().id_ = id;
-    robot->get_session_id().message_counter_ = message_counter;
-    robot->set_state(remote_robot_state);
-    robot->set_state_status(remote_robot::state_status::CURRENT);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "ROBOT_STATE (after): Position=%d, state=%s, state status=%s", robot->get_position(), robot_state_to_string(robot->get_state()).c_str(), remote_robot::remote_robot_state_status_to_string(robot->get_state_status()).c_str());
+    if (!result)
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d with port %d returned false", __FUNCTION__, robot->get_position(), robot->get_port());
 }
 
 void
