@@ -180,11 +180,14 @@ void
 conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, port_t _next_remote_robot_port, position_t _next_remote_robot_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d with port %d passed recipe ID %d", _remote_robot_position, _remote_robot_port, _finished_recipe);
+    if (position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
+        position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_port, _next_remote_robot_position);
+    }
     notifications_map_.erase(_remote_robot_position);
     plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
     p.place_recipe_id(_finished_recipe);
     p.set_occupied(true);
-    // TODO: add next suitable robot parameters to plates
+    p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get());
     occupied_plates_.insert(p.get_plate_id());
     retrieved_positions_.insert(_remote_robot_position);
     if(retrieved_positions_ == retrievable_positions_) {

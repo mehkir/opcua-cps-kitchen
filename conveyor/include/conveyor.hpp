@@ -100,7 +100,9 @@ struct plate {
         position_t position_;
         UA_Server* conveyor_;
         recipe_id_t placed_recipe_id_;
+        UA_UInt32 processed_steps_of_placed_recipe_id_;
         UA_Boolean occupied_;
+        remote_robot* target_robot_;
     public:
         /**
          * @brief Construct a new plate object.
@@ -109,31 +111,28 @@ struct plate {
          * @param _position the plate position
          * @param _conveyor the reference to the conveyor 
          */
-        plate(plate_id_t _id, position_t _position, UA_Server* _conveyor) : id_(_id), position_(_position), conveyor_(_conveyor), placed_recipe_id_(0), occupied_(false) {
-            information_node_inserter id_information_node;
+        plate(plate_id_t _id, position_t _position, UA_Server* _conveyor) : id_(_id), position_(_position), conveyor_(_conveyor), placed_recipe_id_(0), processed_steps_of_placed_recipe_id_(0), occupied_(false), target_robot_(nullptr) {
+            information_node_inserter inserter;
             std::string id_node_id = "plate_id_" + std::to_string(id_);
-            UA_StatusCode status = id_information_node.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(id_node_id.c_str())), "plate id", UA_TYPES_UINT32, const_cast<plate_id_t*>(&id_));
+            UA_StatusCode status = inserter.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(id_node_id.c_str())), "plate id", UA_TYPES_UINT32, const_cast<plate_id_t*>(&id_));
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate id information node", __FUNCTION__);
             }
 
-            information_node_inserter position_information_node;
             std::string position_node_id = "plate_position_" + std::to_string(id_);
-            status = position_information_node.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(position_node_id.c_str())), "plate position", UA_TYPES_UINT32, &position_);
+            status = inserter.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(position_node_id.c_str())), "plate position", UA_TYPES_UINT32, &position_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate position information node", __FUNCTION__);
             }
 
-            information_node_inserter placed_recipe_id_information_node;
             std::string placed_recipe_id_node_id = "plate_placed_recipe_id_" + std::to_string(id_);
-            status = placed_recipe_id_information_node.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(placed_recipe_id_node_id.c_str())), "placed recipe id", UA_TYPES_UINT32, &placed_recipe_id_);
+            status = inserter.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(placed_recipe_id_node_id.c_str())), "placed recipe id", UA_TYPES_UINT32, &placed_recipe_id_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate placed recipe id information node", __FUNCTION__);
             }
 
-            information_node_inserter occupied_information_node;
             std::string occupied_id_node_id = "plate_occupied_" + std::to_string(id_);
-            status = occupied_information_node.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), "plate occupied status", UA_TYPES_BOOLEAN, &occupied_);
+            status = inserter.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), "plate occupied status", UA_TYPES_BOOLEAN, &occupied_);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate occupied information node", __FUNCTION__);
             }
@@ -167,12 +166,17 @@ struct plate {
         //     return *this;
         // }
 
+        /**
+         * @brief Get the plate id
+         * 
+         * @return plate_id_t 
+         */
         plate_id_t get_plate_id() const {
             return id_;
         }
 
         /**
-         * @brief Set the position object and write to the information node.
+         * @brief Set the position and write to the information node.
          * 
          * @param _position the plate position
          */
@@ -186,14 +190,19 @@ struct plate {
             }
         }
 
-        position_t get_position() {
+        /**
+         * @brief Get the current position of the plate on the conveyor
+         * 
+         * @return position_t the current position on the conveyor
+         */
+        position_t get_position() const {
             return position_;
         }
 
         /**
          * @brief Places the finished dish on the plate.
          * 
-         * @param _placed_recipe_id the placed recipe id
+         * @param _placed_recipe_id the placed dish's recipe id
          */
         void place_recipe_id(recipe_id_t _placed_recipe_id) {
             placed_recipe_id_ = _placed_recipe_id;
@@ -205,8 +214,26 @@ struct plate {
             }
         }
 
-        recipe_id_t get_placed_recipe_id() {
+        /**
+         * @brief Get the placed recipe id
+         * 
+         * @return recipe_id_t the recipe id
+         */
+        recipe_id_t get_placed_recipe_id() const {
             return placed_recipe_id_;
+        }
+
+        void set_target_robot(remote_robot* _target_robot) {
+            target_robot_ = _target_robot;
+        }
+
+        /**
+         * @brief Get the target robot to where the dish has to be transferred
+         * 
+         * @return remote_robot* the target robot
+         */
+        remote_robot* get_target_robot() const {
+            return target_robot_;
         }
 
         /**
@@ -224,6 +251,11 @@ struct plate {
             }
         }
 
+        /**
+         * @brief Returns whether plate is occupied or not
+         * 
+         * @return UA_Boolean indicates whether plate is occupied or not
+         */
         UA_Boolean is_occupied() {
             return occupied_;
         }
