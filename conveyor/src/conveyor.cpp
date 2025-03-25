@@ -223,13 +223,30 @@ conveyor::move_conveyor(steps_t _steps) {
 
 void
 conveyor::deliver_finished_order() {
-    plate& output_plate = plates_[position_plate_id_map_[OUTPUT_POSITION]];
-    if(output_plate.is_occupied()) {
-        recipe_id_t recipe = output_plate.get_placed_recipe_id();
-        output_plate.place_recipe_id(0);
-        output_plate.set_occupied(false);
-        occupied_plates_.erase(output_plate.get_plate_id());
+    for (size_t i = 0; i < plates_.size(); i++) {
+        plate& p = plates_[i];
+        if (!p.is_occupied()) {
+            continue;
+        }
+        if (p.get_target_robot() != nullptr && (p.get_target_robot()->get_position() == p.get_position())) {
+            // TODO: call instruct on robot and reset plate fields after successful task receival, call determine next movement after all deliverables are delivered
+            // p.get_target_robot()->instruct
+        }
+        if (p.get_position() == OUTPUT_POSITION) {
+            recipe_id_t recipe = p.get_placed_recipe_id();
+            p.place_recipe_id(0);
+            p.set_occupied(false);
+            occupied_plates_.erase(p.get_plate_id());
+        }
     }
+
+    // plate& output_plate = plates_[position_plate_id_map_[OUTPUT_POSITION]];
+    // if(output_plate.is_occupied()) {
+    //     recipe_id_t recipe = output_plate.get_placed_recipe_id();
+    //     output_plate.place_recipe_id(0);
+    //     output_plate.set_occupied(false);
+    //     occupied_plates_.erase(output_plate.get_plate_id());
+    // }
 }
 
 void
