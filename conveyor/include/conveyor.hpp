@@ -30,6 +30,9 @@ struct remote_robot {
         bool running_;
         std::thread client_thread_;
         method_node_caller handover_finished_order_caller_;
+        method_node_caller receive_robot_task_caller_;
+        recipe_id_t recipe_id_;
+        UA_UInt32 processed_steps_;
 
     public:
         /**
@@ -46,6 +49,9 @@ struct remote_robot {
                 running_ = false;
                 return;
             }
+
+            receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
+            receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
@@ -87,6 +93,26 @@ struct remote_robot {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "HANDOVER: Retrieve finished order from robot on position %d with port %d", position_, port_);
             UA_StatusCode status = handover_finished_order_caller_.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(HANDOVER_FINISHED_ORDER)), _callback, _userdata);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+                running_ = false;
+            }
+        }
+
+        /**
+         * @brief Instructs the remote robot to process a partially processed dish.
+         * 
+         * @param _recipe_id the recipe ID of the dish
+         * @param _processed_steps the processed steps of the recipe ID so far
+         * @param _callback the callback called after the robot is instructed
+         * @param _userdata the conveyor client
+         */
+        void instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback, void* _userdata) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
+            recipe_id_ = _recipe_id;
+            processed_steps_ = _processed_steps;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d from step %d", position_, port_, _recipe_id, _processed_steps);
+            UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
@@ -153,18 +179,6 @@ struct plate {
          */
         plate(const plate& _plate) : id_(_plate.id_), position_(_plate.position_), conveyor_(_plate.conveyor_), placed_recipe_id_(_plate.placed_recipe_id_), occupied_(_plate.occupied_) {
         }
-
-        // plate& operator=(const plate& _plate) {
-        //     if (this == &_plate) {
-        //         return *this;
-        //     }
-
-        //     id_ = _plate.id_;
-        //     position_ = _plate.position_;
-        //     placed_recipe_id_ = _plate.placed_recipe_id_;
-        //     occupied_ = _plate.occupied_;
-        //     return *this;
-        // }
 
         /**
          * @brief Get the plate id
@@ -237,6 +251,24 @@ struct plate {
         }
 
         /**
+         * @brief Sets the processed steps of the currently placed recipe id on the plate
+         * 
+         * @param _processed_steps_of_placed_recipe_id the processed steps
+         */
+        void set_processed_steps(UA_UInt32 _processed_steps_of_placed_recipe_id) {
+            processed_steps_of_placed_recipe_id_ = _processed_steps_of_placed_recipe_id;
+        }
+
+        /**
+         * @brief Returns the processed steps of the currently placed recipe id on the plate
+         * 
+         * @return UA_UInt32 the processed steps
+         */
+        UA_UInt32 get_processed_steps() const {
+            return processed_steps_of_placed_recipe_id_;
+        }
+
+        /**
          * @brief Sets the plate's occupied state.
          * 
          * @param _occupied the occupied state
@@ -280,6 +312,8 @@ private:
     std::set<plate_id_t> occupied_plates_;
     std::set<position_t> retrievable_positions_;
     std::set<position_t> retrieved_positions_;
+    std::set<position_t> deliverable_positions_;
+    std::set<position_t> delivered_positions_;
     std::unordered_map<position_t, plate_id_t> position_plate_id_map_;
     std::unordered_map<position_t, port_t> notifications_map_;
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
@@ -389,6 +423,17 @@ private:
      */
     static void
     perform_movement(UA_Server* _server, void* _data);
+
+    /**
+     * @brief Callback called after robot is instructed. Extracts the returned robot state parameters.
+     * 
+     * @param _client the client instance from which this method is called
+     * @param _userdata the userdata passed to the instruct call
+     * @param _request_id 
+     * @param _response the pointer to the returned parameters
+     */
+    static void
+    receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
 
     /**
      * @brief Joins all started threads.

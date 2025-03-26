@@ -229,24 +229,21 @@ conveyor::deliver_finished_order() {
             continue;
         }
         if (p.get_target_robot() != nullptr && (p.get_target_robot()->get_position() == p.get_position())) {
-            // TODO: call instruct on robot and reset plate fields after successful task receival, call determine next movement after all deliverables are delivered
-            // p.get_target_robot()->instruct
+            deliverable_positions_.insert(p.get_position());
         }
         if (p.get_position() == OUTPUT_POSITION) {
-            recipe_id_t recipe = p.get_placed_recipe_id();
             p.place_recipe_id(0);
             p.set_occupied(false);
+            p.set_processed_steps(0);
             occupied_plates_.erase(p.get_plate_id());
         }
     }
 
-    // plate& output_plate = plates_[position_plate_id_map_[OUTPUT_POSITION]];
-    // if(output_plate.is_occupied()) {
-    //     recipe_id_t recipe = output_plate.get_placed_recipe_id();
-    //     output_plate.place_recipe_id(0);
-    //     output_plate.set_occupied(false);
-    //     occupied_plates_.erase(output_plate.get_plate_id());
-    // }
+    for (position_t position : deliverable_positions_) {
+        // TODO: call instruct on robot and reset plate fields after successful task receival, call determine next movement after all deliverables are delivered
+        plate& p = plates_[position_plate_id_map_[position]];
+        p.get_target_robot()->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), receive_robot_task_called, this);
+    }
 }
 
 void
@@ -257,6 +254,56 @@ conveyor::determine_next_movement() {
     } else {
         handle_retrieve_finished_orders();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: There are still finished orders to deliver or retrieve");
+    }
+}
+
+void
+conveyor::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_userdata == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
+        return;
+    }
+
+    response_checker response(_response);
+    UA_StatusCode status_code = response.get_service_result();
+    if(status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
+        return;
+    }
+
+    if(response.get_output_arguments_size(0) != 3) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        return;
+    }
+
+    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
+      || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
+      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        return;
+    }
+
+    port_t remote_robot_port = *(port_t*) response.get_data(0,0);
+    position_t remote_robot_position = *(position_t*) response.get_data(0,1);
+    UA_Boolean result = *(position_t*) response.get_data(0,2);
+
+    if (!result)
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d with port %d returned false", __FUNCTION__, remote_robot_position, remote_robot_port);
+
+    conveyor* self = static_cast<conveyor*>(_userdata);
+    self->delivered_positions_.insert(remote_robot_position);
+    plate& p = self->plates_[self->position_plate_id_map_[remote_robot_position]];
+    p.place_recipe_id(0);
+    p.set_occupied(false);
+    p.set_processed_steps(0);
+    p.set_target_robot(nullptr);
+    self->occupied_plates_.erase(p.get_plate_id());
+    if(self->retrieved_positions_ == self->retrievable_positions_) {
+        self->retrieved_positions_.clear();
+        self->retrievable_positions_.clear();
+        callback_scheduler movement_scheduler(self->server_, perform_movement, self, NULL);
+        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
     }
 }
 
