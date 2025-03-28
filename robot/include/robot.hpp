@@ -126,6 +126,15 @@ private:
     handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
 
     /**
+     * @brief Determines the last equipped tool according to the robot's capabilities
+     * 
+     * @param action_queue the action queue
+     * @return robot_tool the last equipped tool
+     */
+    robot_tool
+    determine_last_equipped_tool(std::queue<robot_action> action_queue);
+
+    /**
      * @brief Initiates the handover of the finished order.
      * 
      * @param _server the server instance from which this method is called
@@ -201,6 +210,19 @@ private:
      */
     static void
     retool(UA_Server* _server, void* _data);
+
+    /**
+     * @brief Inserts an information node
+     * 
+     * @param _server the server 
+     * @param _ns_index the namespace index
+     * @param _node_name the node name
+     * @param _browse_name the browse name
+     * @param _type_index the type index of the data type
+     * @param _value the value
+     */
+    void
+    add_information_node(UA_Server* _server, UA_UInt16 _ns_index, std::string _node_name, std::string _browse_name, UA_UInt32 _type_index, void* _value);
 
     /**
      * @brief Updates an information node

@@ -54,48 +54,24 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         return;
     }
 
-    information_node_inserter recipe_id_information_node;
-    status = recipe_id_information_node.add_scalar_node(server_, UA_NODEID_STRING(1, const_cast<char*>(RECIPE_ID)), "recipe id", UA_TYPES_UINT32, &recipe_id_in_process_);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the recipe id information node", __FUNCTION__);
-        running_ = false;
-        return;
-    }
-
-    information_node_inserter dish_name_information_node;
+    // Add recipe id to information model
+    add_information_node(server_, 1, RECIPE_ID, "recipe id", UA_TYPES_UINT32, &recipe_id_in_process_);
+    // Add dish name to information model
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
-    status = dish_name_information_node.add_scalar_node(server_, UA_NODEID_STRING(1, const_cast<char*>(DISH_NAME)), "dish name", UA_TYPES_STRING, &dish_in_process);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the dish name information node", __FUNCTION__);
-        running_ = false;
-        return;
-    }
-
+    add_information_node(server_, 1, DISH_NAME, "dish name", UA_TYPES_STRING, &dish_in_process);
+    // Add action name to information model
     UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
-    information_node_inserter action_name_information_node;
-    status = action_name_information_node.add_scalar_node(server_, UA_NODEID_STRING(1, const_cast<char*>(ACTION_NAME)), "action name", UA_TYPES_STRING, &action_in_process);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the action name information node", __FUNCTION__);
-        running_ = false;
-        return;
-    }
-
+    add_information_node(server_, 1, ACTION_NAME, "action name", UA_TYPES_STRING, &action_in_process);
+    // Add ingredients to information model
     UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
-    information_node_inserter ingredients_information_node;
-    status = ingredients_information_node.add_scalar_node(server_, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), "ingredients", UA_TYPES_STRING, &ingredients_in_process);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the ingredients information node", __FUNCTION__);
-        running_ = false;
-        return;
-    }
-
-    information_node_inserter overall_time_information_node;
-    status = overall_time_information_node.add_scalar_node(server_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), "overall time", UA_TYPES_UINT32, &overall_time_);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the overall time information node", __FUNCTION__);
-        running_ = false;
-        return;
-    }
+    add_information_node(server_, 1, INGREDIENTS, "ingredients", UA_TYPES_STRING, &ingredients_in_process);
+    // Add overall time to information node
+    add_information_node(server_, 1, OVERALL_TIME, "overall time", UA_TYPES_UINT64, &overall_time_);
+    // Add current tool to information node
+    UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(current_tool_)));
+    add_information_node(server_, 1, CURRENT_TOOL, "current tool", UA_TYPES_STRING, &current_tool);
+    // Add last equipped tool to information node
+    add_information_node(server_, 1, LAST_EQUIPPED_TOOL, "last equipped tool", UA_TYPES_UINT32, &current_tool);
 
     /* Run the robot server */
     status = UA_Server_run_startup(server_);
@@ -231,7 +207,7 @@ robot::choose_next_robot_called(UA_Client* _client, void* _userdata, UA_UInt32 _
         return;
     }
     if( !response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16]) ||
-        !response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT32])) {
+        !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
@@ -294,7 +270,7 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
     }
     // Update recipe id in process
     recipe_id_in_process_ = _recipe_id;
-    update_information_node(server_, 1, std::string(RECIPE_ID), &recipe_id_in_process_, UA_TYPES_UINT32);
+    update_information_node(server_, 1, RECIPE_ID, &recipe_id_in_process_, UA_TYPES_UINT32);
     // Set output parameters
     UA_Boolean task_received = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
@@ -308,13 +284,28 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
     recipe current_recipe = recipe_parser_.get_recipe(recipe_id_in_process_);
     dish_in_process_ = current_recipe.get_dish_name();
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
-    update_information_node(server_, 1, std::string(DISH_NAME), &dish_in_process, UA_TYPES_STRING);
-    // Update overall time
+    update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
     action_queue_ = current_recipe.get_action_queue();
+    UA_UInt32 last_equipped_tool = (UA_UInt32)determine_last_equipped_tool(action_queue_);
+    update_information_node(server_, 1, LAST_EQUIPPED_TOOL, &last_equipped_tool, UA_TYPES_UINT32);
+    // Update overall time
     overall_time_ = current_recipe.get_overall_time();
     overall_time_ += current_tool_ != action_queue_.front().get_required_tool() ? RETOOLING_TIME : 0;
-    update_information_node(server_, 1, std::string(OVERALL_TIME), &overall_time_, UA_TYPES_UINT32);
+    update_information_node(server_, 1, OVERALL_TIME, &overall_time_, UA_TYPES_UINT64);
     determine_next_action();
+}
+
+robot_tool
+robot::determine_last_equipped_tool(std::queue<robot_action> action_queue) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    robot_tool last_equipped_tool;
+    while (!action_queue.empty()) {
+        if (!capability_parser_.is_capable_to(action_queue.front().get_name()))
+            break;
+        last_equipped_tool = action_queue.front().get_required_tool();
+        action_queue.pop();
+    }
+    return last_equipped_tool;
 }
 
 UA_StatusCode
@@ -359,7 +350,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     next_suitable_robot_port_for_recipe_id_in_process_ = 0;
     next_suitable_robot_position_for_recipe_id_in_process_ = 0;
     // Update recipe id in process
-    update_information_node(server_, 1, std::string(RECIPE_ID), &recipe_id_in_process_, UA_TYPES_UINT32);
+    update_information_node(server_, 1, RECIPE_ID, &recipe_id_in_process_, UA_TYPES_UINT32);
 }
 
 robot::~robot() {
@@ -393,11 +384,11 @@ robot::determine_next_action() {
             // Update action in process
             action_in_process_ = robot_act.get_name();
             UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
-            update_information_node(server_, 1, std::string(ACTION_NAME), &action_in_process, UA_TYPES_STRING);
+            update_information_node(server_, 1, ACTION_NAME, &action_in_process, UA_TYPES_STRING);
             // Update ingredients in process
             ingredients_in_process_ = robot_act.get_ingredients();
             UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
-            update_information_node(server_, 1, std::string(INGREDIENTS), &ingredients_in_process, UA_TYPES_STRING);
+            update_information_node(server_, 1, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
             // Schedule next action
             duration_t action_duration = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %lld", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
@@ -412,15 +403,15 @@ robot::determine_next_action() {
         // Update dish in process
         dish_in_process_ = "None";
         UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
-        update_information_node(server_, 1, std::string(DISH_NAME), &dish_in_process, UA_TYPES_STRING);
+        update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
         // Update action in process
         action_in_process_ = "None";
         UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
-        update_information_node(server_, 1, std::string(ACTION_NAME), &action_in_process, UA_TYPES_STRING);
+        update_information_node(server_, 1, ACTION_NAME, &action_in_process, UA_TYPES_STRING);
         // Update ingredients in process
         ingredients_in_process_ = "None";
         UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
-        update_information_node(server_, 1, std::string(INGREDIENTS), &ingredients_in_process, UA_TYPES_STRING);
+        update_information_node(server_, 1, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
         // Send finished order notification to conveyor
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Recipe_id=%d finished, send finished order notification", recipe_id_in_process_);
         UA_StatusCode status = receive_finished_order_notification_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), receive_finished_order_notification_called, this);
@@ -475,7 +466,7 @@ robot::perform_action(UA_Server* _server, void* _data) {
     robot_action robot_act = self->action_queue_.front();
     duration_t action_duration = robot_act.get_action_duration();
     self->overall_time_ -= action_duration;
-    self->update_information_node(_server, 1, std::string(OVERALL_TIME), &self->overall_time_, UA_TYPES_UINT32);
+    self->update_information_node(_server, 1, OVERALL_TIME, &self->overall_time_, UA_TYPES_UINT64);
     self->processed_steps_of_recipe_id_in_process_++;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %lld", robot_act.get_name().c_str(), self->recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
     self->action_queue_.pop();
@@ -490,10 +481,22 @@ robot::retool(UA_Server* _server, void* _data) {
     }
     robot* self = static_cast<robot*>(_data);
     self->current_tool_ = self->action_queue_.front().get_required_tool();
+    UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(self->current_tool_)));
+    self->update_information_node(_server, 1, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
     self->overall_time_ -= RETOOLING_TIME;
-    self->update_information_node(_server, 1, std::string(OVERALL_TIME), &self->overall_time_, UA_TYPES_UINT32);
+    self->update_information_node(_server, 1, OVERALL_TIME, &self->overall_time_, UA_TYPES_UINT64);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Current tool now is %s", robot_tool_to_string(self->current_tool_));
     self->determine_next_action();
+}
+
+void
+robot::add_information_node(UA_Server* _server, UA_UInt16 _ns_index, std::string _node_name, std::string _browse_name, UA_UInt32 _type_index, void* _value) {
+    information_node_inserter inserter;
+    UA_StatusCode status = inserter.add_scalar_node(_server, UA_NODEID_STRING(_ns_index, const_cast<char*>(_node_name.c_str())), _browse_name, _type_index, _value);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s information node insertion failed", __FUNCTION__, _node_name.c_str());
+        running_ = false;
+    }
 }
 
 void

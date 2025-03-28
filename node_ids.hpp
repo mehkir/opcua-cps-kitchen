@@ -11,6 +11,7 @@
 #define ACTION_NAME "action_name"
 #define INGREDIENTS "ingredients"
 #define OVERALL_TIME "overall_time"
+#define CURRENT_TOOL "current_tool"
 #define LAST_EQUIPPED_TOOL "last_equipped_tool"
 
 /* CONVEYOR */
