@@ -209,7 +209,6 @@ conveyor::perform_movement(UA_Server* _server, void* _data) {
     conveyor* self = static_cast<conveyor*>(_data);
     self->move_conveyor(1);
     self->deliver_finished_order();
-    self->determine_next_movement();
 }
 
 void
@@ -237,6 +236,11 @@ conveyor::deliver_finished_order() {
             p.set_processed_steps(0);
             occupied_plates_.erase(p.get_plate_id());
         }
+    }
+
+    if(deliverable_positions_.empty()) {
+        determine_next_movement();
+        return;
     }
 
     for (position_t position : deliverable_positions_) {
@@ -302,8 +306,7 @@ conveyor::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt
     if(self->retrieved_positions_ == self->retrievable_positions_) {
         self->retrieved_positions_.clear();
         self->retrievable_positions_.clear();
-        callback_scheduler movement_scheduler(self->server_, perform_movement, self, NULL);
-        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
+        self->determine_next_movement();
     }
 }
 
