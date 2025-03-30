@@ -171,20 +171,7 @@ controller::handle_next_robot_request(port_t _port, position_t _position, recipe
     // std::string first_action = recipe_parser_.get_recipe(recipe_id).get_action_queue().front().get_name();
     // UA_UInt32 random_uint = distribution(mersenne_twister);
 
-    std::queue<robot_action> recipe_action_queue = recipe_parser_.get_recipe(_recipe_id).get_action_queue();
-    for (size_t i = 0; i < _processed_steps; i++) {
-        recipe_action_queue.pop();
-    }
-    std::string next_action = recipe_action_queue.front().get_name();
-    remote_robot* next_suitable_robot = NULL;
-    for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
-        remote_robot* robot = position_remote_robot->second.get();
-        if (robot->is_capable_to(next_action)) {
-            next_suitable_robot = robot;
-            // robot.instruct(_recipe_id, _processed_steps, receive_robot_task_called);
-            break;
-        }
-    }
+    remote_robot* next_suitable_robot = find_suitable_robot(_recipe_id, _processed_steps);
     port_t next_suitable_robot_port = 0;
     position_t next_suitable_robot_position = 0;
     if (next_suitable_robot != NULL) {
@@ -198,6 +185,26 @@ controller::handle_next_robot_request(port_t _port, position_t _position, recipe
         running_ = false;
         return;
     }
+}
+
+remote_robot*
+controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    std::queue<robot_action> recipe_action_queue = recipe_parser_.get_recipe(_recipe_id).get_action_queue();
+    for (size_t i = 0; i < _processed_steps; i++) {
+        recipe_action_queue.pop();
+    }
+    remote_robot* suitable_robot = NULL;
+    std::string next_action = recipe_action_queue.front().get_name();
+    for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
+        remote_robot* robot = position_remote_robot->second.get();
+        if (robot->is_capable_to(next_action)) {
+            suitable_robot = robot;
+            break;
+            // robot.instruct(_recipe_id, _processed_steps, receive_robot_task_called);
+        }
+    }
+    return suitable_robot;
 }
 
 void

@@ -203,6 +203,16 @@ private:
     handle_next_robot_request(port_t _port, position_t _position, recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
 
     /**
+     * @brief Returns a suitable robot for the given recipe ID starting from the next step to be processed
+     * 
+     * @param _recipe_id the recipe ID
+     * @param _processed_steps the steps until the recipe is processed
+     * @return remote_robot* the suitable robot
+     */
+    remote_robot*
+    find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps);
+
+    /**
      * @brief Callback called after robot is instructed. Extracts the returned robot state parameters.
      * 
      * @param _client the client instance from which this method is called
