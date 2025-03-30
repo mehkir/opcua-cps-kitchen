@@ -292,10 +292,13 @@ conveyor::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt
     position_t remote_robot_position = *(position_t*) response.get_data(0,1);
     UA_Boolean result = *(position_t*) response.get_data(0,2);
 
-    if (!result)
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d with port %d returned false", __FUNCTION__, remote_robot_position, remote_robot_port);
-
     conveyor* self = static_cast<conveyor*>(_userdata);
+    if (!result) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d with port %d returned false", __FUNCTION__, remote_robot_position, remote_robot_port);
+        self->running_ = false;
+        return;
+    }
+
     self->delivered_positions_.insert(remote_robot_position);
     plate& p = self->plates_[self->position_plate_id_map_[remote_robot_position]];
     p.place_recipe_id(0);
