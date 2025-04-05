@@ -117,6 +117,10 @@ controller::handle_robot_registration(port_t _port, position_t _position, std::u
     }
     bool capabilities_received = true;
     UA_Variant_setScalarCopy(_output, &capabilities_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    // Dummy initialization
+    remote_robot* next_suitable_robot = find_suitable_robot(2, 0);
+    if (next_suitable_robot != NULL)
+        next_suitable_robot->instruct(2, 0, receive_robot_task_called);
 }
 
 UA_StatusCode
@@ -201,7 +205,6 @@ controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_ste
         if (robot->is_capable_to(next_action)) {
             suitable_robot = robot;
             break;
-            // robot.instruct(_recipe_id, _processed_steps, receive_robot_task_called);
         }
     }
     return suitable_robot;
