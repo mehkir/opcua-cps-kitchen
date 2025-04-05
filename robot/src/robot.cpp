@@ -220,6 +220,11 @@ robot::choose_next_robot_called(UA_Client* _client, void* _userdata, UA_UInt32 _
 void
 robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (_target_port == 0 || _target_position == 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No suitable robot for next steps received", __FUNCTION__);
+        running_ = false;
+        return;
+    }
     next_suitable_robot_port_for_recipe_id_in_process_ = _target_port;
     next_suitable_robot_position_for_recipe_id_in_process_ = _target_position;
     UA_StatusCode status = receive_finished_order_notification_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), receive_finished_order_notification_called, this);
