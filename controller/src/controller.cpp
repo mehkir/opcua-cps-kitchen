@@ -105,7 +105,7 @@ controller::register_robot(UA_Server* _server,
 void
 controller::handle_robot_registration(port_t _port, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    std::string capabilites_str = "Capabilities of robot at position " + std::to_string(_position) + " [";
+    std::string capabilites_str = "REGISTRATION: Capabilities of robot at position " + std::to_string(_position) + " [";
     for (std::string capability : _remote_robot_capabilities) {
         capabilites_str += capability + ", ";
     }
@@ -175,6 +175,7 @@ controller::handle_next_robot_request(port_t _port, position_t _position, recipe
     // std::string first_action = recipe_parser_.get_recipe(recipe_id).get_action_queue().front().get_name();
     // UA_UInt32 random_uint = distribution(mersenne_twister);
 
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Robot with port %d and position %d requests next robot for recipe id %d processed with %d steps already", _port, _position, _recipe_id, _processed_steps);
     remote_robot* next_suitable_robot = find_suitable_robot(_recipe_id, _processed_steps);
     port_t next_suitable_robot_port = 0;
     position_t next_suitable_robot_position = 0;
@@ -182,6 +183,7 @@ controller::handle_next_robot_request(port_t _port, position_t _position, recipe
         next_suitable_robot_port = next_suitable_robot->get_port();
         next_suitable_robot_position = next_suitable_robot->get_position();
     }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d with port %d", next_suitable_robot_position, next_suitable_robot_port);
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &next_suitable_robot_port, &UA_TYPES[UA_TYPES_UINT16]);
     status |= UA_Variant_setScalarCopy(&_output[1], &next_suitable_robot_position, &UA_TYPES[UA_TYPES_UINT32]);
     if(status != UA_STATUSCODE_GOOD) {
