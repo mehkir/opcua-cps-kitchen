@@ -105,7 +105,7 @@ controller::register_robot(UA_Server* _server,
 void
 controller::handle_robot_registration(port_t _port, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    std::string capabilites_str = "Capabilities of robot at position " + std::to_string(_position) + "[";
+    std::string capabilites_str = "Capabilities of robot at position " + std::to_string(_position) + " [";
     for (std::string capability : _remote_robot_capabilities) {
         capabilites_str += capability + ", ";
     }
