@@ -191,7 +191,9 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
     p.place_recipe_id(_finished_recipe);
     p.set_occupied(true);
-    p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get());
+    p.set_processed_steps(_processed_steps);
+    if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0)
+        p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get());
     occupied_plates_.insert(p.get_plate_id());
     retrieved_positions_.insert(_remote_robot_position);
     if(retrieved_positions_ == retrievable_positions_) {
@@ -248,7 +250,6 @@ conveyor::deliver_finished_order() {
     }
 
     for (position_t position : deliverable_positions_) {
-        // TODO: call instruct on robot and reset plate fields after successful task receival, call determine next movement after all deliverables are delivered
         plate& p = plates_[position_plate_id_map_[position]];
         p.get_target_robot()->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), receive_robot_task_called, this);
     }
