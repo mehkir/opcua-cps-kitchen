@@ -180,7 +180,7 @@ void
 conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, port_t _next_remote_robot_port, position_t _next_remote_robot_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d with port %d passed recipe ID %d with processed steps of %d for next robot at position %d with port %d ", _remote_robot_position, _remote_robot_port, _finished_recipe, _processed_steps, _next_remote_robot_port, _next_remote_robot_position);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d with port %d passed recipe ID %d with processed steps of %d for next robot at position %d with port %d ", _remote_robot_position, _remote_robot_port, _finished_recipe, _processed_steps, _next_remote_robot_position, _next_remote_robot_port);
     } else {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d with port %d passed recipe ID %d with processed steps of %d", _remote_robot_position, _remote_robot_port, _finished_recipe, _processed_steps);
     }
