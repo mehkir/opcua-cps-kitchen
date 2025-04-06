@@ -291,8 +291,10 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
     dish_in_process_ = current_recipe.get_dish_name();
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
     update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
-    // TODO: Update action queue
     action_queue_ = current_recipe.get_action_queue();
+    for (size_t i = 0; i < processed_steps_of_recipe_id_in_process_; i++) {
+        action_queue_.pop();
+    }
     UA_UInt32 last_equipped_tool = (UA_UInt32)determine_last_equipped_tool(action_queue_);
     update_information_node(server_, 1, LAST_EQUIPPED_TOOL, &last_equipped_tool, UA_TYPES_UINT32);
     // Update overall time
