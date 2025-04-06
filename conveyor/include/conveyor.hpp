@@ -130,7 +130,7 @@ struct remote_robot {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             recipe_id_ = _recipe_id;
             processed_steps_ = _processed_steps;
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d from step %d", position_, port_, _recipe_id, _processed_steps);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d after step %d", position_, port_, _recipe_id, _processed_steps);
             UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
