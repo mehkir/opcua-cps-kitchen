@@ -268,7 +268,7 @@ robot::receive_task(UA_Server *_server,
 void
 robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Received instruction(recipe_id=%d)", _recipe_id);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Received instruction to cook recipe_id=%d with already %d processed steps", _recipe_id, _processed_steps);
     if (!recipe_parser_.has_recipe(_recipe_id)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unknown recipe ID", __FUNCTION__);
         return;
@@ -276,6 +276,7 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
     // Update recipe id in process
     recipe_id_in_process_ = _recipe_id;
     update_information_node(server_, 1, RECIPE_ID, &recipe_id_in_process_, UA_TYPES_UINT32);
+    processed_steps_of_recipe_id_in_process_ = _processed_steps;
     // Set output parameters
     UA_Boolean task_received = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
@@ -290,6 +291,7 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
     dish_in_process_ = current_recipe.get_dish_name();
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
     update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
+    // TODO: Update action queue
     action_queue_ = current_recipe.get_action_queue();
     UA_UInt32 last_equipped_tool = (UA_UInt32)determine_last_equipped_tool(action_queue_);
     update_information_node(server_, 1, LAST_EQUIPPED_TOOL, &last_equipped_tool, UA_TYPES_UINT32);
