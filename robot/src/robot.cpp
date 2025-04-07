@@ -227,6 +227,7 @@ robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_p
     }
     next_suitable_robot_port_for_recipe_id_in_process_ = _target_port;
     next_suitable_robot_position_for_recipe_id_in_process_ = _target_position;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with port %d", next_suitable_robot_position_for_recipe_id_in_process_, next_suitable_robot_port_for_recipe_id_in_process_);
     UA_StatusCode status = receive_finished_order_notification_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), receive_finished_order_notification_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification", __FUNCTION__);
