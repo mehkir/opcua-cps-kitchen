@@ -311,9 +311,9 @@ conveyor::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt
     p.set_processed_steps(0);
     p.set_target_robot(nullptr);
     self->occupied_plates_.erase(p.get_plate_id());
-    if(self->retrieved_positions_ == self->retrievable_positions_) {
-        self->retrieved_positions_.clear();
-        self->retrievable_positions_.clear();
+    if(self->delivered_positions_ == self->deliverable_positions_) {
+        self->delivered_positions_.clear();
+        self->deliverable_positions_.clear();
         self->determine_next_movement();
     }
 }
