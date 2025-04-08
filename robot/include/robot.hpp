@@ -175,6 +175,13 @@ private:
     determine_next_action();
 
     /**
+     * @brief Resets fields for displaying actions, tools, ingredients, dish and recipe id currently in process
+     * 
+     */
+    void
+    reset_in_process_fields();
+
+    /**
      * @brief Callback called after conveyor is notified about finished dish. Extracts the conveyor response.
      * 
      * @param _client the client instance from which this method is called

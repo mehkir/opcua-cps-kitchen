@@ -361,6 +361,10 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     next_suitable_robot_position_for_recipe_id_in_process_ = 0;
     // Update recipe id in process
     update_information_node(server_, 1, RECIPE_ID, &recipe_id_in_process_, UA_TYPES_UINT32);
+    // Update dish in process
+    dish_in_process_ = "None";
+    UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
+    update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
 }
 
 robot::~robot() {
@@ -379,6 +383,7 @@ robot::determine_next_action() {
         robot_tool required_tool = robot_act.get_required_tool();
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
+            reset_in_process_fields();
             choose_next_robot_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(CHOOSE_NEXT_ROBOT)), choose_next_robot_called, this);
             return;
         }
@@ -410,18 +415,7 @@ robot::determine_next_action() {
             }
         }
     } else {
-        // Update dish in process
-        dish_in_process_ = "None";
-        UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
-        update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
-        // Update action in process
-        action_in_process_ = "None";
-        UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
-        update_information_node(server_, 1, ACTION_NAME, &action_in_process, UA_TYPES_STRING);
-        // Update ingredients in process
-        ingredients_in_process_ = "None";
-        UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
-        update_information_node(server_, 1, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
+        reset_in_process_fields();
         // Send finished order notification to conveyor
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Recipe_id=%d finished, send finished order notification", recipe_id_in_process_);
         UA_StatusCode status = receive_finished_order_notification_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), receive_finished_order_notification_called, this);
@@ -430,6 +424,18 @@ robot::determine_next_action() {
             running_ = false;
         }
     }
+}
+
+void
+robot::reset_in_process_fields() {
+    // Update action in process
+    action_in_process_ = "None";
+    UA_String action_in_process = UA_STRING(const_cast<char*>(action_in_process_.c_str()));
+    update_information_node(server_, 1, ACTION_NAME, &action_in_process, UA_TYPES_STRING);
+    // Update ingredients in process
+    ingredients_in_process_ = "None";
+    UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
+    update_information_node(server_, 1, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
 }
 
 void
