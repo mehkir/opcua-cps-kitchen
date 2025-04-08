@@ -406,7 +406,7 @@ robot::determine_next_action() {
             update_information_node(server_, 1, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
             // Schedule next action
             duration_t action_duration = robot_act.get_action_duration();
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %lld", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
             callback_scheduler action_scheduler(server_, perform_action, this, NULL);
             UA_StatusCode status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (action_duration * TIME_UNIT));
             if (status != UA_STATUSCODE_GOOD) {
@@ -484,7 +484,7 @@ robot::perform_action(UA_Server* _server, void* _data) {
     self->overall_time_ -= action_duration;
     self->update_information_node(_server, 1, OVERALL_TIME, &self->overall_time_, UA_TYPES_UINT64);
     self->processed_steps_of_recipe_id_in_process_++;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %lld", robot_act.get_name().c_str(), self->recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld", robot_act.get_name().c_str(), self->recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
     self->action_queue_.pop();
     self->determine_next_action();
 }
