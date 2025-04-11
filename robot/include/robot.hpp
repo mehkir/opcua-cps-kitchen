@@ -46,6 +46,7 @@ private:
     position_t position_;
     port_t port_;
     robot_tool current_tool_;
+    robot_tool last_equipped_tool_;
     recipe_id_t recipe_id_in_process_;
     UA_UInt32 processed_steps_of_recipe_id_in_process_;
     port_t next_suitable_robot_port_for_recipe_id_in_process_;
@@ -148,13 +149,19 @@ private:
     handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
 
     /**
-     * @brief Determines the last equipped tool according to the robot's capabilities
+     * @brief Cooks the next order in the order queue
      * 
-     * @param action_queue the action queue
-     * @return robot_tool the last equipped tool
      */
-    robot_tool
-    determine_last_equipped_tool(std::queue<robot_action> action_queue);
+    void
+    cook_next_order();
+
+    /**
+     * @brief Computes the overall time and determines the last equipped tool according to the actions the robot is capable to
+     * 
+     * @param _action_queue the action queue
+     */
+    void
+    compute_overall_time_and_determine_last_tool(std::queue<robot_action> _action_queue);
 
     /**
      * @brief Initiates the handover of the finished order.

@@ -18,7 +18,7 @@
 
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
         server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
-        current_tool_(robot_tool::ROBOT_TOOLS_COUNT), recipe_id_in_process_(0), processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_port_for_recipe_id_in_process_(0), next_suitable_robot_position_for_recipe_id_in_process_(0),
+        current_tool_(robot_tool::ROBOT_TOOLS_COUNT), last_equipped_tool_(current_tool_), recipe_id_in_process_(0), processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_port_for_recipe_id_in_process_(0), next_suitable_robot_position_for_recipe_id_in_process_(0),
         dish_in_process_("None"), action_in_process_("None"), ingredients_in_process_("None"), overall_time_(0), recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -71,7 +71,8 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(current_tool_)));
     add_information_node(server_, 1, CURRENT_TOOL, "current tool", UA_TYPES_STRING, &current_tool);
     // Add last equipped tool to information node
-    add_information_node(server_, 1, LAST_EQUIPPED_TOOL, "last equipped tool", UA_TYPES_UINT32, &current_tool);
+    UA_String last_equipped_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(last_equipped_tool_)));
+    add_information_node(server_, 1, LAST_EQUIPPED_TOOL, "last equipped tool", UA_TYPES_UINT32, &last_equipped_tool);
 
     /* Run the robot server */
     status = UA_Server_run_startup(server_);
@@ -274,12 +275,19 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unknown recipe ID", __FUNCTION__);
         return;
     }
-    // TODO: Prepare incoming order with action queue
-    // order_queue_.push
-    // Update recipe id in process
-    recipe_id_in_process_ = _recipe_id;
-    update_information_node(server_, 1, RECIPE_ID, &recipe_id_in_process_, UA_TYPES_UINT32);
-    processed_steps_of_recipe_id_in_process_ = _processed_steps;
+    recipe incoming_recipe = recipe_parser_.get_recipe(_recipe_id);
+    std::queue<robot_action> action_queue = incoming_recipe.get_action_queue();
+    // Remove already processed steps
+    for (size_t i = 0; i < processed_steps_of_recipe_id_in_process_; i++) {
+        action_queue.pop();
+    }
+    compute_overall_time_and_determine_last_tool(action_queue);
+    // Update overall time
+    update_information_node(server_, 1, OVERALL_TIME, &overall_time_, UA_TYPES_UINT64);
+    // Update last equipped tool
+    update_information_node(server_, 1, LAST_EQUIPPED_TOOL, &last_equipped_tool_, UA_TYPES_UINT32);
+    // Setup incoming order
+    order_queue_.push(order(_recipe_id, _processed_steps, action_queue));
     // Set output parameters
     UA_Boolean task_received = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
@@ -289,36 +297,39 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
         running_ = false;
     }
+    if (recipe_id_in_process_ == 0)
+        cook_next_order();
+}
+
+void
+robot::cook_next_order() {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (order_queue_.empty())
+        return;
+    order next_order = order_queue_.front();
+    order_queue_.pop();
+    // Update recipe id in process
+    recipe_id_in_process_ = next_order.get_recipe_id();
+    update_information_node(server_, 1, RECIPE_ID, &recipe_id_in_process_, UA_TYPES_UINT32);
+    processed_steps_of_recipe_id_in_process_ = next_order.get_processed_steps();
     // Update dish name
     recipe current_recipe = recipe_parser_.get_recipe(recipe_id_in_process_);
     dish_in_process_ = current_recipe.get_dish_name();
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
     update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
-    action_queue_in_process_ = current_recipe.get_action_queue();
-    // Remove already processed steps
-    for (size_t i = 0; i < processed_steps_of_recipe_id_in_process_; i++) {
-        action_queue_in_process_.pop();
-    }
-    UA_UInt32 last_equipped_tool = (UA_UInt32)determine_last_equipped_tool(action_queue_in_process_);
-    update_information_node(server_, 1, LAST_EQUIPPED_TOOL, &last_equipped_tool, UA_TYPES_UINT32);
-    // Update overall time
-    overall_time_ = current_recipe.get_overall_time();
-    overall_time_ += current_tool_ != action_queue_in_process_.front().get_required_tool() ? RETOOLING_TIME : 0;
-    update_information_node(server_, 1, OVERALL_TIME, &overall_time_, UA_TYPES_UINT64);
+    action_queue_in_process_ = next_order.get_action_queue();
     determine_next_action();
 }
 
-robot_tool
-robot::determine_last_equipped_tool(std::queue<robot_action> action_queue) {
+void
+robot::compute_overall_time_and_determine_last_tool(std::queue<robot_action> _action_queue) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    robot_tool last_equipped_tool;
-    while (!action_queue.empty()) {
-        if (!capability_parser_.is_capable_to(action_queue.front().get_name()))
-            break;
-        last_equipped_tool = action_queue.front().get_required_tool();
-        action_queue.pop();
+    while (!_action_queue.empty() && capability_parser_.is_capable_to(_action_queue.front().get_name())) {
+        overall_time_ += last_equipped_tool_ != _action_queue.front().get_required_tool() ? RETOOLING_TIME : 0;
+        overall_time_ += _action_queue.front().get_action_duration();
+        last_equipped_tool_ = _action_queue.front().get_required_tool();
+        _action_queue.pop();
     }
-    return last_equipped_tool;
 }
 
 UA_StatusCode
@@ -368,6 +379,8 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     dish_in_process_ = "None";
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
     update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
+    if (recipe_id_in_process_ == 0)
+        cook_next_order();
 }
 
 robot::~robot() {
