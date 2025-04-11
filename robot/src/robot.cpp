@@ -278,7 +278,7 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
     recipe incoming_recipe = recipe_parser_.get_recipe(_recipe_id);
     std::queue<robot_action> action_queue = incoming_recipe.get_action_queue();
     // Remove already processed steps
-    for (size_t i = 0; i < processed_steps_of_recipe_id_in_process_; i++) {
+    for (size_t i = 0; i < _processed_steps; i++) {
         action_queue.pop();
     }
     compute_overall_time_and_determine_last_tool(action_queue);
