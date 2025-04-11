@@ -5,7 +5,6 @@
 #include <open62541/client.h>
 #include <thread>
 #include <queue>
-#include <tuple>
 
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
@@ -16,6 +15,28 @@
 #include "capability_parser.hpp"
 
 using namespace cps_kitchen;
+
+struct order {
+    private:
+        recipe_id_t recipe_id_;
+        UA_UInt32 processed_steps_;
+        std::queue<robot_action> action_queue_;
+    public:
+        order(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, std::queue<robot_action> _action_queue) : recipe_id_(_recipe_id), processed_steps_(_processed_steps), action_queue_(_action_queue) {
+        }
+
+        recipe_id_t get_recipe_id() const {
+            return recipe_id_;
+        }
+
+        UA_UInt32 get_processed_steps() const {
+            return processed_steps_;
+        }
+
+        std::queue<robot_action> get_action_queue() const {
+            return action_queue_;
+        }
+};
 
 class robot {
 
@@ -29,11 +50,12 @@ private:
     UA_UInt32 processed_steps_of_recipe_id_in_process_;
     port_t next_suitable_robot_port_for_recipe_id_in_process_;
     position_t next_suitable_robot_position_for_recipe_id_in_process_;
+    std::queue<order> order_queue_;
     std::string dish_in_process_;
     std::string action_in_process_;
     std::string ingredients_in_process_;
     duration_t overall_time_;
-    std::queue<robot_action> action_queue_;
+    std::queue<robot_action> action_queue_in_process_;
     volatile UA_Boolean running_;
     method_node_inserter receive_task_inserter_;
     method_node_inserter handover_finished_order_inserter_;

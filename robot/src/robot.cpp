@@ -274,6 +274,8 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unknown recipe ID", __FUNCTION__);
         return;
     }
+    // TODO: Prepare incoming order with action queue
+    // order_queue_.push
     // Update recipe id in process
     recipe_id_in_process_ = _recipe_id;
     update_information_node(server_, 1, RECIPE_ID, &recipe_id_in_process_, UA_TYPES_UINT32);
@@ -292,15 +294,16 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
     dish_in_process_ = current_recipe.get_dish_name();
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
     update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
-    action_queue_ = current_recipe.get_action_queue();
+    action_queue_in_process_ = current_recipe.get_action_queue();
+    // Remove already processed steps
     for (size_t i = 0; i < processed_steps_of_recipe_id_in_process_; i++) {
-        action_queue_.pop();
+        action_queue_in_process_.pop();
     }
-    UA_UInt32 last_equipped_tool = (UA_UInt32)determine_last_equipped_tool(action_queue_);
+    UA_UInt32 last_equipped_tool = (UA_UInt32)determine_last_equipped_tool(action_queue_in_process_);
     update_information_node(server_, 1, LAST_EQUIPPED_TOOL, &last_equipped_tool, UA_TYPES_UINT32);
     // Update overall time
     overall_time_ = current_recipe.get_overall_time();
-    overall_time_ += current_tool_ != action_queue_.front().get_required_tool() ? RETOOLING_TIME : 0;
+    overall_time_ += current_tool_ != action_queue_in_process_.front().get_required_tool() ? RETOOLING_TIME : 0;
     update_information_node(server_, 1, OVERALL_TIME, &overall_time_, UA_TYPES_UINT64);
     determine_next_action();
 }
@@ -378,8 +381,8 @@ robot::~robot() {
 
 void
 robot::determine_next_action() {
-    if (action_queue_.size()) {
-        robot_action robot_act = action_queue_.front();
+    if (action_queue_in_process_.size()) {
+        robot_action robot_act = action_queue_in_process_.front();
         robot_tool required_tool = robot_act.get_required_tool();
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
@@ -479,13 +482,13 @@ robot::perform_action(UA_Server* _server, void* _data) {
         return;
     }
     robot* self = static_cast<robot*>(_data);
-    robot_action robot_act = self->action_queue_.front();
+    robot_action robot_act = self->action_queue_in_process_.front();
     duration_t action_duration = robot_act.get_action_duration();
     self->overall_time_ -= action_duration;
     self->update_information_node(_server, 1, OVERALL_TIME, &self->overall_time_, UA_TYPES_UINT64);
     self->processed_steps_of_recipe_id_in_process_++;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld", robot_act.get_name().c_str(), self->recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
-    self->action_queue_.pop();
+    self->action_queue_in_process_.pop();
     self->determine_next_action();
 }
 
@@ -496,7 +499,7 @@ robot::retool(UA_Server* _server, void* _data) {
         return;
     }
     robot* self = static_cast<robot*>(_data);
-    self->current_tool_ = self->action_queue_.front().get_required_tool();
+    self->current_tool_ = self->action_queue_in_process_.front().get_required_tool();
     UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(self->current_tool_)));
     self->update_information_node(_server, 1, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
     self->overall_time_ -= RETOOLING_TIME;
