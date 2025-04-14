@@ -37,7 +37,7 @@ struct remote_robot {
         UA_UInt32 processed_steps_;
         duration_t overall_time_;
         robot_tool last_equipped_tool_;
-        node_value_subscriber subscriber;
+        node_value_subscriber subscriber_;
 
     public:
         /**
@@ -58,8 +58,8 @@ struct remote_robot {
             receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
             receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
 
-            subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_callback, this);
-            subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(LAST_EQUIPPED_TOOL)), last_equipped_tool_callback, this);
+            // subscriber_.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_callback, this);
+            // subscriber_.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(LAST_EQUIPPED_TOOL)), last_equipped_tool_callback, this);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {

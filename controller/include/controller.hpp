@@ -57,9 +57,9 @@ struct remote_robot {
             receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
             receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
 
-            node_value_subscriber nv_subscriber;
-            nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_changed, this);
-            nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(LAST_EQUIPPED_TOOL)), last_equipped_tool_changed, this);
+            // node_value_subscriber nv_subscriber;
+            // nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_changed, this);
+            // nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(LAST_EQUIPPED_TOOL)), last_equipped_tool_changed, this);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
@@ -126,17 +126,6 @@ struct remote_robot {
         }
 
         /**
-         * @brief Sets the last equipped tool
-         * 
-         * @param _last_equipped_tool the last equipped tool
-         */
-        void
-        set_last_equipped_tool(robot_tool _last_equipped_tool) {
-            last_equipped_tool_ = _last_equipped_tool;
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, position_, robot_tool_to_string(last_equipped_tool_));
-        }
-
-        /**
          * @brief Returns the remote robot's overall time
          * 
          * @return duration_t the remote robot's overall time
@@ -144,17 +133,6 @@ struct remote_robot {
         duration_t
         get_overall_time() const {
             return overall_time_;
-        }
-
-        /**
-         * @brief Sets the overall time
-         * 
-         * @param _overall_time the overall time
-         */
-        void
-        set_overall_time(duration_t _overall_time) {
-            overall_time_ = _overall_time;
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot at position %d has an overall time of %ld", __FUNCTION__, position_, overall_time_);
         }
 
         /**
@@ -189,8 +167,8 @@ struct remote_robot {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
                     return;
                 }
-                duration_t overall_time = *(duration_t*) _value->value.data;
-                self->set_overall_time(overall_time);
+                self->overall_time_ = *(duration_t*) _value->value.data;
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot at position %d has an overall time of %ld", __FUNCTION__, self->position_, self->overall_time_);
         }
 
         static void
@@ -205,8 +183,8 @@ struct remote_robot {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
                     return;
                 }
-                robot_tool last_equipped_tool = *(robot_tool*) _value->value.data;
-                self->set_last_equipped_tool(last_equipped_tool);
+                self->last_equipped_tool_ = *(robot_tool*) _value->value.data;
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, self->position_, robot_tool_to_string(self->last_equipped_tool_));
         }
 };
 
