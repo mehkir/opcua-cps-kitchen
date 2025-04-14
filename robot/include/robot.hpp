@@ -56,6 +56,7 @@ private:
     std::string action_in_process_;
     std::string ingredients_in_process_;
     duration_t overall_time_;
+    duration_t current_action_duration_;
     std::queue<robot_action> action_queue_in_process_;
     volatile UA_Boolean running_;
     method_node_inserter receive_task_inserter_;
@@ -230,13 +231,20 @@ private:
     handle_finished_order_notification_result(UA_Boolean _finished_order_notification_received);
 
     /**
-     * @brief Timed callback to indicate the current action completion and to update the overall time for the current dish.
+     * @brief Passes the time for the current action
      * 
      * @param _server the server instance from which this method is called
      * @param _data the data passed to the scheduling call
      */
     static void
-    perform_action(UA_Server* _server, void* _data);
+    pass_time(UA_Server* _server, void* _data);
+
+    /**
+     * @brief Callback to indicate the current action completion.
+     * 
+     */
+    void
+    action_performed();
 
     /**
      * @brief Timed callback to indicate retooling completion and to update the current tool and overall time.

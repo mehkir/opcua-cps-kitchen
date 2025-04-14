@@ -19,7 +19,7 @@
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
         server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
         current_tool_(robot_tool::ROBOT_TOOLS_COUNT), last_equipped_tool_(current_tool_), recipe_id_in_process_(0), processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_port_for_recipe_id_in_process_(0), next_suitable_robot_position_for_recipe_id_in_process_(0),
-        dish_in_process_("None"), action_in_process_("None"), ingredients_in_process_("None"), overall_time_(0), recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position) {
+        dish_in_process_("None"), action_in_process_("None"), ingredients_in_process_("None"), overall_time_(0), current_action_duration_(0), recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -379,8 +379,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     dish_in_process_ = "None";
     UA_String dish_in_process = UA_STRING(const_cast<char*>(dish_in_process_.c_str()));
     update_information_node(server_, 1, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
-    if (recipe_id_in_process_ == 0)
-        cook_next_order();
+    cook_next_order();
 }
 
 robot::~robot() {
@@ -421,12 +420,12 @@ robot::determine_next_action() {
             UA_String ingredients_in_process = UA_STRING(const_cast<char*>(ingredients_in_process_.c_str()));
             update_information_node(server_, 1, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
             // Schedule next action
-            duration_t action_duration = robot_act.get_action_duration();
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
-            callback_scheduler action_scheduler(server_, perform_action, this, NULL);
-            UA_StatusCode status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (action_duration * TIME_UNIT));
+            current_action_duration_ = robot_act.get_action_duration();
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), current_action_duration_);
+            callback_scheduler action_scheduler(server_, pass_time, this, NULL);
+            UA_StatusCode status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (TIME_UNIT_UPDATE_RATE * TIME_UNIT));
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling perform action", __FUNCTION__);
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time", __FUNCTION__);
                 running_ = false;
             }
         }
@@ -489,20 +488,35 @@ robot::handle_finished_order_notification_result(UA_Boolean _finished_order_noti
 }
 
 void
-robot::perform_action(UA_Server* _server, void* _data) {
+robot::pass_time(UA_Server* _server, void* _data) {
     if (_data == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
         return;
     }
     robot* self = static_cast<robot*>(_data);
-    robot_action robot_act = self->action_queue_in_process_.front();
-    duration_t action_duration = robot_act.get_action_duration();
-    self->overall_time_ -= action_duration;
+    self->overall_time_ -= TIME_UNIT_UPDATE_RATE;
     self->update_information_node(_server, 1, OVERALL_TIME, &self->overall_time_, UA_TYPES_UINT64);
-    self->processed_steps_of_recipe_id_in_process_++;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld", robot_act.get_name().c_str(), self->recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
-    self->action_queue_in_process_.pop();
-    self->determine_next_action();
+    self->current_action_duration_ -= TIME_UNIT_UPDATE_RATE;
+    if (self->current_action_duration_ != 0) {
+        callback_scheduler action_scheduler(_server, pass_time, _data, NULL);
+        UA_StatusCode status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (TIME_UNIT_UPDATE_RATE * TIME_UNIT));
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time", __FUNCTION__);
+            self->running_ = false;
+        }
+    } else {
+        self->action_performed();
+    }
+}
+
+void
+robot::action_performed() {
+    robot_action robot_act = action_queue_in_process_.front();
+    duration_t action_duration = robot_act.get_action_duration();
+    processed_steps_of_recipe_id_in_process_++;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
+    action_queue_in_process_.pop();
+    determine_next_action();
 }
 
 void
