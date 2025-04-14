@@ -31,6 +31,7 @@ struct remote_robot {
         std::unordered_set<std::string> capabilities_;
         robot_state state_;
         robot_tool last_equipped_tool_;
+        duration_t overall_time_;
         bool running_;
         std::thread client_thread_;
         method_node_caller receive_robot_task_caller_;
@@ -56,6 +57,10 @@ struct remote_robot {
             receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
             receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
 
+            node_value_subscriber nv_subscriber;
+            nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_changed, this);
+            nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(LAST_EQUIPPED_TOOL)), last_equipped_tool_changed, this);
+
             client_thread_ = std::thread([this]() {
                 while(running_) {
                     UA_StatusCode status = UA_Client_run_iterate(client_, 100);
@@ -78,24 +83,78 @@ struct remote_robot {
             UA_Client_delete(client_);
         }
 
-        port_t get_port() const {
+        /**
+         * @brief Returns the port of the remote robot.
+         * 
+         * @return port_t the remote robot port
+         */
+        port_t
+        get_port() const {
             return port_;
         }
 
-        position_t get_position() const {
+        /**
+         * @brief Returns the remote robot's position.
+         * 
+         * @return position_t the remote robot position
+         */
+        position_t
+        get_position() const {
             return position_;
         }
 
-        bool is_capable_to(std::string _capability) const {
+        /**
+         * @brief Indicates if a robot is capable to perform the given action
+         * 
+         * @param _capability the action to check whether it can be performed
+         * @return true if the remote is capable to perform the action
+         * @return false if the remote is not capable to perform the action
+         */
+        bool
+        is_capable_to(std::string _capability) const {
             return capabilities_.find(_capability) != capabilities_.end();
         }
 
-        robot_tool get_last_equipped_tool() const {
+        /**
+         * @brief Returns the remote robot's last equipped tool
+         * 
+         * @return robot_tool the last equipped tool
+         */
+        robot_tool
+        get_last_equipped_tool() const {
             return last_equipped_tool_;
         }
 
-        void set_last_equipped_tool(robot_tool _last_equipped_tool) {
+        /**
+         * @brief Sets the last equipped tool
+         * 
+         * @param _last_equipped_tool the last equipped tool
+         */
+        void
+        set_last_equipped_tool(robot_tool _last_equipped_tool) {
             last_equipped_tool_ = _last_equipped_tool;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, position_, robot_tool_to_string(last_equipped_tool_));
+        }
+
+        /**
+         * @brief Returns the remote robot's overall time
+         * 
+         * @return duration_t the remote robot's overall time
+         */
+        duration_t
+        get_overall_time() const {
+            return overall_time_;
+        }
+
+        /**
+         * @brief Sets the overall time
+         * 
+         * @param _overall_time the overall time
+         */
+        void
+        set_overall_time(duration_t _overall_time) {
+            overall_time_ = _overall_time;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot at position %d has an overall time of %ld", __FUNCTION__, position_, overall_time_);
         }
 
         /**
@@ -105,7 +164,8 @@ struct remote_robot {
          * @param _processed_steps the processed steps of the recipe ID so far
          * @param _callback the callback called after the robot is instructed
          */
-        void instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback) {
+        void
+        instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             recipe_id_ = _recipe_id;
             processed_steps_ = _processed_steps;
@@ -115,6 +175,38 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
             }
+        }
+
+        static void
+        overall_time_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
+            UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
+                if(_mon_context == NULL) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
+                    return;
+                }
+                remote_robot* self = static_cast<remote_robot*>(_mon_context);
+                if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT64])) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                    return;
+                }
+                duration_t overall_time = *(duration_t*) _value->value.data;
+                self->set_overall_time(overall_time);
+        }
+
+        static void
+        last_equipped_tool_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
+            UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
+                if(_mon_context == NULL) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
+                    return;
+                }
+                remote_robot* self = static_cast<remote_robot*>(_mon_context);
+                if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                    return;
+                }
+                robot_tool last_equipped_tool = *(robot_tool*) _value->value.data;
+                self->set_last_equipped_tool(last_equipped_tool);
         }
 };
 
