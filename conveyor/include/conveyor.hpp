@@ -35,9 +35,6 @@ struct remote_robot {
         method_node_caller receive_robot_task_caller_;
         recipe_id_t recipe_id_;
         UA_UInt32 processed_steps_;
-        duration_t overall_time_;
-        robot_tool last_equipped_tool_;
-        node_value_subscriber subscriber_;
 
     public:
         /**
@@ -57,9 +54,6 @@ struct remote_robot {
 
             receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
             receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
-
-            // subscriber_.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_callback, this);
-            // subscriber_.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(LAST_EQUIPPED_TOOL)), last_equipped_tool_callback, this);
 
             client_thread_ = std::thread([this]() {
                 while(running_) {
@@ -136,66 +130,6 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
             }
-        }
-
-        /**
-         * @brief The callback when the remote robot updates its overall time 
-         * 
-         * @param _client the client instance
-         * @param _sub_id the subscription id
-         * @param sub_context the subscription context
-         * @param mon_id the monitor ID
-         * @param mon_context the monitor context
-         * @param value the new value of the overall time
-         */
-        static void
-        overall_time_callback(UA_Client* _client, UA_UInt32 _sub_id, void *sub_context, UA_UInt32 mon_id, void* mon_context, UA_DataValue* value) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            if (mon_context == NULL) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: monitor context is NULL", __FUNCTION__);
-                return;
-            }
-            remote_robot* self = static_cast<remote_robot*>(mon_context);
-            self->overall_time_ = *(UA_UInt64*) value->value.data;
-        }
-
-        /**
-         * @brief The callback when the remote robot updates its last equipped tool
-         * 
-         * @param _client the client instance
-         * @param _sub_id the subscription id
-         * @param sub_context the subscription context
-         * @param mon_id the monitor ID
-         * @param mon_context the monitor context
-         * @param value the new value of the last equipped tool
-         */
-        static void
-        last_equipped_tool_callback(UA_Client* _client, UA_UInt32 _sub_id, void *sub_context, UA_UInt32 mon_id, void* mon_context, UA_DataValue* value) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            if (mon_context == NULL) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: monitor context is NULL", __FUNCTION__);
-                return;
-            }
-            remote_robot* self = static_cast<remote_robot*>(mon_context);
-            self->last_equipped_tool_ = *(robot_tool*) value->value.data;
-        }
-
-        /**
-         * @brief Returns the remote robot's overall time
-         * 
-         * @return duration_t the overall time
-         */
-        duration_t get_overall_time() {
-            return overall_time_;
-        }
-
-        /**
-         * @brief Returns the remote robot's last equipped tool
-         * 
-         * @return robot_tool the last equipped tool
-         */
-        robot_tool get_last_equipped_tool() {
-            return last_equipped_tool_;
         }
 };
 
