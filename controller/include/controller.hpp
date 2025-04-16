@@ -57,6 +57,16 @@ struct remote_robot {
             receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
             receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
 
+            client_thread_ = std::thread([this]() {
+                while(running_) {
+                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
+                    if (status != UA_STATUSCODE_GOOD) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running robot client");
+                        running_ = false;
+                    }
+                }
+            });
+
             node_value_subscriber nv_subscriber;
             UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
@@ -68,16 +78,6 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error subscribing to last equipped tool");
                 running_ = false;
             }
-
-            client_thread_ = std::thread([this]() {
-                while(running_) {
-                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
-                    if (status != UA_STATUSCODE_GOOD) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running robot client");
-                        running_ = false;
-                    }
-                }
-            });
         }
 
         /**
