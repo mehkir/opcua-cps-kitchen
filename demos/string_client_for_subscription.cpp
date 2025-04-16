@@ -26,11 +26,6 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, stopHandler);
 
     UA_Client* client = UA_Client_new();
-    UA_ClientConfig *cc = UA_Client_getConfig(client);
-    UA_ClientConfig_setDefault(cc);
-    cc->securityMode = UA_MESSAGESECURITYMODE_NONE;
-    cc->timeout = 1000;
-
     client_connection_establisher con_estab;
     con_estab.establish_connection(client, 4840);
 
