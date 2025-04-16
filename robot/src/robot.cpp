@@ -395,13 +395,13 @@ void
 robot::determine_next_action() {
     if (action_queue_in_process_.size()) {
         robot_action robot_act = action_queue_in_process_.front();
-        robot_tool required_tool = robot_act.get_required_tool();
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
             reset_in_process_fields();
             choose_next_robot_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(CHOOSE_NEXT_ROBOT)), choose_next_robot_called, this);
             return;
         }
+        robot_tool required_tool = robot_act.get_required_tool();
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             callback_scheduler retool_scheduler(server_, retool, this, NULL);
