@@ -23,16 +23,14 @@ UA_SessionState client_connection_establisher::establish_connection(UA_Client* _
     /* Connect to a server */
     UA_SessionState session_state = UA_SESSIONSTATE_CLOSED;
     int retry_counter = 0;
-    while(retry_counter < RETRY_LIMIT) {
+    while(retry_counter < RETRY_LIMIT && session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_StatusCode status_code = UA_Client_connect(_client, server_endpoint.c_str());
-        if(status_code != UA_STATUSCODE_GOOD) {
+        UA_Client_getState(_client, NULL, &session_state, NULL);
+        if(status_code != UA_STATUSCODE_GOOD || session_state != UA_SESSIONSTATE_ACTIVATED) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Not connected. Retrying to connect in 1 second");
             sleep_ms(1000);
             retry_counter++;
-            continue;
         }
-        session_state = UA_SESSIONSTATE_ACTIVATED;
-        break;
     }
     return session_state;
 }

@@ -49,7 +49,7 @@ struct remote_robot {
             client_connection_establisher robot_client_connection_establisher;
             UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
             if (session_state != UA_SESSIONSTATE_ACTIVATED) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing robot client session");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "Error establishing robot client session for position %d", position_);
                 running_ = false;
                 return;
             }
@@ -70,12 +70,12 @@ struct remote_robot {
             node_value_subscriber nv_subscriber;
             UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error subscribing to overall time");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error subscribing to remote robot's overall time at position %d", position_);
                 running_ = false;
             }
             status = nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(LAST_EQUIPPED_TOOL)), last_equipped_tool_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error subscribing to last equipped tool");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error subscribing to remote robot's last equipped tool at position %d", position_);
                 running_ = false;
             }
         }
@@ -176,7 +176,7 @@ struct remote_robot {
                     return;
                 }
                 self->overall_time_ = *(duration_t*) _value->value.data;
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot at position %d has an overall time of %ld", __FUNCTION__, self->position_, self->overall_time_);
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's overall time at position %d is %ld", __FUNCTION__, self->position_, self->overall_time_);
         }
 
         static void
