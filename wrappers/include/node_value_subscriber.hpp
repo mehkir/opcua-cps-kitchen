@@ -5,7 +5,7 @@
 
 class node_value_subscriber {
 private:
-    /* data */
+    UA_StatusCode subscribe_node_value_(UA_Client* _client, UA_NodeId _monitored_node_id, UA_Client_DataChangeNotificationCallback _notification_callback, void* _context);
 public:
     node_value_subscriber();
     ~node_value_subscriber();
