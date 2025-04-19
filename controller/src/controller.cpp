@@ -236,9 +236,10 @@ controller::place_random_order(UA_Server* _server,
 void
 controller::handle_random_order_request(UA_Variant* _output) {
     bool instructed = false;
-    remote_robot* next_suitable_robot = find_suitable_robot(uniform_int_distribution_(mersenne_twister_), 0);
+    recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
+    remote_robot* next_suitable_robot = find_suitable_robot(recipe_id, 0);
     if (next_suitable_robot != NULL) {
-        next_suitable_robot->instruct(2, 0, receive_robot_task_called);
+        next_suitable_robot->instruct(recipe_id, 0, receive_robot_task_called);
         instructed = true;
     }
     UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);   
