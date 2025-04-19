@@ -207,11 +207,12 @@ private:
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
     method_node_inserter choose_next_robot_inserter_;
     method_node_inserter register_robot_inserter_;
+    method_node_inserter place_random_order_inserter_;
     /* recipe related member variables */
     recipe_parser recipe_parser_;
 
     /**
-     * @brief Register robot.
+     * @brief Extracts the received robot registration parameters.
      * 
      * @param _server the server instance from which this method is called
      * @param _session_id 
@@ -276,6 +277,7 @@ private:
      * @param _position the position of the remote robot
      * @param _recipe_id the recipe id of the partial finished order
      * @param _processed_steps the steps until the recipe is processed
+     * @param _output the output pointer to store return parameters
      */
     void
     handle_next_robot_request(port_t _port, position_t _position, recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
@@ -289,6 +291,38 @@ private:
      */
     remote_robot*
     find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps);
+
+    /**
+     * @brief Places a random order.
+     * 
+     * @param _server the server instance from which this method is called
+     * @param _session_id 
+     * @param _session_context 
+     * @param _method_id 
+     * @param _method_context the node context data passed to the method node
+     * @param _object_id 
+     * @param _object_context 
+     * @param _input_size the count of the input parameters
+     * @param _input the input pointer of the input parameters
+     * @param _output_size the allocated output size
+     * @param _output the output pointer to store return parameters
+     * @return UA_StatusCode 
+     */
+    static UA_StatusCode
+    place_random_order(UA_Server* _server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Handles the random order request.
+     * 
+     * @param _output the output pointer to store return parameters
+     */
+    void
+    handle_random_order_request(UA_Variant* _output);
 
     /**
      * @brief Callback called after robot is instructed. Extracts the returned robot state parameters.

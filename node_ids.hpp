@@ -22,5 +22,6 @@
 // method nodes
 #define REGISTER_ROBOT "register_robot"
 #define CHOOSE_NEXT_ROBOT "choose_next_robot"
+#define PLACE_RANDOM_ORDER "place_random_order"
 
 #endif // NODE_IDS_HPP

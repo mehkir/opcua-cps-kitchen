@@ -40,6 +40,14 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
         return;
     }
 
+    place_random_order_inserter_.add_output_argument("robot instructed", "robot_instructed", UA_TYPES_BOOLEAN);
+    status = place_random_order_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(PLACE_RANDOM_ORDER)), "place random order", place_random_order, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the place random order method node");
+        running_ = false;
+        return;
+    }
+
     /* Run the controller server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -97,6 +105,10 @@ controller::register_robot(UA_Server* _server,
         remote_robot_capabilities.insert(std::string((char*) capability.data, capability.length));
     }
     /* Extract method context */
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
     controller* self = static_cast<controller*>(_method_context);
     self->handle_robot_registration(port, position, remote_robot_capabilities, _output);
     return UA_STATUSCODE_GOOD;
@@ -117,11 +129,6 @@ controller::handle_robot_registration(port_t _port, position_t _position, std::u
     }
     bool capabilities_received = true;
     UA_Variant_setScalarCopy(_output, &capabilities_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
-    // Dummy initialization
-    remote_robot* next_suitable_robot = find_suitable_robot(2, 0);
-    if (next_suitable_robot != NULL) {
-        next_suitable_robot->instruct(2, 0, receive_robot_task_called);
-    }
 }
 
 UA_StatusCode
@@ -211,6 +218,38 @@ controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_ste
         }
     }
     return suitable_robot;
+}
+
+UA_StatusCode
+controller::place_random_order(UA_Server* _server,
+        const UA_NodeId* _session_id, void* _session_context,
+        const UA_NodeId* _method_id, void* _method_context,
+        const UA_NodeId* _object_id, void* _object_context,
+        size_t _input_size, const UA_Variant* _input,
+        size_t _output_size, UA_Variant* _output) {
+    if(_input_size != 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+    /* Extract method context */
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+    controller* self = static_cast<controller*>(_method_context);
+    self->handle_random_order_request(_output);
+    return UA_STATUSCODE_GOOD;
+}
+
+void
+controller::handle_random_order_request(UA_Variant* _output) {
+    bool instructed = false;
+    remote_robot* next_suitable_robot = find_suitable_robot(2, 0);
+    if (next_suitable_robot != NULL) {
+        next_suitable_robot->instruct(2, 0, receive_robot_task_called);
+        instructed = true;
+    }
+    UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);   
 }
 
 void
