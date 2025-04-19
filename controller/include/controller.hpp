@@ -9,6 +9,7 @@
 #include <map>
 #include <unordered_set>
 #include <memory>
+#include <random>
 #include "node_value_subscriber.hpp"
 #include "node_ids.hpp"
 #include "method_node_caller.hpp"
@@ -210,6 +211,10 @@ private:
     method_node_inserter place_random_order_inserter_;
     /* recipe related member variables */
     recipe_parser recipe_parser_;
+    /* random distribution */
+    std::random_device random_device_;
+    std::mt19937 mersenne_twister_;
+    std::uniform_int_distribution<std::uint32_t> uniform_int_distribution_;
 
     /**
      * @brief Extracts the received robot registration parameters.

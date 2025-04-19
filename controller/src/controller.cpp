@@ -2,11 +2,10 @@
 #include <open62541/server_config_default.h>
 #include <string>
 #include <response_checker.hpp>
-#include <random>
 
 #define RECIPE_PATH "recipes.json"
 
-controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), running_(true), recipe_parser_(RECIPE_PATH) {
+controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), running_(true), recipe_parser_(RECIPE_PATH), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3) {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -176,13 +175,6 @@ controller::handle_next_robot_request(port_t _port, position_t _position, recipe
         return;
     }
 
-    // std::random_device random_device;
-    // std::mt19937 mersenne_twister(random_device());
-    // std::uniform_int_distribution<std::uint32_t> distribution(1, 3);
-    // cps_kitchen::recipe_id_t recipe_id = distribution(mersenne_twister);
-    // std::string first_action = recipe_parser_.get_recipe(recipe_id).get_action_queue().front().get_name();
-    // UA_UInt32 random_uint = distribution(mersenne_twister);
-
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Robot with port %d and position %d requests next robot for recipe id %d processed with %d steps already", _port, _position, _recipe_id, _processed_steps);
     remote_robot* next_suitable_robot = find_suitable_robot(_recipe_id, _processed_steps);
     port_t next_suitable_robot_port = 0;
@@ -244,7 +236,7 @@ controller::place_random_order(UA_Server* _server,
 void
 controller::handle_random_order_request(UA_Variant* _output) {
     bool instructed = false;
-    remote_robot* next_suitable_robot = find_suitable_robot(2, 0);
+    remote_robot* next_suitable_robot = find_suitable_robot(uniform_int_distribution_(mersenne_twister_), 0);
     if (next_suitable_robot != NULL) {
         next_suitable_robot->instruct(2, 0, receive_robot_task_called);
         instructed = true;
