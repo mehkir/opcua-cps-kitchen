@@ -398,6 +398,7 @@ robot::determine_next_action() {
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
             reset_in_process_fields();
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Request next robot for recipe %d with processed steps %d", recipe_id_in_process_, processed_steps_of_recipe_id_in_process_);
             choose_next_robot_caller_.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(CHOOSE_NEXT_ROBOT)), choose_next_robot_called, this);
             return;
         }
