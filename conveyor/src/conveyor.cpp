@@ -142,7 +142,7 @@ conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA
     conveyor* self = static_cast<conveyor*>(_userdata);
 
     response_checker response(_response);
-    UA_StatusCode status_code = response.get_service_result();;
+    UA_StatusCode status_code = response.get_service_result();
     if(status_code != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
         self->running_ = false;
