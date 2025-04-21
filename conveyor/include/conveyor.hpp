@@ -12,6 +12,7 @@
 #include <set>
 #include <unordered_map>
 #include <memory>
+#include <condition_variable>
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
@@ -321,6 +322,8 @@ private:
     state state_status_;
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
+    std::mutex conveyor_mutex_;
+    std::condition_variable notifications_map_condition_;
     method_node_inserter receive_finished_order_notification_inserter_;
     std::set<plate_id_t> occupied_plates_;
     std::set<position_t> retrievable_positions_;
@@ -447,6 +450,15 @@ private:
      */
     static void
     receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+
+    /**
+     * @brief Timed callback to call determine_next_movement.
+     * 
+     * @param _server the server instance from which this method is called
+     * @param _data the conveyor instance passed to the scheduling call
+     */
+    static void
+    determine_next_movement_callback(UA_Server* _server, void* _data);
 
     /**
      * @brief Joins all started threads.

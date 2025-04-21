@@ -124,12 +124,16 @@ conveyor::handle_retrieve_finished_orders() {
     if (retrievable_positions_.empty() && !occupied_plates_.empty()) {
         callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
         movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
+        return;
     }
 
+    std::unique_lock<std::mutex> lock(conveyor_mutex_);
     for (position_t position : retrievable_positions_) {
         remote_robot& robot = position_remote_robot_map_[position].operator*();
         robot.handover_finished_order(handover_finished_order_called, this);
     }
+    // Avoids notifications map inconsistencies (handle_finished_order_notification <---> handle_handover_finished_order)
+    notifications_map_condition_.wait(lock);
 }
 
 void
@@ -184,24 +188,29 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     } else {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d with port %d passed recipe ID %d with processed steps of %d", _remote_robot_position, _remote_robot_port, _finished_recipe, _processed_steps);
     }
-    if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0 && position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_port, _next_remote_robot_position);
+    
+    {
+        std::lock_guard<std::mutex> lock(conveyor_mutex_);
+        if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0 && position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
+            position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_port, _next_remote_robot_position);
+        }
+        notifications_map_.erase(_remote_robot_position);
+        plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
+        p.place_recipe_id(_finished_recipe);
+        p.set_occupied(true);
+        p.set_processed_steps(_processed_steps);
+        if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0)
+            p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get());
+        occupied_plates_.insert(p.get_plate_id());
+        retrieved_positions_.insert(_remote_robot_position);
+        if (retrieved_positions_ != retrievable_positions_)
+            return;
     }
-    notifications_map_.erase(_remote_robot_position);
-    plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
-    p.place_recipe_id(_finished_recipe);
-    p.set_occupied(true);
-    p.set_processed_steps(_processed_steps);
-    if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0)
-        p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get());
-    occupied_plates_.insert(p.get_plate_id());
-    retrieved_positions_.insert(_remote_robot_position);
-    if(retrieved_positions_ == retrievable_positions_) {
-        retrieved_positions_.clear();
-        retrievable_positions_.clear();
-        callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
-        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
-    }
+    retrieved_positions_.clear();
+    retrievable_positions_.clear();
+    notifications_map_condition_.notify_one();
+    callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
+    movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
 }
 
 
@@ -303,19 +312,32 @@ conveyor::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt
         self->running_ = false;
         return;
     }
-
-    self->delivered_positions_.insert(remote_robot_position);
-    plate& p = self->plates_[self->position_plate_id_map_[remote_robot_position]];
-    p.place_recipe_id(0);
-    p.set_occupied(false);
-    p.set_processed_steps(0);
-    p.set_target_robot(nullptr);
-    self->occupied_plates_.erase(p.get_plate_id());
-    if(self->delivered_positions_ == self->deliverable_positions_) {
-        self->delivered_positions_.clear();
-        self->deliverable_positions_.clear();
-        self->determine_next_movement();
+    {
+        std::lock_guard<std::mutex> lock(self->conveyor_mutex_);
+        self->delivered_positions_.insert(remote_robot_position);
+        plate& p = self->plates_[self->position_plate_id_map_[remote_robot_position]];
+        p.place_recipe_id(0);
+        p.set_occupied(false);
+        p.set_processed_steps(0);
+        p.set_target_robot(nullptr);
+        self->occupied_plates_.erase(p.get_plate_id());
+        if (self->delivered_positions_ != self->deliverable_positions_)
+            return;
     }
+    self->delivered_positions_.clear();
+    self->deliverable_positions_.clear();
+    callback_scheduler next_movement_scheduler(self->server_, determine_next_movement_callback, self, NULL);
+    next_movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic());
+}
+
+void
+conveyor::determine_next_movement_callback(UA_Server* _server, void* _data) {
+    if (_data == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
+        return;
+    }
+    conveyor* self = static_cast<conveyor*>(_data);
+    self->determine_next_movement();
 }
 
 void
