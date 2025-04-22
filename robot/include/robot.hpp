@@ -205,7 +205,7 @@ private:
     determine_next_action();
 
     /**
-     * @brief Resets fields for displaying actions, tools, ingredients, dish and recipe id currently in process
+     * @brief Resets fields for displayed action and ingredients to "None" and updates the corresponding information nodes
      * 
      */
     void

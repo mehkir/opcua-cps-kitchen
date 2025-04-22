@@ -323,7 +323,7 @@ private:
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
     std::mutex conveyor_mutex_;
-    std::condition_variable notifications_map_condition_;
+    std::condition_variable condition_variable_;
     method_node_inserter receive_finished_order_notification_inserter_;
     std::set<plate_id_t> occupied_plates_;
     std::set<position_t> retrievable_positions_;

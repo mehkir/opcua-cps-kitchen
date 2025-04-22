@@ -133,7 +133,7 @@ conveyor::handle_retrieve_finished_orders() {
         robot.handover_finished_order(handover_finished_order_called, this);
     }
     // Avoids notifications map inconsistencies (handle_finished_order_notification <---> handle_handover_finished_order)
-    notifications_map_condition_.wait(lock);
+    condition_variable_.wait(lock);
 }
 
 void
@@ -208,7 +208,7 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     }
     retrieved_positions_.clear();
     retrievable_positions_.clear();
-    notifications_map_condition_.notify_one();
+    condition_variable_.notify_one();
     callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
     movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
 }
