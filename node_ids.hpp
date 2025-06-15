@@ -6,6 +6,7 @@
 #define RECEIVE_TASK "receive_task"
 #define HANDOVER_FINISHED_ORDER "handover_finished_order"
 // information nodes
+#define AGENT_TYPE "agent_type"
 #define RECIPE_ID "recipe_id"
 #define DISH_NAME "dish_name"
 #define ACTION_NAME "action_name"
