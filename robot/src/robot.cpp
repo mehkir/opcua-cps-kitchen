@@ -54,6 +54,9 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         return;
     }
 
+    // Add agent type to information model
+    UA_String agent_type = UA_STRING(const_cast<char*>("robot"));
+    add_information_node(server_, 1, AGENT_TYPE, "agent type", UA_TYPES_STRING, &agent_type);
     // Add recipe id to information model
     add_information_node(server_, 1, RECIPE_ID, "recipe id", UA_TYPES_UINT32, &recipe_id_in_process_);
     // Add dish name to information model
