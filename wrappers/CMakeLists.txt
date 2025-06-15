@@ -1,5 +1,5 @@
 file(GLOB MY_SOURCES "./src/*.cpp")
 file(GLOB MY_HEADERS "./include/*.hpp")
-add_library(wrappers_lib ${MY_SOURCES} ${MY_HEADERS})
+add_library(wrappers_lib ${MY_SOURCES})
 target_include_directories(wrappers_lib PUBLIC ${PROJECT_SOURCE_DIR})
 target_link_libraries(wrappers_lib PUBLIC open62541)
