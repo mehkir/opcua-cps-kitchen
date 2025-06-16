@@ -31,7 +31,25 @@ int main(int argc, char* argv[]) {
         return status;
     }
 
+    UA_NodeId pumpId; /* get the nodeid assigned by the server */
+    UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
+    oAttr.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>("Pump (Manual)"));
+    UA_Server_addObjectNode(server, UA_NODEID_NULL,
+        UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
+        UA_QUALIFIEDNAME(1, const_cast<char*>("Pump (Manual)")),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE),
+        oAttr, NULL, &pumpId);
     
+    UA_VariableAttributes mnAttr = UA_VariableAttributes_default;
+    UA_String manufacturerName = UA_STRING(const_cast<char*>("Pump King Ltd."));
+    UA_Variant_setScalar(&mnAttr.value, &manufacturerName, &UA_TYPES[UA_TYPES_STRING]);
+    mnAttr.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>("ManufacturerName"));
+    UA_Server_addVariableNode(server, UA_NODEID_NULL, pumpId,
+        UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+        UA_QUALIFIEDNAME(1, const_cast<char*>("ManufacturerName")),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
+        mnAttr, NULL, NULL);
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);

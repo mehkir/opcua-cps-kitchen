@@ -409,7 +409,7 @@ robot::determine_next_action() {
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             callback_scheduler retool_scheduler(server_, retool, this, NULL);
-            UA_StatusCode status = retool_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (RETOOLING_TIME * TIME_UNIT));
+            UA_StatusCode status = retool_scheduler.schedule_from_now_relative(RETOOLING_TIME * TIME_UNIT);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
                 running_ = false;
@@ -427,7 +427,7 @@ robot::determine_next_action() {
             current_action_duration_ = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), current_action_duration_);
             callback_scheduler action_scheduler(server_, pass_time, this, NULL);
-            UA_StatusCode status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (TIME_UNIT_UPDATE_RATE * TIME_UNIT));
+            UA_StatusCode status = action_scheduler.schedule_from_now_relative(TIME_UNIT_UPDATE_RATE * TIME_UNIT);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time", __FUNCTION__);
                 running_ = false;
@@ -503,7 +503,7 @@ robot::pass_time(UA_Server* _server, void* _data) {
     self->current_action_duration_ -= TIME_UNIT_UPDATE_RATE;
     if (self->current_action_duration_ != 0) {
         callback_scheduler action_scheduler(_server, pass_time, _data, NULL);
-        UA_StatusCode status = action_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (TIME_UNIT_UPDATE_RATE * TIME_UNIT));
+        UA_StatusCode status = action_scheduler.schedule_from_now_relative(TIME_UNIT_UPDATE_RATE * TIME_UNIT);
         if (status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time", __FUNCTION__);
             self->running_ = false;

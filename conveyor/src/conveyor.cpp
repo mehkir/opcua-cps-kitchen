@@ -100,7 +100,7 @@ conveyor::handle_finished_order_notification(port_t _robot_port, position_t _rob
     if (state_status_ == conveyor::state::IDLING) {
         state_status_ = conveyor::state::MOVING;
         callback_scheduler retrieve_finished_orders_scheduler(server_, retrieve_finished_orders, this, NULL);
-        retrieve_finished_orders_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (DEBOUNCE_TIME * TIME_UNIT));
+        retrieve_finished_orders_scheduler.schedule_from_now_relative(DEBOUNCE_TIME * TIME_UNIT);
     }
 }
 
@@ -124,7 +124,7 @@ conveyor::handle_retrieve_finished_orders() {
 
     if (retrievable_positions_.empty() && !occupied_plates_.empty()) {
         callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
-        movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
+        movement_scheduler.schedule_from_now_relative(MOVE_TIME * TIME_UNIT);
         return;
     }
 
@@ -212,7 +212,7 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     retrievable_positions_.clear();
     condition_variable_.notify_one();
     callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
-    movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic() + (MOVE_TIME * TIME_UNIT));
+    movement_scheduler.schedule_from_now_relative(MOVE_TIME * TIME_UNIT);
 }
 
 
@@ -329,7 +329,7 @@ conveyor::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt
     self->delivered_positions_.clear();
     self->deliverable_positions_.clear();
     callback_scheduler next_movement_scheduler(self->server_, determine_next_movement_callback, self, NULL);
-    next_movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic());
+    next_movement_scheduler.schedule_from_now_relative(0);
 }
 
 void
