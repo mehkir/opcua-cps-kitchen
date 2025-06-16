@@ -20,7 +20,7 @@ for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
         echo "Error: Non-zero exit code detected. Exiting."
         break
     fi
-    sleep 0.5
+    # sleep 0.5
 done
 echo "All robots started"
 wait

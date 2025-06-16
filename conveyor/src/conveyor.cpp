@@ -94,6 +94,7 @@ conveyor::handle_finished_order_notification(port_t _robot_port, position_t _rob
     UA_Variant_setScalarCopy(_output, &finished_order_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_port, _robot_position);
+        position_remote_robot_map_[_robot_position]->start_thread();
     }
     notifications_map_[_robot_position] = _robot_port;
     if (state_status_ == conveyor::state::IDLING) {
@@ -193,6 +194,7 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
         std::lock_guard<std::mutex> lock(conveyor_mutex_);
         if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0 && position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
             position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_port, _next_remote_robot_position);
+            position_remote_robot_map_[_next_remote_robot_position]->start_thread();
         }
         notifications_map_.erase(_remote_robot_position);
         plate& p = plates_[position_plate_id_map_[_remote_robot_position]];

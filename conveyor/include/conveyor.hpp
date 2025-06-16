@@ -79,6 +79,22 @@ struct remote_robot {
         }
 
         /**
+         * @brief Starts the housekeeping thread
+         * 
+         */
+        void start_thread() {
+            client_thread_ = std::thread([this]() {
+                while(running_) {
+                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
+                    if (status != UA_STATUSCODE_GOOD) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running robot client");
+                        running_ = false;
+                    }
+                }
+            });
+        }
+
+        /**
          * @brief Returns the robot's port
          * 
          * @return port_t the robot's port
