@@ -5,6 +5,7 @@
 #include <string>
 #include <open62541/client_config_default.h>
 #include <open62541/plugin/log_stdout.h>
+#include <signal.h>
 
 
 static volatile UA_Boolean running = true;
