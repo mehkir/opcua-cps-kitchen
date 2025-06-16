@@ -55,16 +55,6 @@ struct remote_robot {
 
             receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
             receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
-
-            client_thread_ = std::thread([this]() {
-                while(running_) {
-                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
-                    if (status != UA_STATUSCODE_GOOD) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Error running robot client");
-                        running_ = false;
-                    }
-                }
-            });
         }
 
         /**
