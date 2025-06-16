@@ -30,7 +30,7 @@ static void change_string(UA_Server* _server, void *data) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "New string value is: %s", new_str.c_str());
     counter++;
     callback_scheduler change_str_information_node(_server, change_string, NULL, NULL);
-    status = change_str_information_node.schedule_from_now(UA_DateTime_nowMonotonic() + (1LL * UA_DATETIME_SEC));
+    status = change_str_information_node.schedule_from_now_relative(1000);
     if (status != UA_STATUSCODE_GOOD) {
         running = false;
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error setting callback scheduler");
@@ -61,8 +61,9 @@ int main(int argc, char* argv[]) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding string value information node");
         running = false;
     }
+
     callback_scheduler change_str_information_node(server, change_string, NULL, NULL);
-    status = change_str_information_node.schedule_from_now(UA_DateTime_nowMonotonic() + (1LL * UA_DATETIME_SEC));
+    status = change_str_information_node.schedule_from_now_relative(1000);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error setting callback scheduler");
         running = false;

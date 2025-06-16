@@ -10,3 +10,12 @@ UA_StatusCode
 callback_scheduler::schedule_from_now(UA_DateTime _expiry_time) {
     return UA_Server_addTimedCallback(server_, callback_, data_, _expiry_time, callback_id_);
 }
+
+UA_StatusCode
+callback_scheduler::schedule_from_now_relative(UA_Double _delay_in_ms) {
+    OnceCallback *once = (OnceCallback*)UA_malloc(sizeof(*once));
+    if(!once) return UA_STATUSCODE_BADOUTOFMEMORY;
+    once->cb = callback_;
+    once->data = data_;
+    return UA_Server_addRepeatedCallback(server_, once_wrapper, once, _delay_in_ms, &once->id);
+}

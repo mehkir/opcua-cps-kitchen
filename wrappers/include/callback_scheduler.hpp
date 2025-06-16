@@ -3,6 +3,19 @@
 
 #include <open62541/server.h>
 
+typedef struct {
+    UA_ServerCallback cb;
+    void *data;
+    UA_UInt64 id;
+} OnceCallback;
+
+static void once_wrapper(UA_Server* _server, void* _context) {
+    OnceCallback *once = (OnceCallback*)_context;
+    once->cb(_server, once->data);
+    UA_Server_removeRepeatedCallback(_server, once->id);
+    UA_free(once);
+}
+
 class callback_scheduler
 {
 private:
@@ -14,6 +27,7 @@ public:
     callback_scheduler(UA_Server* _server, UA_ServerCallback _callback, void* _data, UA_UInt64* _callback_id);
     ~callback_scheduler();
     UA_StatusCode schedule_from_now(UA_DateTime _expiry_time);
+    UA_StatusCode schedule_from_now_relative(UA_Double _delay_in_ms);
 };
 
 #endif // CALLBACK_SCHEDULER_HPP
