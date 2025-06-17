@@ -120,11 +120,13 @@ void
 conveyor::handle_retrieve_finished_orders() {
     for (auto notification = notifications_map_.begin(); notification != notifications_map_.end(); notification++) {
         if (!plates_[position_plate_id_map_[notification->first]].is_occupied()){
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE RETRIEVAL: Dish at position %d is retrievable", notification->first);
             retrievable_positions_.insert(notification->first);
         }
     }
 
     if (retrievable_positions_.empty() && !occupied_plates_.empty()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE RETRIEVAL: No retrievables, but occupied plates, scheduling movement.");
         callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
         movement_scheduler.schedule_from_now_relative(MOVE_TIME * TIME_UNIT);
         return;
@@ -136,7 +138,9 @@ conveyor::handle_retrieve_finished_orders() {
         robot.handover_finished_order(handover_finished_order_called, this);
     }
     // Avoids notifications map inconsistencies (handle_finished_order_notification <---> handle_handover_finished_order)
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE RETRIEVAL: Waiting for all robots to pass their (partially) finished dishes.");
     condition_variable_.wait(lock);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE RETRIEVAL: All robots passed their dishes.");
 }
 
 void
@@ -237,6 +241,7 @@ conveyor::move_conveyor(steps_t _steps) {
         plates_[i].set_position(new_position);
         position_plate_id_map_[new_position] = plates_[i].get_plate_id();
     }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MOVEMENT: Conveyor moved %d step", _steps);
 }
 
 void
@@ -247,9 +252,11 @@ conveyor::deliver_finished_order() {
             continue;
         }
         if (p.get_target_robot() != nullptr && (p.get_target_robot()->get_position() == p.get_position())) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Dish at position %d is deliverable", p.get_position());
             deliverable_positions_.insert(p.get_position());
         }
         if (p.get_position() == OUTPUT_POSITION) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output", p.get_placed_recipe_id());
             p.place_recipe_id(0);
             p.set_occupied(false);
             p.set_processed_steps(0);
@@ -258,6 +265,7 @@ conveyor::deliver_finished_order() {
     }
 
     if(deliverable_positions_.empty()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: No deliverables found");
         determine_next_movement();
         return;
     }
@@ -270,6 +278,7 @@ conveyor::deliver_finished_order() {
 
 void
 conveyor::determine_next_movement() {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (occupied_plates_.empty() && notifications_map_.empty()) {
         state_status_ = conveyor::state::IDLING;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: No occupied plates or notifications, idling now");
@@ -320,18 +329,26 @@ conveyor::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt
         std::lock_guard<std::mutex> lock(self->conveyor_mutex_);
         self->delivered_positions_.insert(remote_robot_position);
         plate& p = self->plates_[self->position_plate_id_map_[remote_robot_position]];
+        // Sanity check
+        if (!p.is_occupied() || p.get_target_robot() == nullptr || p.get_target_robot()->get_position() != remote_robot_position) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", p.get_position(), remote_robot_position);
+            self->running_ = false;
+            return;    
+        }
         p.place_recipe_id(0);
         p.set_occupied(false);
         p.set_processed_steps(0);
         p.set_target_robot(nullptr);
         self->occupied_plates_.erase(p.get_plate_id());
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: Delivered dish at position %d successfully", remote_robot_position);
         if (self->delivered_positions_ != self->deliverable_positions_)
             return;
     }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: All deliverable dishes delivered, schedule next movement determination");
     self->delivered_positions_.clear();
     self->deliverable_positions_.clear();
     callback_scheduler next_movement_scheduler(self->server_, determine_next_movement_callback, self, NULL);
-    next_movement_scheduler.schedule_from_now_relative(0);
+    next_movement_scheduler.schedule_from_now(UA_DateTime_nowMonotonic());
 }
 
 void
