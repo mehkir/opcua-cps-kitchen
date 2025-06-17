@@ -77,7 +77,7 @@ int main(int argc, char* argv[]) {
         status = UA_ServerConfig_setMinimal(server_config, atoi(argv[1]), NULL);
     } else {
         usage(argv[0]);
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Please provide a port and clock port");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Please provide a port and clock port");
         return EXIT_FAILURE;
     }
 
@@ -117,7 +117,7 @@ int main(int argc, char* argv[]) {
     /* Run the server loop */
     status = UA_Server_run(server, &running);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the server");
         return EXIT_FAILURE;
     }
 

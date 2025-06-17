@@ -27,7 +27,7 @@ UA_SessionState client_connection_establisher::establish_connection(UA_Client* _
         UA_StatusCode status_code = UA_Client_connect(_client, server_endpoint.c_str());
         UA_Client_getState(_client, NULL, &session_state, NULL);
         if(status_code != UA_STATUSCODE_GOOD || session_state != UA_SESSIONSTATE_ACTIVATED) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Not connected. Retrying to connect in 1 second");
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Not connected. Retrying to connect in 1 second");
             sleep_ms(1000);
             retry_counter++;
         }

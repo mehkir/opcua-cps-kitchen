@@ -24,7 +24,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Error with setting up the server", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error with setting up the server", __FUNCTION__);
         running_ = false;
         return;
     }
@@ -80,7 +80,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     /* Run the robot server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Error at robot startup", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at robot startup", __FUNCTION__);
         running_ = false;
         return;
     }
@@ -91,7 +91,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
             }
         });
     } catch (...) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Error running robot", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot", __FUNCTION__);
         running_ = false;
         return;
     }
@@ -126,7 +126,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
             while(running_) {
                 UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
                 if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "%s: Error running the controller client", __FUNCTION__);
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the controller client", __FUNCTION__);
                     running_ = false;
                 }
             }
@@ -150,7 +150,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
             while(running_) {
                 UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 100);
                 if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "%s: Error running the conveyor client", __FUNCTION__);
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the conveyor client", __FUNCTION__);
                     running_ = false;
                 }
             }
@@ -273,7 +273,7 @@ robot::receive_task(UA_Server *_server,
 void
 robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "INSTRUCTIONS: Received instruction to cook recipe_id=%d with already %d processed steps", _recipe_id, _processed_steps);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Received instruction to cook recipe_id=%d with already %d processed steps", _recipe_id, _processed_steps);
     if (!recipe_parser_.has_recipe(_recipe_id)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unknown recipe ID", __FUNCTION__);
         return;
@@ -371,7 +371,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
         running_ = false;
         return;
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "HANDOVER: Pass finished recipe_id=%d (port=%d, position=%d)", recipe_id_in_process_, port_, position_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Pass finished recipe_id=%d (port=%d, position=%d)", recipe_id_in_process_, port_, position_);
     recipe_id_in_process_ = 0;
     processed_steps_of_recipe_id_in_process_ = 0;
     next_suitable_robot_port_for_recipe_id_in_process_ = 0;
@@ -407,7 +407,7 @@ robot::determine_next_action() {
         }
         robot_tool required_tool = robot_act.get_required_tool();
         if (required_tool != current_tool_) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             callback_scheduler retool_scheduler(server_, retool, this, NULL);
             UA_StatusCode status = retool_scheduler.schedule_from_now_relative(RETOOLING_TIME * TIME_UNIT);
             if (status != UA_STATUSCODE_GOOD) {
@@ -425,7 +425,7 @@ robot::determine_next_action() {
             update_information_node(server_, 1, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
             // Schedule next action
             current_action_duration_ = robot_act.get_action_duration();
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), current_action_duration_);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), current_action_duration_);
             callback_scheduler action_scheduler(server_, pass_time, this, NULL);
             UA_StatusCode status = action_scheduler.schedule_from_now_relative(TIME_UNIT_UPDATE_RATE * TIME_UNIT);
             if (status != UA_STATUSCODE_GOOD) {
@@ -436,7 +436,7 @@ robot::determine_next_action() {
     } else {
         reset_in_process_fields();
         // Send finished order notification to conveyor
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process_, processed_steps_of_recipe_id_in_process_);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process_, processed_steps_of_recipe_id_in_process_);
         UA_StatusCode status = receive_finished_order_notification_caller_.call_method_node(conveyor_client_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), receive_finished_order_notification_called, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification", __FUNCTION__);
@@ -518,7 +518,7 @@ robot::action_performed() {
     robot_action robot_act = action_queue_in_process_.front();
     duration_t action_duration = robot_act.get_action_duration();
     processed_steps_of_recipe_id_in_process_++;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process_, robot_act.get_ingredients().c_str(), action_duration);
     action_queue_in_process_.pop();
     determine_next_action();
 }
@@ -535,7 +535,7 @@ robot::retool(UA_Server* _server, void* _data) {
     self->update_information_node(_server, 1, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
     self->overall_time_ -= RETOOLING_TIME;
     self->update_information_node(_server, 1, OVERALL_TIME, &self->overall_time_, UA_TYPES_UINT64);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "RETOOL: Current tool now is %s", robot_tool_to_string(self->current_tool_));
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Current tool now is %s", robot_tool_to_string(self->current_tool_));
     self->determine_next_action();
 }
 

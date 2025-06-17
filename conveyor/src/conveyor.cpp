@@ -6,6 +6,7 @@
 #include "response_checker.hpp"
 #include "callback_scheduler.hpp"
 #include "time_unit.hpp"
+#include "filtered_logger.hpp"
 
 #define DEBOUNCE_TIME 1LL
 #define MOVE_TIME 1LL
@@ -14,10 +15,11 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the conveyor server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the conveyor server");
         running_ = false;
         return;
     }
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 
     /* Setup plates */
     for (size_t i = 0; i < _robot_count+1; i++) {
@@ -30,7 +32,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
     receive_finished_order_notification_inserter_.add_output_argument("notification received", "notification_received", UA_TYPES_BOOLEAN);
     status = receive_finished_order_notification_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), "receive finished order notification", receive_finished_order_notification, this);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "%s: Error adding the receive finished order notification method node", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the receive finished order notification method node", __FUNCTION__);
         running_ = false;
         return;
     }
@@ -38,7 +40,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
     /* Run the conveyor server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error at conveyor startup");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error at conveyor startup");
         running_ = false;
         return;
     }
@@ -49,7 +51,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
             }
         });
     } catch (...) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running conveyor");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running conveyor");
         running_ = false;
         return;
     }

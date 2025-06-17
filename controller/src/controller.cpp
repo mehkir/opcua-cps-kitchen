@@ -10,7 +10,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the controller server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the controller server");
         running_ = false;
         return;
     }
@@ -50,7 +50,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
     /* Run the controller server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error at controller startup");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error at controller startup");
         running_ = false;
         return;
     }
@@ -61,7 +61,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
             }
         });
     } catch (...) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running controller");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running controller");
         running_ = false;
         return;
     }
@@ -280,7 +280,7 @@ controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UI
     remote_robot* robot = static_cast<remote_robot*>(_userdata);
     // Sanity check
     if(robot->get_port() != remote_robot_port || robot->get_position() != remote_robot_position) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "%s: Mismatch on <port,position>. Received<%d,%d>, actually<%d,%d>", __FUNCTION__, remote_robot_port, remote_robot_position, robot->get_port(), robot->get_position());
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on <port,position>. Received<%d,%d>, actually<%d,%d>", __FUNCTION__, remote_robot_port, remote_robot_position, robot->get_port(), robot->get_position());
     }
     if (!result)
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d with port %d returned false", __FUNCTION__, robot->get_position(), robot->get_port());

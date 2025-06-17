@@ -82,19 +82,19 @@ int main(int argc, char* argv[]) {
         clock_client_count_ = atoi(argv[2]);
     } else {
         usage(argv[0]);
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Please provide a port and an index");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Please provide a port and an index");
         return EXIT_FAILURE;
     }
     
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the server");
         return EXIT_FAILURE;
     }
 
     information_node_inserter info_node_inserter;
     status = info_node_inserter.add_scalar_node(server, UA_NODEID_STRING(1, const_cast<char*>("clock_tick")), "the clock tick", UA_TYPES_UINT64, &clock_tick_);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding information node");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding information node");
         return EXIT_FAILURE;
     }
 
@@ -105,14 +105,14 @@ int main(int argc, char* argv[]) {
     receive_tick_ack_inserter.add_output_argument("ack received", "ack_received", UA_TYPES_BOOLEAN);
     status = receive_tick_ack_inserter.add_method_node(server, UA_NODEID_STRING(1, const_cast<char*>("receive_tick_ack")), "receive tick ack", receive_tick_ack);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding method node");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding method node");
         return EXIT_FAILURE;
     }
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the server");
         return EXIT_FAILURE;
     }
 

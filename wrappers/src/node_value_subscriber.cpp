@@ -35,7 +35,7 @@ UA_StatusCode node_value_subscriber::subscribe_node_value(UA_Client* _client, UA
     int retry_counter = 0;
     UA_StatusCode status;
     while ((retry_counter < RETRY_LIMIT) && ((status = subscribe_node_value_(_client, _monitored_node_id, _notification_callback, _context)) != UA_STATUSCODE_GOOD)) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "Not subscribed. Retrying to subscribe in 1 second");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Not subscribed. Retrying to subscribe in 1 second");
         retry_counter++;
     }
     return status;

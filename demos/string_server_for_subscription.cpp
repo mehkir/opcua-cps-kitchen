@@ -20,7 +20,7 @@ static void change_string(UA_Server* _server, void *data) {
     information_node_reader str_value_reader;
     UA_StatusCode status = str_value_reader.read_information_node(_server, UA_NODEID_STRING(1, const_cast<char*>("str_node")));
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with reading string value");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with reading string value");
         running = false;
     }
     UA_String string_value = *(UA_String*) str_value_reader.get_variant()->data;
@@ -34,7 +34,7 @@ static void change_string(UA_Server* _server, void *data) {
     status = change_str_information_node.schedule_from_now_relative(1000);
     if (status != UA_STATUSCODE_GOOD) {
         running = false;
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error setting callback scheduler");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error setting callback scheduler");
     }
 }
 
@@ -51,7 +51,7 @@ int main(int argc, char* argv[]) {
         status = UA_ServerConfig_setDefault(server_config);
     }
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the server");
         return status;
     }
     *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
@@ -60,21 +60,21 @@ int main(int argc, char* argv[]) {
     information_node_inserter str_inserter;
     status = str_inserter.add_scalar_node(server, UA_NODEID_STRING(1, const_cast<char*>("str_node")), "str node", UA_TYPES_STRING, &string_value);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error adding string value information node");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding string value information node");
         running = false;
     }
 
     callback_scheduler change_str_information_node(server, change_string, NULL, NULL);
     status = change_str_information_node.schedule_from_now_relative(1000);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error setting callback scheduler");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error setting callback scheduler");
         running = false;
     }
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the server");
     }
 
     /* Clean up */
