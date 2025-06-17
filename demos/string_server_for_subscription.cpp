@@ -7,6 +7,7 @@
 #include "information_node_writer.hpp"
 #include "information_node_reader.hpp"
 #include "callback_scheduler.hpp"
+#include "filtered_logger.hpp"
 
 static volatile UA_Boolean running = true;
 static void stopHandler(int sig) {
@@ -53,6 +54,7 @@ int main(int argc, char* argv[]) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
         return status;
     }
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 
     UA_String string_value = UA_STRING(const_cast<char*>("I got a story to tell and this is it"));
     information_node_inserter str_inserter;
