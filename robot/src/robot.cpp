@@ -12,6 +12,7 @@
 #include "information_node_inserter.hpp"
 #include "information_node_writer.hpp"
 #include "time_unit.hpp"
+#include "filtered_logger.hpp"
 
 #define RECIPE_PATH "recipes.json"
 #define CAPABILITIES_PATH "./capabilities/"
@@ -28,6 +29,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         running_ = false;
         return;
     }
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 
     receive_task_inserter_.add_input_argument("recipe id", "recipe_id", UA_TYPES_UINT32);
     receive_task_inserter_.add_input_argument("processed steps", "processed_steps", UA_TYPES_UINT32);
