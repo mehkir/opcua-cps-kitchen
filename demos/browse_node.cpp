@@ -7,6 +7,7 @@
 #include <iostream>
 
 #include "client_connection_establisher.hpp"
+#include "information_node_reader.hpp"
 
 static volatile UA_Boolean running = true;
 static void stopHandler(int sig) {
@@ -61,7 +62,6 @@ std::vector<UA_NodeId> browse(UA_Client* _client, UA_NodeId _start_node_id, uint
                 // Match found
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%d" , (UA_UInt32) ref->nodeId.nodeId.identifier.numeric);
                 matching_node_ids.push_back(ref->nodeId.nodeId);
-                break;
             }
         }
     }
@@ -92,6 +92,15 @@ int main(int argc, char* argv[]) {
         std::vector<UA_NodeId> attribute_ids = browse(client, nid);
         for (UA_NodeId nid : attribute_ids) {
             std::cout << "Found attribure id: " << nid.namespaceIndex << "," << nid.identifier.numeric << std::endl;
+            information_node_reader nreader;
+            UA_StatusCode status = nreader.read_information_node(client, nid);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Failed to read information node");
+                continue;
+            }
+            UA_String string_value = *(UA_String*) nreader.get_variant()->data;
+            std::string new_str = std::string((char*) string_value.data, string_value.length);
+            std::cout << "Attribute value: " << new_str << std::endl;
         }
     }
 
