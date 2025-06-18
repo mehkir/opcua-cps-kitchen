@@ -50,6 +50,27 @@ int main(int argc, char* argv[]) {
         UA_QUALIFIEDNAME(1, const_cast<char*>("ManufacturerName")),
         UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
         mnAttr, NULL, NULL);
+    
+    // Another pump
+    UA_NodeId otherPumpId; /* get the nodeid assigned by the server by passing UA_NODEID_NULL and pumpId reference in addObjectNode */
+    UA_ObjectAttributes oAttrOther = UA_ObjectAttributes_default;
+    oAttrOther.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>("Pump (Manual)"));
+    UA_Server_addObjectNode(server, UA_NODEID_NULL,
+        UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES),
+        UA_QUALIFIEDNAME(1, const_cast<char*>("Pump (Manual)")),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE),
+        oAttrOther, NULL, &otherPumpId);
+    
+    UA_VariableAttributes mnAttrOther = UA_VariableAttributes_default;
+    UA_String manufacturerNameOther = UA_STRING(const_cast<char*>("Pump Queen Ltd."));
+    UA_Variant_setScalar(&mnAttrOther.value, &manufacturerNameOther, &UA_TYPES[UA_TYPES_STRING]);
+    mnAttrOther.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>("ManufacturerName"));
+    UA_Server_addVariableNode(server, UA_NODEID_NULL, otherPumpId,
+        UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
+        UA_QUALIFIEDNAME(1, const_cast<char*>("ManufacturerName")),
+        UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
+        mnAttrOther, NULL, NULL);
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);
