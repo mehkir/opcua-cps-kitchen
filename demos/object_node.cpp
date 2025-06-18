@@ -27,11 +27,11 @@ int main(int argc, char* argv[]) {
         status = UA_ServerConfig_setDefault(server_config);
     }
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error with setting up the server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the server");
         return status;
     }
 
-    UA_NodeId pumpId; /* get the nodeid assigned by the server */
+    UA_NodeId pumpId; /* get the nodeid assigned by the server by passing UA_NODEID_NULL and pumpId reference in addObjectNode */
     UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
     oAttr.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>("Pump (Manual)"));
     UA_Server_addObjectNode(server, UA_NODEID_NULL,
@@ -54,7 +54,7 @@ int main(int argc, char* argv[]) {
     /* Run the server loop */
     status = UA_Server_run(server, &running);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER, "Error running the server");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the server");
     }
 
     /* Clean up */

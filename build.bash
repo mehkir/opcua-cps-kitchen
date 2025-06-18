@@ -5,6 +5,8 @@ $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/de
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target clock_demo -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target string_server_for_subscription -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target string_client_for_subscription -- -j$(nproc)
+$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target object_node -- -j$(nproc)
+$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target browse_node -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/tests --config Release --target information_node_tester -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_robot_instance -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_controller_instance -- -j$(nproc)

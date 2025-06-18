@@ -17,3 +17,7 @@ target_include_directories(string_client_for_subscription PUBLIC ${PROJECT_BINAR
 add_executable(object_node object_node.cpp)
 target_link_libraries(object_node PUBLIC wrappers_lib open62541)
 target_include_directories(object_node PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
+
+add_executable(browse_node browse_node.cpp)
+target_link_libraries(browse_node PUBLIC wrappers_lib open62541)
+target_include_directories(browse_node PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
