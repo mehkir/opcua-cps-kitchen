@@ -21,3 +21,6 @@ target_include_directories(object_node PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SO
 add_executable(browse_node browse_node.cpp)
 target_link_libraries(browse_node PUBLIC wrappers_lib open62541)
 target_include_directories(browse_node PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
+
+add_executable(tutorial_server_object tutorial_server_object.c)
+target_link_libraries(tutorial_server_object PUBLIC open62541)
