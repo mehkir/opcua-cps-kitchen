@@ -13,14 +13,14 @@ class object_type_node_inserter {
         UA_Server* server_;
 
         /**
-         * The object id of the parent object
+         * The object id of the parent object type
          */
-        UA_NodeId parent_object_id_;
+        UA_NodeId parent_object_type_id_;
 
         /**
-         * The object ids map containing the node ids of all objects added by the inserter including the parent object
+         * The object ids map containing the node ids of all object types added by the inserter including the parent object type
          */
-        std::unordered_map<std::string, UA_NodeId> object_ids_;
+        std::unordered_map<std::string, UA_NodeId> object_type_ids_;
 
         /**
          * @brief Makes an attribute mandatory by its attribute id
@@ -28,44 +28,6 @@ class object_type_node_inserter {
          * @param _attribute_id 
          */
         void make_mandatory(UA_NodeId _attribute_id);
-
-    public:
-        /**
-         * @brief Constructs a new object type node inserter object
-         * 
-         * @param _server 
-         * @param _object_name 
-         */
-        object_type_node_inserter(UA_Server* _server, const char* _object_name);
-
-        /**
-         * @brief Destroys the object type node inserter object
-         * 
-         */
-        ~object_type_node_inserter();
-
-        /**
-         * @brief Adds an attribute
-         * 
-         * @param _parent_object_name the object's name the attribute is added to
-         * @param _attribute_name the attribute's name
-         * @param _mandatory flag to determine whether the attribute is mandatory
-         */
-        void add_attribute(std::string _parent_object_name, const char* _attribute_name, bool _mandatory = true);
-
-        /**
-         * @brief Adds an object type attribute
-         * 
-         * @param _object_name the object's name
-         */
-        void add_object_type_attribute(const char* _object_name);
-
-        /**
-         * @brief Adds an object instance
-         * 
-         * @param _instance_name the instance name
-         */
-        void add_object_instance(const char* _instance_name, const char* _type_name);
 
         /**
          * @brief Constructor called when a new object type is instantiated
@@ -85,28 +47,67 @@ class object_type_node_inserter {
                                 const UA_NodeId* _type_id, void* _type_context,
                                 const UA_NodeId* _nodeId, void** _node_context);
 
+    public:
+        /**
+         * @brief Constructs a new object type node inserter
+         * 
+         * @param _server the server instance
+         * @param _parent_object_type_name the name of the parent object type under which all attributes are added
+         */
+        object_type_node_inserter(UA_Server* _server, const char* _parent_object_type_name);
+
+        /**
+         * @brief Destroys the object type node inserter object
+         * 
+         */
+        ~object_type_node_inserter();
+
+        /**
+         * @brief Adds an attribute
+         * 
+         * @param _parent_object_type_name the object type name the attribute is added to
+         * @param _attribute_name the attribute's name
+         * @param _mandatory flag to determine whether the attribute is mandatory
+         */
+        void add_attribute(std::string _parent_object_type_name, const char* _attribute_name, bool _mandatory = true);
+
+        /**
+         * @brief Adds an object sub type which inherits attributes from the parent object type
+         * 
+         * @param _object_type_name the object type name
+         */
+        void add_object_sub_type(const char* _object_type_name);
+
+        /**
+         * @brief Adds an instance of the given type
+         * 
+         * @param _instance_name the instance name
+         * @param _type_object_name the object type name
+         */
+        void add_object_instance(const char* _instance_name, const char* _type_name);
+
         /**
          * @brief Adds the object type constructor
          * 
          * @param _server the server to add the constructor to
-         * @param _object_id the object id to add the constructor for
+         * @param _object_type_id the object type id to add the constructor for
          */
         void
-        add_object_type_constructor(UA_Server* _server, UA_NodeId _object_id);
+        add_object_type_constructor(UA_Server* _server, UA_NodeId _object_type_id);
 
         /**
-         * @brief Returns the object id by its name
+         * @brief Returns the object type id by its name
          * 
-         * @param _object_name the object's name
+         * @param _object_type_name the object's name
          */
-        UA_NodeId get_object_id(std::string _object_name);
+        UA_NodeId get_object_type_id(std::string _object_type_name);
 
         /**
-         * @brief Returns whether the given object id is known or not
+         * @brief Returns whether the given object type id is known or not
          * 
-         * @param _object_name the object's name
+         * @param _object_type_name the object type name
          */
-        bool has_object(std::string _object_name);
+        bool has_object_type(std::string _object_type_name);
 
 };
 
