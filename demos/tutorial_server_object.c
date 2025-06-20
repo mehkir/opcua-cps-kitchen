@@ -229,6 +229,7 @@ defineObjectTypes(UA_Server *server) {
 
 static void
 addPumpObjectInstance(UA_Server *server, char *name) {
+    UA_NodeId node_id;
     UA_ObjectAttributes oAttr = UA_ObjectAttributes_default;
     oAttr.displayName = UA_LOCALIZEDTEXT("en-US", name);
     UA_Server_addObjectNode(server, UA_NODEID_NULL,
@@ -236,7 +237,8 @@ addPumpObjectInstance(UA_Server *server, char *name) {
                             UA_QUALIFIEDNAME(1, name),
                             pumpTypeId, /* this refers to the object type
                                            identifier */
-                            oAttr, NULL, NULL);
+                            oAttr, NULL, &node_id);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Node ID: %d", __FUNCTION__, node_id.identifier.numeric);
 }
 
 /**
@@ -253,7 +255,7 @@ pumpTypeConstructor(UA_Server *server,
                     const UA_NodeId *typeId, void *typeContext,
                     const UA_NodeId *nodeId, void **nodeContext) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "New pump created");
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Node ID: %d", nodeId->identifier.numeric);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Node ID: %d", __FUNCTION__, nodeId->identifier.numeric);
 
     /* Find the NodeId of the status child variable */
     UA_RelativePathElement rpe;

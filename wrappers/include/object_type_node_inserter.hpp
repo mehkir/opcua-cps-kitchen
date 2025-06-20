@@ -8,19 +8,25 @@
 class object_type_node_inserter {
     private:
         /**
-         * The server instance the object type will be added to
+         * @brief The server instance the object type will be added to
          */
         UA_Server* server_;
 
         /**
-         * The object id of the parent object type
+         * @brief The object id of the parent object type
          */
         UA_NodeId parent_object_type_id_;
 
         /**
-         * The object ids map containing the node ids of all object types added by the inserter including the parent object type
+         * @brief The object ids map containing the node ids of all object types added by this inserter including the parent object type
          */
         std::unordered_map<std::string, UA_NodeId> object_type_ids_;
+
+        /**
+         * @brief The instance ids map containing the node ids of all instances added by this inserter (add_object_instance)
+         * 
+         */
+        std::unordered_map<std::string, UA_NodeId> instance_ids_;
 
         /**
          * @brief Makes an attribute mandatory by its attribute id
@@ -46,6 +52,34 @@ class object_type_node_inserter {
                                 const UA_NodeId* _session_id, void* _session_context,
                                 const UA_NodeId* _type_id, void* _type_context,
                                 const UA_NodeId* _nodeId, void** _node_context);
+
+        /**
+         * @brief Returns whether the given object type's id is known or not
+         * 
+         * @param _object_type_name the object type name
+         * @return true if known
+         * @return false if unknown
+         */
+        bool has_object_type(std::string _object_type_name);
+
+        /**
+         * @brief Returns whether the given instance's id is known or not
+         * 
+         * @param _instance_name the instance name
+         * @return true if known
+         * @return false if unknown
+         */
+        bool
+        has_instance(std::string _instance_name);
+
+        /**
+         * @brief Looks for the attribute node id
+         * 
+         * @param _instance_name the instance name whose attribute node id is to be searched for
+         * @param _attribute_name the attribute name
+         * @return UA_StatusCode the status code
+         */
+        UA_StatusCode find_attribute_node_id(std::string _instance_name, const char* _attribute_name, UA_NodeId& _node_id);
 
     public:
         /**
@@ -103,12 +137,15 @@ class object_type_node_inserter {
         UA_NodeId get_object_type_id(std::string _object_type_name);
 
         /**
-         * @brief Returns whether the given object type id is known or not
+         * @brief Sets the scalar attribute object for the given instance
          * 
-         * @param _object_type_name the object type name
+         * @param _instance_name the instance name
+         * @param _attribute_name the attribute name
+         * @param _value the value
+         * @param _type_index the type index
+         * @return UA_StatusCode the status code
          */
-        bool has_object_type(std::string _object_type_name);
-
+        UA_StatusCode set_scalar_attribute(std::string _instance_name, const char* _attribute_name, void* _value, UA_UInt32 _type_index);
 };
 
 #endif // OBJECT_TYPE_NODE_INSERTER_HPP

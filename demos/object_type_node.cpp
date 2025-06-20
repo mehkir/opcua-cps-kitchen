@@ -30,12 +30,17 @@ int main(int argc, char* argv[]) {
 
     object_type_node_inserter type_node_inserter(server,"RobotType");
     type_node_inserter.add_attribute("RobotType", "action");
+    type_node_inserter.add_object_type_constructor(server, type_node_inserter.get_object_type_id("RobotType"));
+        
     type_node_inserter.add_object_sub_type("CookingRobotType");
     type_node_inserter.add_attribute("CookingRobotType", "model");
-    type_node_inserter.add_object_type_constructor(server, type_node_inserter.get_object_type_id("RobotType"));
     type_node_inserter.add_object_type_constructor(server, type_node_inserter.get_object_type_id("CookingRobotType"));
-    type_node_inserter.add_object_instance("Robot 1", "RobotType");
     type_node_inserter.add_object_instance("CookingRobot 1", "CookingRobotType");
+
+    UA_String action_name = UA_STRING(const_cast<char*>("whip the action"));
+    type_node_inserter.set_scalar_attribute("CookingRobot 1", "action", &action_name, UA_TYPES_STRING);
+    UA_String model_name = UA_STRING(const_cast<char*>("Cookomatic 3000"));
+    type_node_inserter.set_scalar_attribute("CookingRobot 1", "model", &model_name, UA_TYPES_STRING);
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);

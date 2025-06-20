@@ -1,5 +1,6 @@
 #include "../include/object_type_node_inserter.hpp"
 #include <open62541/plugin/log_stdout.h>
+#include <iostream>
 
 object_type_node_inserter::object_type_node_inserter(UA_Server* _server, const char* _parent_object_type_name) : server_(_server) {
     UA_NodeId parent_object_type_id;
@@ -64,13 +65,15 @@ object_type_node_inserter::add_object_instance(const char* _instance_name, const
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Unknown type name. Instance is not added");
         return;
     }
+    UA_NodeId node_id;
     UA_ObjectAttributes object_attribute = UA_ObjectAttributes_default;
     object_attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_instance_name));
     UA_Server_addObjectNode(server_, UA_NODEID_NULL,
                             UA_NS0ID(OBJECTSFOLDER), UA_NS0ID(ORGANIZES),
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_instance_name)),
                             object_type_ids_[std::string(_object_type_name)],
-                            object_attribute, NULL, NULL);
+                            object_attribute, NULL, &node_id);
+    instance_ids_[std::string(_instance_name)] = node_id;
 }
 
 UA_StatusCode
@@ -126,4 +129,53 @@ object_type_node_inserter::get_object_type_id(std::string _object_type_name) {
 bool
 object_type_node_inserter::has_object_type(std::string _object_type_name) {
     return object_type_ids_.find(_object_type_name) != object_type_ids_.end();
+}
+
+bool
+object_type_node_inserter::has_instance(std::string _instance_name) {
+    return instance_ids_.find(_instance_name) != instance_ids_.end();
+}
+
+UA_StatusCode
+object_type_node_inserter::find_attribute_node_id(std::string _instance_name, const char* _attribute_name, UA_NodeId& _node_id) {
+    if (!has_instance(_instance_name)) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Unknown instance. Attribute can not be found");
+        return UA_STATUSCODE_BAD;
+    }
+
+    UA_RelativePathElement rpe;
+    UA_RelativePathElement_init(&rpe);
+    rpe.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    rpe.isInverse = false;
+    rpe.includeSubtypes = false;
+    rpe.targetName = UA_QUALIFIEDNAME(1, const_cast<char*>(_attribute_name));
+
+    UA_BrowsePath bp;
+    UA_BrowsePath_init(&bp);
+    bp.startingNode = instance_ids_[_instance_name];
+    bp.relativePath.elementsSize = 1;
+    bp.relativePath.elements = &rpe;
+
+    UA_BrowsePathResult bpr = UA_Server_translateBrowsePathToNodeIds(server_, &bp);
+    if(bpr.statusCode != UA_STATUSCODE_GOOD || bpr.targetsSize < 1) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Failed to find attribute %s for instance %s", _attribute_name, _instance_name.c_str());
+        return UA_STATUSCODE_BAD;
+    }
+    _node_id = bpr.targets[0].targetId.nodeId;
+    UA_BrowsePathResult_clear(&bpr); // NOTE: may be a problem if node identifier is not numeric
+    return UA_STATUSCODE_GOOD;
+}
+
+UA_StatusCode
+object_type_node_inserter::set_scalar_attribute(std::string _instance_name, const char* _attribute_name, void* _value, UA_UInt32 _type_index) {
+    UA_NodeId attribute_node_id;
+    UA_StatusCode status_code = find_attribute_node_id(_instance_name, _attribute_name, attribute_node_id);
+    if (status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Could not set the attribute %s for instance %s", _attribute_name, _instance_name.c_str());
+        return status_code;
+    }
+    UA_Variant value;
+    UA_Variant_setScalar(&value, _value, &UA_TYPES[_type_index]);
+    UA_Server_writeValue(server_, attribute_node_id, value);
+    return UA_STATUSCODE_GOOD;
 }
