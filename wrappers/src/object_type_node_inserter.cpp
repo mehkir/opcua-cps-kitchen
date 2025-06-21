@@ -187,7 +187,5 @@ object_type_node_inserter::set_attribute(std::string _instance_name, const char*
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Could not set the attribute %s for instance %s", _attribute_name, _instance_name.c_str());
         return status_code;
     }
-
-    UA_Server_writeValue(server_, attribute_node_id, _value);
-    return UA_STATUSCODE_GOOD;
+    return UA_Server_writeValue(server_, attribute_node_id, _value);
 }
