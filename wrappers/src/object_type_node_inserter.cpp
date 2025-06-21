@@ -10,8 +10,10 @@ object_type_node_inserter::object_type_node_inserter(UA_Server* _server, const c
                                 UA_NS0ID(BASEOBJECTTYPE), UA_NS0ID(HASSUBTYPE),
                                 UA_QUALIFIEDNAME(1, const_cast<char*>(_parent_object_type_name)), attribute,
                                 NULL, &parent_object_type_id);
-    if (status != UA_STATUSCODE_GOOD)
+    if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Adding object type node %s failed", _parent_object_type_name);
+        return;
+    }
     parent_object_type_id_ = parent_object_type_id;
     object_type_ids_[std::string(_parent_object_type_name)] = parent_object_type_id_;
 }
@@ -19,11 +21,11 @@ object_type_node_inserter::object_type_node_inserter(UA_Server* _server, const c
 object_type_node_inserter::~object_type_node_inserter() {
 }
 
-void
+UA_StatusCode
 object_type_node_inserter::add_attribute(std::string _parent_object_type_name, const char* _attribute_name, bool _mandatory) {
     if (!has_object_type(_parent_object_type_name)) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Unknown object type. Attribute is not added");
-        return;
+        return UA_STATUSCODE_BAD;
     }
     UA_VariableAttributes attribute = UA_VariableAttributes_default;
     attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_attribute_name));
@@ -33,46 +35,62 @@ object_type_node_inserter::add_attribute(std::string _parent_object_type_name, c
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_attribute_name)),
                             UA_NS0ID(BASEDATAVARIABLETYPE),
                             attribute, NULL, &attribute_id);
-    if (status != UA_STATUSCODE_GOOD)
+    if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Adding attribute node %s failed", _attribute_name);
+        return status;
+    }
     if (_mandatory)
-        make_mandatory(attribute_id);
+        return make_mandatory(attribute_id);
+    return status;
 }
 
-void
+UA_StatusCode
 object_type_node_inserter::add_object_sub_type(const char* _object_type_name) {
     UA_NodeId object_type_id;
     UA_ObjectTypeAttributes object_type_attribute = UA_ObjectTypeAttributes_default;
     object_type_attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_object_type_name));
-    UA_Server_addObjectTypeNode(server_, UA_NODEID_NULL, parent_object_type_id_, UA_NS0ID(HASSUBTYPE),
+    UA_StatusCode status = UA_Server_addObjectTypeNode(server_, UA_NODEID_NULL, parent_object_type_id_, UA_NS0ID(HASSUBTYPE),
                                 UA_QUALIFIEDNAME(1, const_cast<char*>(_object_type_name)), object_type_attribute,
                                 NULL, &object_type_id);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Adding object sub type %s failed", _object_type_name);
+        return status;
+    }
     object_type_ids_[std::string(_object_type_name)] = object_type_id;
+    return status;
 }
 
-void
+UA_StatusCode
 object_type_node_inserter::make_mandatory(UA_NodeId _attribute_id) {
     UA_StatusCode status = UA_Server_addReference(server_, _attribute_id, UA_NS0ID(HASMODELLINGRULE),
                            UA_NS0EXID(MODELLINGRULE_MANDATORY), true);
-    if (status != UA_STATUSCODE_GOOD)
+    if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Making attribute node mandatory failed");
+        return status;
+    }
+    return status;
 }
 
-void
+UA_StatusCode
 object_type_node_inserter::add_object_instance(const char* _instance_name, const char* _object_type_name) {
     if (!has_object_type(std::string(_object_type_name))) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Unknown type name. Instance is not added");
-        return;
+        return UA_STATUSCODE_BAD;
     }
     UA_NodeId node_id;
     UA_ObjectAttributes object_attribute = UA_ObjectAttributes_default;
     object_attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_instance_name));
-    UA_Server_addObjectNode(server_, UA_NODEID_NULL,
+    UA_StatusCode status = UA_Server_addObjectNode(server_, UA_NODEID_NULL,
                             UA_NS0ID(OBJECTSFOLDER), UA_NS0ID(ORGANIZES),
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_instance_name)),
                             object_type_ids_[std::string(_object_type_name)],
                             object_attribute, NULL, &node_id);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Adding object instance %s failed", _instance_name);
+        return status;
+    }
     instance_ids_[std::string(_instance_name)] = node_id;
+    return status;
 }
 
 UA_StatusCode
@@ -105,15 +123,15 @@ object_type_node_inserter::object_type_constructor(UA_Server* _server,
     UA_LocalizedText_clear(&localized_text);
 
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s instance of type %s created ", instance_display_name.c_str(), type_display_name.c_str());
-    return UA_STATUSCODE_GOOD;
+    return status;
 }
 
-void
+UA_StatusCode
 object_type_node_inserter::add_object_type_constructor(UA_Server* _server, UA_NodeId _object_type_id) {
     UA_NodeTypeLifecycle lifecycle;
     lifecycle.constructor = object_type_constructor;
     lifecycle.destructor = NULL;
-    UA_Server_setNodeTypeLifecycle(_server, _object_type_id, lifecycle);
+    return UA_Server_setNodeTypeLifecycle(_server, _object_type_id, lifecycle);
 }
 
 UA_NodeId

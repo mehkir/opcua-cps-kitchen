@@ -4,6 +4,47 @@
 #include <open62541/server.h>
 #include <string>
 #include <unordered_map>
+#include <vector>
+
+struct method_arguments {
+    private:
+        std::vector<UA_Argument> input_arguments_;
+        std::vector<UA_Argument> output_arguments_;
+
+        void initialize_argument(std::string _description, std::string _name, UA_UInt32 _type_index, UA_Argument& _argument) {
+            UA_Argument_init(&_argument);
+            _argument.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
+            _argument.name = UA_STRING(const_cast<char*>(_name.c_str()));
+            _argument.dataType = UA_TYPES[_type_index].typeId;
+            _argument.valueRank = UA_VALUERANK_ANY;
+        }
+    public:
+        method_arguments(){
+        }
+
+        ~method_arguments(){
+        }
+
+        void add_input_argument(std::string _description, std::string _name, UA_UInt32 _type_index) {
+            UA_Argument argument;
+            initialize_argument(_description, _name, _type_index, argument);
+            input_arguments_.push_back(argument);
+        }
+
+        void add_output_argument(std::string _description, std::string _name, UA_UInt32 _type_index) {
+            UA_Argument argument;
+            initialize_argument(_description, _name, _type_index, argument);
+            output_arguments_.push_back(argument);
+        }
+
+        std::vector<UA_Argument> get_input_arguments() {
+            return input_arguments_;
+        }
+
+        std::vector<UA_Argument> get_output_arguments() {
+            return output_arguments_;
+        }
+};
 
 class object_type_node_inserter {
     private:
@@ -32,8 +73,9 @@ class object_type_node_inserter {
          * @brief Makes an attribute mandatory by its attribute id
          * 
          * @param _attribute_id 
+         * @return UA_StatusCode the status code
          */
-        void make_mandatory(UA_NodeId _attribute_id);
+        UA_StatusCode make_mandatory(UA_NodeId _attribute_id);
 
         /**
          * @brief Constructor called when a new object type is instantiated
@@ -112,31 +154,37 @@ class object_type_node_inserter {
          * @param _parent_object_type_name the object type name the attribute is added to
          * @param _attribute_name the attribute's name
          * @param _mandatory flag to determine whether the attribute is mandatory
+         * @return UA_StatusCode the status code
          */
-        void add_attribute(std::string _parent_object_type_name, const char* _attribute_name, bool _mandatory = true);
+        UA_StatusCode add_attribute(std::string _parent_object_type_name, const char* _attribute_name, bool _mandatory = true);
+
+
 
         /**
          * @brief Adds an object sub type which inherits attributes from the parent object type
          * 
          * @param _object_type_name the object type name
+         * @return UA_StatusCode the status code
          */
-        void add_object_sub_type(const char* _object_type_name);
+        UA_StatusCode add_object_sub_type(const char* _object_type_name);
 
         /**
          * @brief Adds an instance of the given type
          * 
          * @param _instance_name the instance name
          * @param _type_object_name the object type name
+         * @return UA_StatusCode the status code
          */
-        void add_object_instance(const char* _instance_name, const char* _type_name);
+        UA_StatusCode add_object_instance(const char* _instance_name, const char* _type_name);
 
         /**
          * @brief Adds the object type constructor
          * 
          * @param _server the server to add the constructor to
          * @param _object_type_id the object type id to add the constructor for
+         * @return UA_StatusCode the status code
          */
-        void
+        UA_StatusCode
         add_object_type_constructor(UA_Server* _server, UA_NodeId _object_type_id);
 
         /**
