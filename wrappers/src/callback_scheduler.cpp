@@ -13,7 +13,7 @@ callback_scheduler::schedule_from_now(UA_DateTime _expiry_time) {
 
 UA_StatusCode
 callback_scheduler::schedule_from_now_relative(UA_Double _delay_in_ms) {
-    OnceCallback *once = (OnceCallback*)UA_malloc(sizeof(*once));
+    once_callback *once = (once_callback*)UA_malloc(sizeof(*once));
     if(!once) return UA_STATUSCODE_BADOUTOFMEMORY;
     once->cb = callback_;
     once->data = data_;

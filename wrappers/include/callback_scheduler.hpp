@@ -7,10 +7,10 @@ typedef struct {
     UA_ServerCallback cb;
     void *data;
     UA_UInt64 id;
-} OnceCallback;
+} once_callback;
 
 static void once_wrapper(UA_Server* _server, void* _context) {
-    OnceCallback *once = (OnceCallback*)_context;
+    once_callback *once = (once_callback*)_context;
     once->cb(_server, once->data);
     UA_Server_removeRepeatedCallback(_server, once->id);
     UA_free(once);
