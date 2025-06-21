@@ -34,6 +34,7 @@ int main(int argc, char* argv[]) {
         
     type_node_inserter.add_object_sub_type("CookingRobotType");
     type_node_inserter.add_attribute("CookingRobotType", "model");
+    type_node_inserter.add_attribute("CookingRobotType", "arrayFeature");
     type_node_inserter.add_object_type_constructor(server, type_node_inserter.get_object_type_id("CookingRobotType"));
     type_node_inserter.add_object_instance("CookingRobot 1", "CookingRobotType");
 
@@ -41,6 +42,15 @@ int main(int argc, char* argv[]) {
     type_node_inserter.set_scalar_attribute("CookingRobot 1", "action", &action_name, UA_TYPES_STRING);
     UA_String model_name = UA_STRING(const_cast<char*>("Cookomatic 3000"));
     type_node_inserter.set_scalar_attribute("CookingRobot 1", "model", &model_name, UA_TYPES_STRING);
+
+    std::string values[] = {"Hello", "World", "!"};
+    UA_String* capabilities;
+    capabilities = (UA_String*) UA_Array_new(3, &UA_TYPES[UA_TYPES_STRING]);
+    for (int i = 0; i < 3; i++) {
+        capabilities[i] = UA_STRING(const_cast<char*>(values[i].c_str()));
+    }
+    type_node_inserter.set_array_attribute("CookingRobot 1", "arrayFeature", capabilities, 3, UA_TYPES_STRING);
+
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);

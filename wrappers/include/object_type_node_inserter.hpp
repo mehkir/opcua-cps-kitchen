@@ -81,6 +81,16 @@ class object_type_node_inserter {
          */
         UA_StatusCode find_attribute_node_id(std::string _instance_name, const char* _attribute_name, UA_NodeId& _node_id);
 
+        /**
+         * @brief Sets the attribute for the given instance
+         * 
+         * @param _instance_name the instance name
+         * @param _attribute_name the attribute name
+         * @param _value the value
+         * @return UA_StatusCode 
+         */
+        UA_StatusCode set_attribute(std::string _instance_name, const char* _attribute_name, UA_Variant& _value);
+
     public:
         /**
          * @brief Constructs a new object type node inserter
@@ -137,7 +147,7 @@ class object_type_node_inserter {
         UA_NodeId get_object_type_id(std::string _object_type_name);
 
         /**
-         * @brief Sets the scalar attribute object for the given instance
+         * @brief Sets the scalar attribute for the given instance
          * 
          * @param _instance_name the instance name
          * @param _attribute_name the attribute name
@@ -146,6 +156,18 @@ class object_type_node_inserter {
          * @return UA_StatusCode the status code
          */
         UA_StatusCode set_scalar_attribute(std::string _instance_name, const char* _attribute_name, void* _value, UA_UInt32 _type_index);
+
+        /**
+         * @brief Sets the array attribute for the given instance
+         * 
+         * @param _instance_name the instance name
+         * @param _attribute_name the attribute name
+         * @param _array the array
+         * @param _array_size the array size
+         * @param _type_index the type index
+         * @return UA_StatusCode the status code
+         */
+        UA_StatusCode set_array_attribute(std::string _instance_name, const char* _attribute_name, void* _array, size_t _array_size, UA_UInt32 _type_index);
 };
 
 #endif // OBJECT_TYPE_NODE_INSERTER_HPP

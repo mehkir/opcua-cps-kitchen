@@ -1,6 +1,5 @@
 #include "../include/object_type_node_inserter.hpp"
 #include <open62541/plugin/log_stdout.h>
-#include <iostream>
 
 object_type_node_inserter::object_type_node_inserter(UA_Server* _server, const char* _parent_object_type_name) : server_(_server) {
     UA_NodeId parent_object_type_id;
@@ -168,14 +167,27 @@ object_type_node_inserter::find_attribute_node_id(std::string _instance_name, co
 
 UA_StatusCode
 object_type_node_inserter::set_scalar_attribute(std::string _instance_name, const char* _attribute_name, void* _value, UA_UInt32 _type_index) {
+    UA_Variant value;
+    UA_Variant_setScalar(&value, _value, &UA_TYPES[_type_index]);
+    return set_attribute(_instance_name, _attribute_name, value);
+}
+
+UA_StatusCode
+object_type_node_inserter::set_array_attribute(std::string _instance_name, const char* _attribute_name, void* _array, size_t _array_size, UA_UInt32 _type_index) {
+    UA_Variant value;
+    UA_Variant_setArray(&value, _array, _array_size, &UA_TYPES[_type_index]);
+    return set_attribute(_instance_name, _attribute_name, value);
+}
+
+UA_StatusCode
+object_type_node_inserter::set_attribute(std::string _instance_name, const char* _attribute_name, UA_Variant& _value) {
     UA_NodeId attribute_node_id;
     UA_StatusCode status_code = find_attribute_node_id(_instance_name, _attribute_name, attribute_node_id);
     if (status_code != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Could not set the attribute %s for instance %s", _attribute_name, _instance_name.c_str());
         return status_code;
     }
-    UA_Variant value;
-    UA_Variant_setScalar(&value, _value, &UA_TYPES[_type_index]);
-    UA_Server_writeValue(server_, attribute_node_id, value);
+
+    UA_Server_writeValue(server_, attribute_node_id, _value);
     return UA_STATUSCODE_GOOD;
 }
