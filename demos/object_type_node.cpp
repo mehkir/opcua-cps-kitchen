@@ -65,6 +65,14 @@ int main(int argc, char* argv[]) {
     }
     type_node_inserter.set_array_attribute("CookingRobot 1", "arrayFeature", capabilities, 3, UA_TYPES_STRING);
 
+    UA_Variant model_value;
+    type_node_inserter.get_attribute("CookingRobot 1", "model", model_value);
+    if (UA_Variant_hasScalarType(&model_value, &UA_TYPES[UA_TYPES_STRING])) {
+        UA_String mod = *(UA_String*)model_value.data;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "The model: %s", std::string((char*)mod.data, mod.length).c_str());
+    }
+
+
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);

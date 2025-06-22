@@ -121,13 +121,13 @@ class object_type_node_inserter {
         has_instance(std::string _instance_name);
 
         /**
-         * @brief Looks for the attribute node id
+         * @brief Looks for the child node id of the given instance
          * 
          * @param _instance_name the instance name whose attribute node id is to be searched for
-         * @param _attribute_name the attribute name
+         * @param _child_name the child name
          * @return UA_StatusCode the status code
          */
-        UA_StatusCode find_attribute_node_id(std::string _instance_name, const char* _attribute_name, UA_NodeId& _node_id);
+        UA_StatusCode find_child_node_id(std::string _instance_name, const char* _child_name, UA_NodeId& _node_id);
 
         /**
          * @brief Sets the attribute for the given instance
@@ -232,6 +232,16 @@ class object_type_node_inserter {
          * @return UA_StatusCode the status code
          */
         UA_StatusCode set_array_attribute(std::string _instance_name, const char* _attribute_name, void* _array, size_t _array_size, UA_UInt32 _type_index);
+
+        /**
+         * @brief Gets the attribute for the given instance
+         * 
+         * @param _instance_name the instance name
+         * @param _attribute_name the attribute name
+         * @param _value where the attribute value is stored
+         * @return UA_StatusCode the status code
+         */
+        UA_StatusCode get_attribute(std::string _instance_name, const char* _attribute_name, UA_Variant& _value);
 };
 
 #endif // OBJECT_TYPE_NODE_INSERTER_HPP

@@ -181,7 +181,7 @@ object_type_node_inserter::has_instance(std::string _instance_name) {
 }
 
 UA_StatusCode
-object_type_node_inserter::find_attribute_node_id(std::string _instance_name, const char* _attribute_name, UA_NodeId& _node_id) {
+object_type_node_inserter::find_child_node_id(std::string _instance_name, const char* _child_name, UA_NodeId& _node_id) {
     if (!has_instance(_instance_name)) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Unknown instance. Attribute can not be found");
         return UA_STATUSCODE_BAD;
@@ -192,7 +192,7 @@ object_type_node_inserter::find_attribute_node_id(std::string _instance_name, co
     rpe.referenceTypeId = UA_NS0ID(HASCOMPONENT);
     rpe.isInverse = false;
     rpe.includeSubtypes = false;
-    rpe.targetName = UA_QUALIFIEDNAME(1, const_cast<char*>(_attribute_name));
+    rpe.targetName = UA_QUALIFIEDNAME(1, const_cast<char*>(_child_name));
 
     UA_BrowsePath bp;
     UA_BrowsePath_init(&bp);
@@ -202,7 +202,7 @@ object_type_node_inserter::find_attribute_node_id(std::string _instance_name, co
 
     UA_BrowsePathResult bpr = UA_Server_translateBrowsePathToNodeIds(server_, &bp);
     if(bpr.statusCode != UA_STATUSCODE_GOOD || bpr.targetsSize < 1) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Failed to find attribute %s for instance %s", _attribute_name, _instance_name.c_str());
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Failed to find child %s for instance %s", _child_name, _instance_name.c_str());
         return UA_STATUSCODE_BAD;
     }
     _node_id = bpr.targets[0].targetId.nodeId;
@@ -227,10 +227,21 @@ object_type_node_inserter::set_array_attribute(std::string _instance_name, const
 UA_StatusCode
 object_type_node_inserter::set_attribute(std::string _instance_name, const char* _attribute_name, UA_Variant& _value) {
     UA_NodeId attribute_node_id;
-    UA_StatusCode status_code = find_attribute_node_id(_instance_name, _attribute_name, attribute_node_id);
+    UA_StatusCode status_code = find_child_node_id(_instance_name, _attribute_name, attribute_node_id);
     if (status_code != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Could not set the attribute %s for instance %s", _attribute_name, _instance_name.c_str());
         return status_code;
     }
     return UA_Server_writeValue(server_, attribute_node_id, _value);
+}
+
+UA_StatusCode
+object_type_node_inserter::get_attribute(std::string _instance_name, const char* _attribute_name, UA_Variant& _value) {
+    UA_NodeId attribute_node_id;
+    UA_StatusCode status_code = find_child_node_id(_instance_name, _attribute_name, attribute_node_id);
+    if (status_code != UA_STATUSCODE_GOOD) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Could not get the attribute %s for instance %s", _attribute_name, _instance_name.c_str());
+        return status_code;
+    }
+    return UA_Server_readValue(server_, attribute_node_id, &_value);
 }
