@@ -45,6 +45,33 @@ object_type_node_inserter::add_attribute(std::string _parent_object_type_name, c
 }
 
 UA_StatusCode
+object_type_node_inserter::add_method(std::string _parent_object_type_name, const char* _method_name, UA_MethodCallback _method_callback, method_arguments& _method_arguments, void* _node_context, bool _mandatory) {
+    if (!has_object_type(_parent_object_type_name)) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Unknown object type. Method is not added");
+        return UA_STATUSCODE_BAD;
+    }
+    UA_MethodAttributes method_attributes = UA_MethodAttributes_default;
+    method_attributes.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_method_name));
+    method_attributes.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_method_name));
+    method_attributes.executable = true;
+    method_attributes.userExecutable = true;
+    UA_NodeId method_id;
+    UA_StatusCode status = UA_Server_addMethodNode(server_, UA_NODEID_NULL, object_type_ids_[_parent_object_type_name],
+                            UA_NS0ID(HASCOMPONENT),
+                            UA_QUALIFIEDNAME(1, const_cast<char*>(_method_name)),
+                            method_attributes, _method_callback,
+                            _method_arguments.get_input_arguments().size(), _method_arguments.get_input_arguments().data(),
+                            _method_arguments.get_output_arguments().size(), _method_arguments.get_output_arguments().data(), _node_context, &method_id);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Adding method node %s failed", _method_name);
+        return status;
+    }
+    if (_mandatory)
+        return make_mandatory(method_id);
+    return status;
+}
+
+UA_StatusCode
 object_type_node_inserter::add_object_sub_type(const char* _object_type_name) {
     UA_NodeId object_type_id;
     UA_ObjectTypeAttributes object_type_attribute = UA_ObjectTypeAttributes_default;
@@ -61,11 +88,11 @@ object_type_node_inserter::add_object_sub_type(const char* _object_type_name) {
 }
 
 UA_StatusCode
-object_type_node_inserter::make_mandatory(UA_NodeId _attribute_id) {
-    UA_StatusCode status = UA_Server_addReference(server_, _attribute_id, UA_NS0ID(HASMODELLINGRULE),
+object_type_node_inserter::make_mandatory(UA_NodeId _node_id) {
+    UA_StatusCode status = UA_Server_addReference(server_, _node_id, UA_NS0ID(HASMODELLINGRULE),
                            UA_NS0EXID(MODELLINGRULE_MANDATORY), true);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Making attribute node mandatory failed");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Making attribute/method node mandatory failed");
         return status;
     }
     return status;

@@ -11,6 +11,16 @@ static void stopHandler(int sig) {
     running = false;
 }
 
+static UA_StatusCode my_method(UA_Server *server, const UA_NodeId *sessionId,
+                               void *sessionContext, const UA_NodeId *methodId,
+                               void *methodContext, const UA_NodeId *objectId,
+                               void *objectContext, size_t inputSize,
+                               const UA_Variant *input, size_t outputSize,
+                               UA_Variant *output) {
+
+    return UA_STATUSCODE_GOOD;
+}
+
 int main(int argc, char* argv[]) {
     signal(SIGINT, stopHandler);
     signal(SIGTERM, stopHandler);
@@ -35,6 +45,10 @@ int main(int argc, char* argv[]) {
     type_node_inserter.add_object_sub_type("CookingRobotType");
     type_node_inserter.add_attribute("CookingRobotType", "model");
     type_node_inserter.add_attribute("CookingRobotType", "arrayFeature");
+    method_arguments my_method_arguments;
+    my_method_arguments.add_input_argument("The input argument", "input", UA_TYPES_STRING);
+    my_method_arguments.add_output_argument("The output argument", "output", UA_TYPES_BOOLEAN);
+    type_node_inserter.add_method("CookingRobotType", "myMethod", my_method, my_method_arguments, NULL);
     type_node_inserter.add_object_type_constructor(server, type_node_inserter.get_object_type_id("CookingRobotType"));
     type_node_inserter.add_object_instance("CookingRobot 1", "CookingRobotType");
 

@@ -13,8 +13,8 @@ struct method_arguments {
 
         void initialize_argument(std::string _description, std::string _name, UA_UInt32 _type_index, UA_Argument& _argument) {
             UA_Argument_init(&_argument);
-            _argument.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
-            _argument.name = UA_STRING(const_cast<char*>(_name.c_str()));
+            _argument.description = UA_LOCALIZEDTEXT_ALLOC(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
+            _argument.name = UA_STRING_ALLOC(const_cast<char*>(_name.c_str()));
             _argument.dataType = UA_TYPES[_type_index].typeId;
             _argument.valueRank = UA_VALUERANK_ANY;
         }
@@ -23,6 +23,12 @@ struct method_arguments {
         }
 
         ~method_arguments(){
+            for (auto& arg : input_arguments_) {
+                UA_Argument_clear(&arg);
+            }
+            for (auto& arg : output_arguments_) {
+                UA_Argument_clear(&arg);
+            }
         }
 
         void add_input_argument(std::string _description, std::string _name, UA_UInt32 _type_index) {
@@ -70,12 +76,12 @@ class object_type_node_inserter {
         std::unordered_map<std::string, UA_NodeId> instance_ids_;
 
         /**
-         * @brief Makes an attribute mandatory by its attribute id
+         * @brief Makes an attribute or method mandatory by its node id
          * 
-         * @param _attribute_id 
+         * @param _node_id the node id of the attribute or method
          * @return UA_StatusCode the status code
          */
-        UA_StatusCode make_mandatory(UA_NodeId _attribute_id);
+        UA_StatusCode make_mandatory(UA_NodeId _node_id);
 
         /**
          * @brief Constructor called when a new object type is instantiated
@@ -129,7 +135,7 @@ class object_type_node_inserter {
          * @param _instance_name the instance name
          * @param _attribute_name the attribute name
          * @param _value the value
-         * @return UA_StatusCode 
+         * @return UA_StatusCode the status code
          */
         UA_StatusCode set_attribute(std::string _instance_name, const char* _attribute_name, UA_Variant& _value);
 
@@ -158,7 +164,18 @@ class object_type_node_inserter {
          */
         UA_StatusCode add_attribute(std::string _parent_object_type_name, const char* _attribute_name, bool _mandatory = true);
 
-
+        /**
+         * @brief Adds a method
+         * 
+         * @param _parent_object_type_name the object type to which the method is added
+         * @param _method_name the method name
+         * @param _method_callback the method callback
+         * @param _method_arguments the method arguments
+         * @param _node_context the node context
+         * @param _mandatory flag to determine whether the attribute is mandatory
+         * @return UA_StatusCode the status code
+         */
+        UA_StatusCode add_method(std::string _parent_object_type_name, const char* _method_name, UA_MethodCallback _method_callback, method_arguments& _method_arguments, void* _node_context, bool _mandatory = true);
 
         /**
          * @brief Adds an object sub type which inherits attributes from the parent object type
@@ -184,8 +201,7 @@ class object_type_node_inserter {
          * @param _object_type_id the object type id to add the constructor for
          * @return UA_StatusCode the status code
          */
-        UA_StatusCode
-        add_object_type_constructor(UA_Server* _server, UA_NodeId _object_type_id);
+        UA_StatusCode add_object_type_constructor(UA_Server* _server, UA_NodeId _object_type_id);
 
         /**
          * @brief Returns the object type id by its name
