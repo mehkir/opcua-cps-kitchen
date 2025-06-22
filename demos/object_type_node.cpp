@@ -72,7 +72,14 @@ int main(int argc, char* argv[]) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "The model: %s", std::string((char*)mod.data, mod.length).c_str());
     }
 
-
+    UA_Variant array_value;
+    type_node_inserter.get_attribute("CookingRobot 1", "arrayFeature", array_value);
+    if (UA_Variant_hasArrayType(&array_value, &UA_TYPES[UA_TYPES_STRING])) {
+        for (size_t i = 0; i < array_value.arrayLength; i++) {
+            UA_String element = ((UA_String*)array_value.data)[i];
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Array element at position %d: %s", i, std::string((char*)element.data, element.length).c_str());
+        }
+    }
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);
