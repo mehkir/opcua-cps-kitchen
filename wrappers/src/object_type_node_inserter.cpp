@@ -99,7 +99,7 @@ object_type_node_inserter::make_mandatory(UA_NodeId _node_id) {
 }
 
 UA_StatusCode
-object_type_node_inserter::add_object_instance(const char* _instance_name, const char* _object_type_name) {
+object_type_node_inserter::add_object_instance(const char* _instance_name, const char* _object_type_name, UA_NodeId _parent_node_id) {
     if (!has_object_type(std::string(_object_type_name))) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Unknown type name. Instance is not added");
         return UA_STATUSCODE_BAD;
@@ -108,7 +108,7 @@ object_type_node_inserter::add_object_instance(const char* _instance_name, const
     UA_ObjectAttributes object_attribute = UA_ObjectAttributes_default;
     object_attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_instance_name));
     UA_StatusCode status = UA_Server_addObjectNode(server_, UA_NODEID_NULL,
-                            UA_NS0ID(OBJECTSFOLDER), UA_NS0ID(ORGANIZES),
+                            _parent_node_id, UA_NS0ID(ORGANIZES),
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_instance_name)),
                             object_type_ids_[std::string(_object_type_name)],
                             object_attribute, NULL, &node_id);

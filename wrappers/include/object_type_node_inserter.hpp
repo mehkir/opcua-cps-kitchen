@@ -117,8 +117,7 @@ class object_type_node_inserter {
          * @return true if known
          * @return false if unknown
          */
-        bool
-        has_instance(std::string _instance_name);
+        bool has_instance(std::string _instance_name);
 
         /**
          * @brief Looks for the child node id of the given instance
@@ -157,7 +156,7 @@ class object_type_node_inserter {
         /**
          * @brief Adds an attribute
          * 
-         * @param _parent_object_type_name the object type name the attribute is added to
+         * @param _parent_object_type_name the object type name the attribute will be added to
          * @param _attribute_name the attribute's name
          * @param _mandatory flag to determine whether the attribute is mandatory
          * @return UA_StatusCode the status code
@@ -167,7 +166,7 @@ class object_type_node_inserter {
         /**
          * @brief Adds a method
          * 
-         * @param _parent_object_type_name the object type to which the method is added
+         * @param _parent_object_type_name the object type to which the method will be added
          * @param _method_name the method name
          * @param _method_callback the method callback
          * @param _method_arguments the method arguments
@@ -190,9 +189,10 @@ class object_type_node_inserter {
          * 
          * @param _instance_name the instance name
          * @param _type_object_name the object type name
+         * @param _parent_node_id the parent node id under which the instance will be added
          * @return UA_StatusCode the status code
          */
-        UA_StatusCode add_object_instance(const char* _instance_name, const char* _type_name);
+        UA_StatusCode add_object_instance(const char* _instance_name, const char* _type_name, UA_NodeId _parent_node_id = UA_NS0ID(OBJECTSFOLDER));
 
         /**
          * @brief Adds the object type constructor
