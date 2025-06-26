@@ -2,8 +2,12 @@
 #include <open62541/plugin/log_stdout.h>
 #include <open62541/server.h>
 #include <open62541/server_config_default.h>
+#include <open62541/client.h>
+#include <open62541/client_config_default.h>
 
 #include "object_type_node_inserter.hpp"
+
+#define DISCOVERY_SERVER_ENDPOINT "opc.tcp://localhost:4840"
 
 static volatile UA_Boolean running = true;
 static void stopHandler(int sig) {
@@ -81,13 +85,43 @@ int main(int argc, char* argv[]) {
         }
     }
 
-    /* Run the server loop */
-    status = UA_Server_run(server, &running);
-    if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the server");
+    UA_Server_run_startup(server);
+
+    /* register server */
+    UA_ClientConfig cc;
+    memset(&cc, 0, sizeof(UA_ClientConfig));
+    UA_ClientConfig_setDefault(&cc);
+
+    status = UA_Server_registerDiscovery(server, &cc, UA_STRING(const_cast<char*>(DISCOVERY_SERVER_ENDPOINT)), UA_STRING_NULL);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                     "Could not create periodic job for server register. StatusCode %s",
+                     UA_StatusCode_name(status));
+        UA_Server_delete(server);
+        return EXIT_FAILURE;
     }
 
+    /* Run the server loop */
+    // status = UA_Server_run(server, &running);
+    // if (status != UA_STATUSCODE_GOOD) {
+    //     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the server");
+    // }
+    while(running)
+        UA_Server_run_iterate(server, true);
+
+    /* Unregister the server from the discovery server. */
+    memset(&cc, 0, sizeof(UA_ClientConfig));
+    UA_ClientConfig_setDefault(&cc);
+    status = UA_Server_deregisterDiscovery(server, &cc,
+                                           UA_STRING(const_cast<char*>(DISCOVERY_SERVER_ENDPOINT)));
+    /* status = UA_Server_unregister_discovery(server, "opc.tcp://localhost:4840" ); */
+    if(status != UA_STATUSCODE_GOOD)
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SERVER,
+                     "Could not unregister server from discovery server. StatusCode %s",
+                     UA_StatusCode_name(status));
+
     /* Clean up */
+    UA_Server_run_shutdown(server);
     UA_Server_delete(server);
 
     return 0;

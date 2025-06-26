@@ -9,6 +9,8 @@ $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/de
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target browse_node -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target tutorial_server_object -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target object_type_node -- -j$(nproc)
+$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target discovery_server -- -j$(nproc)
+$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target client_discovery_lookup -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/tests --config Release --target information_node_tester -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_robot_instance -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_controller_instance -- -j$(nproc)
