@@ -37,6 +37,6 @@ add_executable(client_discovery_lookup client_discovery_lookup.cpp)
 target_link_libraries(client_discovery_lookup PUBLIC open62541)
 target_include_directories(client_discovery_lookup PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR})
 
-add_executable(client_discovery_lookup_minimal client_discovery_lookup_minimal.cpp)
+add_executable(client_discovery_lookup_minimal client_discovery_lookup_minimal.c)
 target_link_libraries(client_discovery_lookup_minimal PUBLIC open62541)
 target_include_directories(client_discovery_lookup_minimal PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR})
