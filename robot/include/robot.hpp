@@ -13,6 +13,7 @@
 #include "robot_tool.hpp"
 #include "recipe_parser.hpp"
 #include "capability_parser.hpp"
+#include "object_type_node_inserter.hpp"
 
 using namespace cps_kitchen;
 
@@ -46,33 +47,22 @@ private:
     position_t position_;
     port_t port_;
     robot_tool current_tool_;
-    robot_tool last_equipped_tool_;
-    recipe_id_t recipe_id_in_process_;
     UA_UInt32 processed_steps_of_recipe_id_in_process_;
     port_t next_suitable_robot_port_for_recipe_id_in_process_;
     position_t next_suitable_robot_position_for_recipe_id_in_process_;
     std::queue<order> order_queue_;
-    std::string dish_in_process_;
-    std::string action_in_process_;
-    std::string ingredients_in_process_;
-    duration_t overall_time_;
     duration_t current_action_duration_;
     std::queue<robot_action> action_queue_in_process_;
     volatile UA_Boolean running_;
-    method_node_inserter receive_task_inserter_;
-    method_node_inserter handover_finished_order_inserter_;
     std::thread server_iterate_thread_;
     recipe_parser recipe_parser_;
     capability_parser capability_parser_;
-    UA_String* capabilities_;
+    object_type_node_inserter robot_type_inserter_;
     /* controller related member variables */
     UA_Client* controller_client_;
-    method_node_caller register_robot_caller_;
-    method_node_caller choose_next_robot_caller_;
     std::thread controller_client_iterate_thread_;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
-    method_node_caller receive_finished_order_notification_caller_;
     std::thread conveyor_client_iterate_thread_;
 
     /**
@@ -267,18 +257,6 @@ private:
      */
     void
     add_information_node(UA_Server* _server, UA_UInt16 _ns_index, std::string _node_name, std::string _browse_name, UA_UInt32 _type_index, void* _value);
-
-    /**
-     * @brief Updates an information node
-     * 
-     * @param _server the server 
-     * @param _ns_index the namespace index
-     * @param _node_name the node name
-     * @param _value the value
-     * @param _type_index the type index of the data type
-     */
-    void
-    update_information_node(UA_Server* _server, UA_UInt16 _ns_index, std::string _node_name, void* _value, UA_UInt32 _type_index);
 
     /**
      * @brief Joins all started threads.
