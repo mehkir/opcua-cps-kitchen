@@ -8,8 +8,6 @@
 #include "client_connection_establisher.hpp"
 #include "response_checker.hpp"
 #include "callback_scheduler.hpp"
-#include "information_node_inserter.hpp"
-#include "information_node_writer.hpp"
 #include "time_unit.hpp"
 #include "filtered_logger.hpp"
 #include "browsenames.h"
@@ -19,9 +17,9 @@
 #define CAPABILITIES_PATH "./capabilities/"
 
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
-        server_(UA_Server_new()), position_(_position), port_(_port), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
+        server_(UA_Server_new()), position_(_position), port_(_port), robot_type_inserter_(server_, ROBOT_TYPE), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
         current_tool_(robot_tool::ROBOT_TOOLS_COUNT), processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_port_for_recipe_id_in_process_(0), next_suitable_robot_position_for_recipe_id_in_process_(0),
-        current_action_duration_(0), recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), robot_type_inserter_(server_, ROBOT_TYPE) {
+        current_action_duration_(0), recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -32,7 +30,6 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         return;
     }
     *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
-
     /* Add attributes */
     robot_type_inserter_.add_attribute(ROBOT_TYPE, RECIPE_ID);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, DISH_NAME);
@@ -579,16 +576,6 @@ robot::retool(UA_Server* _server, void* _data) {
     self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Current tool now is %s", robot_tool_to_string(self->current_tool_));
     self->determine_next_action();
-}
-
-void
-robot::add_information_node(UA_Server* _server, UA_UInt16 _ns_index, std::string _node_name, std::string _browse_name, UA_UInt32 _type_index, void* _value) {
-    information_node_inserter inserter;
-    UA_StatusCode status = inserter.add_scalar_node(_server, UA_NODEID_STRING(_ns_index, const_cast<char*>(_node_name.c_str())), _browse_name, _type_index, _value);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s information node insertion failed", __FUNCTION__, _node_name.c_str());
-        running_ = false;
-    }
 }
 
 void

@@ -6,9 +6,7 @@
 #include <thread>
 #include <queue>
 
-#include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
-#include "method_node_inserter.hpp"
 #include "types.hpp"
 #include "robot_tool.hpp"
 #include "recipe_parser.hpp"
@@ -46,6 +44,7 @@ private:
     UA_Server* server_;
     position_t position_;
     port_t port_;
+    object_type_node_inserter robot_type_inserter_;
     robot_tool current_tool_;
     UA_UInt32 processed_steps_of_recipe_id_in_process_;
     port_t next_suitable_robot_port_for_recipe_id_in_process_;
@@ -57,7 +56,6 @@ private:
     std::thread server_iterate_thread_;
     recipe_parser recipe_parser_;
     capability_parser capability_parser_;
-    object_type_node_inserter robot_type_inserter_;
     /* controller related member variables */
     UA_Client* controller_client_;
     std::thread controller_client_iterate_thread_;
@@ -244,19 +242,6 @@ private:
      */
     static void
     retool(UA_Server* _server, void* _data);
-
-    /**
-     * @brief Inserts an information node
-     * 
-     * @param _server the server 
-     * @param _ns_index the namespace index
-     * @param _node_name the node name
-     * @param _browse_name the browse name
-     * @param _type_index the type index of the data type
-     * @param _value the value
-     */
-    void
-    add_information_node(UA_Server* _server, UA_UInt16 _ns_index, std::string _node_name, std::string _browse_name, UA_UInt32 _type_index, void* _value);
 
     /**
      * @brief Joins all started threads.
