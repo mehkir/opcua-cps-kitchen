@@ -62,8 +62,7 @@ int main(int argc, char* argv[]) {
     type_node_inserter.set_scalar_attribute("CookingRobot 1", "model", &model_name, UA_TYPES_STRING);
 
     std::string values[] = {"Hello", "World", "!"};
-    UA_String* capabilities;
-    capabilities = (UA_String*) UA_Array_new(3, &UA_TYPES[UA_TYPES_STRING]);
+    UA_String capabilities[3];
     for (int i = 0; i < 3; i++) {
         capabilities[i] = UA_STRING(const_cast<char*>(values[i].c_str()));
     }
