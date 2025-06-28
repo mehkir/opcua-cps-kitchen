@@ -3,9 +3,10 @@
 #include <string>
 #include <response_checker.hpp>
 
+#define INSTANCE_NAME "KitchenController"
 #define RECIPE_PATH "recipes.json"
 
-controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), running_(true), recipe_parser_(RECIPE_PATH), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3) {
+controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), recipe_parser_(RECIPE_PATH), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3) {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
@@ -15,38 +16,44 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), r
         return;
     }
 
-    choose_next_robot_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
-    choose_next_robot_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT32);
-    choose_next_robot_inserter_.add_input_argument("recipe id", "recipe_id", UA_TYPES_UINT32);
-    choose_next_robot_inserter_.add_input_argument("processed steps", "processed_steps", UA_TYPES_UINT32);
-    choose_next_robot_inserter_.add_output_argument("next suitable robot port", "next_suitable_robot_port", UA_TYPES_UINT16);
-    choose_next_robot_inserter_.add_output_argument("next suitable robot position", "next_suitable_robot_position", UA_TYPES_UINT32);
-    status = choose_next_robot_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(CHOOSE_NEXT_ROBOT)), "choose next robot", choose_next_robot, this);
+    /* Add choose next robot method node */
+    method_arguments choose_next_robot_arguments;
+    choose_next_robot_arguments.add_input_argument("the robot port", "robot_port", UA_TYPES_UINT16);
+    choose_next_robot_arguments.add_input_argument("the robot position", "robot_position", UA_TYPES_UINT32);
+    choose_next_robot_arguments.add_input_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
+    choose_next_robot_arguments.add_input_argument("the processed steps", "processed_steps", UA_TYPES_UINT32);
+    choose_next_robot_arguments.add_output_argument("the next suitable robot port", "next_suitable_robot_port", UA_TYPES_UINT16);
+    choose_next_robot_arguments.add_output_argument("the next suitable robot position", "next_suitable_robot_position", UA_TYPES_UINT32);
+    status = controller_type_inserter_.add_method(CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT, choose_next_robot, choose_next_robot_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the choose next robot method node");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, CHOOSE_NEXT_ROBOT);
         running_ = false;
         return;
     }
-
-    register_robot_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
-    register_robot_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT32);
-    register_robot_inserter_.add_input_argument("robot capabilities", "robot_capabilities", UA_TYPES_STRING);
-    register_robot_inserter_.add_output_argument("capabilities received", "capabilities_received", UA_TYPES_BOOLEAN);
-    status = register_robot_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(REGISTER_ROBOT)), "register robot", register_robot, this);
+    /* Add register robot method node */
+    method_arguments register_robot_arguments;
+    register_robot_arguments.add_input_argument("the robot port", "robot_port", UA_TYPES_UINT16);
+    register_robot_arguments.add_input_argument("the robot position", "robot_position", UA_TYPES_UINT32);
+    register_robot_arguments.add_input_argument("the robot capabilities", "robot_capabilities", UA_TYPES_STRING);
+    register_robot_arguments.add_output_argument("indicates whether the capabilities are received", "capabilities_received", UA_TYPES_BOOLEAN);
+    status = controller_type_inserter_.add_method(CONTROLLER_TYPE, REGISTER_ROBOT, register_robot, register_robot_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the register robot method node");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, REGISTER_ROBOT);
         running_ = false;
         return;
     }
-
-    place_random_order_inserter_.add_output_argument("robot instructed", "robot_instructed", UA_TYPES_BOOLEAN);
-    status = place_random_order_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(PLACE_RANDOM_ORDER)), "place random order", place_random_order, this);
+    method_arguments place_random_order_arguments;
+    place_random_order_arguments.add_output_argument("indicates whether the robot is instructed", "robot_instructed", UA_TYPES_BOOLEAN);
+    status = controller_type_inserter_.add_method(CONTROLLER_TYPE, PLACE_RANDOM_ORDER, place_random_order, place_random_order_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error adding the place random order method node");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, PLACE_RANDOM_ORDER);
         running_ = false;
         return;
     }
-
+    /* Add controller type constructor */
+    controller_type_inserter_.add_object_type_constructor(server_, controller_type_inserter_.get_object_type_id(CONTROLLER_TYPE));
+    /* Instantiate controller type */
+    controller_type_inserter_.add_object_instance(INSTANCE_NAME, CONTROLLER_TYPE);
     /* Run the controller server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {

@@ -11,7 +11,7 @@
 #include <memory>
 #include <random>
 #include "node_value_subscriber.hpp"
-#include "node_ids.hpp"
+#include "browsenames.h"
 #include "method_node_caller.hpp"
 #include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
@@ -21,6 +21,7 @@
 #include "robot_state.hpp"
 #include "robot_tool.hpp"
 #include "session_id.hpp"
+#include "object_type_node_inserter.hpp"
 
 using namespace cps_kitchen;
 
@@ -208,13 +209,11 @@ private:
     /* controller related member variables */
     UA_Server* server_;
     port_t port_;
+    object_type_node_inserter controller_type_inserter_;
     volatile UA_Boolean running_;
     std::thread server_iterate_thread_;
     /* robot related member variables */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
-    method_node_inserter choose_next_robot_inserter_;
-    method_node_inserter register_robot_inserter_;
-    method_node_inserter place_random_order_inserter_;
     /* recipe related member variables */
     recipe_parser recipe_parser_;
     /* random distribution */

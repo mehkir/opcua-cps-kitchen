@@ -23,6 +23,8 @@
 #define FINISHED_ORDER_NOTIFICATION "FinishedOrderNotification"
 
 /* CONTROLLER */
+// object type node
+#define CONTROLLER_TYPE "ControllerType"
 // method nodes
 #define REGISTER_ROBOT "RegisterRobot"
 #define CHOOSE_NEXT_ROBOT "ChooseNextRobot"
