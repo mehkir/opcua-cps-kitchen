@@ -11,7 +11,7 @@
 #define DEBOUNCE_TIME 1LL
 #define MOVE_TIME 1LL
 
-conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), running_(true), state_status_(conveyor::state::IDLING) {
+conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), conveyor_type_inserter_(server_, CONVEYOR_TYPE), running_(true), state_status_(conveyor::state::IDLING) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
@@ -27,12 +27,14 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
         position_plate_id_map_[i] = i;
     }
 
-    receive_finished_order_notification_inserter_.add_input_argument("robot port", "robot_port", UA_TYPES_UINT16);
-    receive_finished_order_notification_inserter_.add_input_argument("robot position", "robot_position", UA_TYPES_UINT32);
-    receive_finished_order_notification_inserter_.add_output_argument("notification received", "notification_received", UA_TYPES_BOOLEAN);
-    status = receive_finished_order_notification_inserter_.add_method_node(server_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), "receive finished order notification", receive_finished_order_notification, this);
+    /* Add receive finished order notification method node*/
+    method_arguments receive_finished_order_notification_arguments;
+    receive_finished_order_notification_arguments.add_input_argument("the robot port", "robot_port", UA_TYPES_UINT16);
+    receive_finished_order_notification_arguments.add_input_argument("the robot position", "robot_position", UA_TYPES_UINT32);
+    receive_finished_order_notification_arguments.add_output_argument("the notification received", "notification_received", UA_TYPES_BOOLEAN);
+    status = conveyor_type_inserter_.add_method(CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION, receive_finished_order_notification, receive_finished_order_notification_arguments, this);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the receive finished order notification method node", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
         running_ = false;
         return;
     }

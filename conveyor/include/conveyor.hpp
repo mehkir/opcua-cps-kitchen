@@ -14,14 +14,12 @@
 #include <memory>
 #include <condition_variable>
 #include "method_node_caller.hpp"
-#include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
 #include "types.hpp"
-#include "node_ids.hpp"
-#include "information_node_inserter.hpp"
-#include "information_node_writer.hpp"
+#include "browsenames.h"
 #include "node_value_subscriber.hpp"
 #include "robot_tool.hpp"
+#include "object_type_node_inserter.hpp"
 
 using namespace cps_kitchen;
 
@@ -32,8 +30,6 @@ struct remote_robot {
         const position_t position_;
         bool running_;
         std::thread client_thread_;
-        method_node_caller handover_finished_order_caller_;
-        method_node_caller receive_robot_task_caller_;
         recipe_id_t recipe_id_;
         UA_UInt32 processed_steps_;
 
@@ -52,9 +48,6 @@ struct remote_robot {
                 running_ = false;
                 return;
             }
-
-            receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
-            receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
         }
 
         /**
@@ -112,7 +105,8 @@ struct remote_robot {
         void handover_finished_order(UA_ClientAsyncCallCallback _callback, void* _userdata) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d with port %d", position_, port_);
-            UA_StatusCode status = handover_finished_order_caller_.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(HANDOVER_FINISHED_ORDER)), _callback, _userdata);
+            method_node_caller handover_finished_order_caller;
+            UA_StatusCode status = handover_finished_order_caller.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(HANDOVER_FINISHED_ORDER)), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
@@ -132,7 +126,10 @@ struct remote_robot {
             recipe_id_ = _recipe_id;
             processed_steps_ = _processed_steps;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d after step %d", position_, port_, _recipe_id, _processed_steps);
-            UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, _userdata);
+            method_node_caller receive_robot_task_caller;
+            receive_robot_task_caller.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
+            receive_robot_task_caller.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
+            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
@@ -324,13 +321,13 @@ private:
     /* conveyor related member variables */
     UA_Server* server_;
     port_t port_;
+    object_type_node_inserter conveyor_type_inserter_;
     volatile UA_Boolean running_;
     state state_status_;
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
     std::mutex conveyor_mutex_;
     std::condition_variable condition_variable_;
-    method_node_inserter receive_finished_order_notification_inserter_;
     std::set<plate_id_t> occupied_plates_;
     std::set<position_t> retrievable_positions_;
     std::set<position_t> retrieved_positions_;

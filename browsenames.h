@@ -19,6 +19,8 @@
 #define CAPABILITIES "Capabilities"
 
 /* CONVEYOR */
+// object type node
+#define CONVEYOR_TYPE "ConveyorType"
 // method nodes
 #define FINISHED_ORDER_NOTIFICATION "FinishedOrderNotification"
 
