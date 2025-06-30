@@ -13,14 +13,11 @@
 #include "node_value_subscriber.hpp"
 #include "browsenames.h"
 #include "method_node_caller.hpp"
-#include "method_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
-#include "information_node_inserter.hpp"
 #include "types.hpp"
 #include "recipe_parser.hpp"
 #include "robot_state.hpp"
 #include "robot_tool.hpp"
-#include "session_id.hpp"
 #include "object_type_node_inserter.hpp"
 
 using namespace cps_kitchen;
@@ -36,9 +33,6 @@ struct remote_robot {
         duration_t overall_time_;
         bool running_;
         std::thread client_thread_;
-        method_node_caller receive_robot_task_caller_;
-        recipe_id_t recipe_id_;
-        UA_UInt32 processed_steps_;
 
     public:
         /**
@@ -55,10 +49,6 @@ struct remote_robot {
                 running_ = false;
                 return;
             }
-
-            receive_robot_task_caller_.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
-            receive_robot_task_caller_.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
-
             node_value_subscriber nv_subscriber;
             UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
@@ -161,10 +151,11 @@ struct remote_robot {
         void
         instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            recipe_id_ = _recipe_id;
-            processed_steps_ = _processed_steps;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d from step %d", position_, port_, _recipe_id, _processed_steps);
-            UA_StatusCode status = receive_robot_task_caller_.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, this);
+            method_node_caller receive_robot_task_caller;
+            receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
+            receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
+            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, this);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
