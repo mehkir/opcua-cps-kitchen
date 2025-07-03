@@ -7,7 +7,7 @@ node_browser::~node_browser() {
 }
 
 UA_NodeId
-node_browser::browse_object_type(UA_Client* _client, UA_NodeId _start_node_id, std::string _target_browsename) {
+node_browser::browse_object_type(UA_Client* _client, UA_NodeId _start_node_id, std::string _object_type_name) {
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _start_node_id;
@@ -22,8 +22,10 @@ node_browser::browse_object_type(UA_Client* _client, UA_NodeId _start_node_id, s
     for(size_t i = 0; i < bres.referencesSize; ++i) {
         const UA_ReferenceDescription *ref = &(bres.references[i]);
         std::string browse_name((char*) ref->browseName.name.data, ref->browseName.name.length);
-        if (!browse_name.compare(_target_browsename))
+        if (!browse_name.compare(_object_type_name)) {
             matching_node_id = ref->nodeId.nodeId;
+            break;
+        }
     }
 
     UA_BrowseResult_clear(&bres);

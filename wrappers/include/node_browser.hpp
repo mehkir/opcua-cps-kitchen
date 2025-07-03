@@ -16,10 +16,10 @@ public:
      * 
      * @param _client the client
      * @param _start_node_id the start node id
-     * @param _target_browsename the browse name of the object type
+     * @param _object_type_name the browse name of the object type
      * @return UA_NodeId the node id if object type is found, else UA_NODEID_NULL
      */
-    UA_NodeId browse_object_type(UA_Client* _client, UA_NodeId _start_node_id, std::string _target_browsename);
+    UA_NodeId browse_object_type(UA_Client* _client, UA_NodeId _start_node_id, std::string _object_type_name);
 
     /**
      * @brief Returns all object nodes under the objects folder
