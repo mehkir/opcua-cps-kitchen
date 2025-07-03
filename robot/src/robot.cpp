@@ -11,6 +11,7 @@
 #include "time_unit.hpp"
 #include "filtered_logger.hpp"
 #include "browsenames.h"
+#include "node_browser_helper.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
 #define RECIPE_PATH "recipes.json"
@@ -233,7 +234,13 @@ robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_p
     method_node_caller receive_finished_order_notification_caller;
     receive_finished_order_notification_caller.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
     receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-    UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), receive_finished_order_notification_called, this);
+    object_method_info omi = node_browser_helper().get_method_id(conveyor_client_, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
+    if (omi == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
+        running_ = false;
+        return;        
+    }
+    UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, receive_finished_order_notification_called, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification", __FUNCTION__);
         running_ = false;
@@ -427,7 +434,13 @@ robot::determine_next_action() {
             choose_next_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
             choose_next_robot_caller.add_scalar_input_argument(&recipe_id_in_process, UA_TYPES_UINT32);
             choose_next_robot_caller.add_scalar_input_argument(&processed_steps_of_recipe_id_in_process_, UA_TYPES_UINT32);
-            choose_next_robot_caller.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(CHOOSE_NEXT_ROBOT)), choose_next_robot_called, this);
+            object_method_info omi = node_browser_helper().get_method_id(controller_client_, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT);
+            if (omi == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
+                running_ = false;
+                return;        
+            }
+            choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, choose_next_robot_called, this);
             return;
         }
         robot_tool required_tool = robot_act.get_required_tool();
@@ -463,7 +476,13 @@ robot::determine_next_action() {
         method_node_caller receive_finished_order_notification_caller;
         receive_finished_order_notification_caller.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
         receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-        UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, UA_NODEID_STRING(1, const_cast<char*>(FINISHED_ORDER_NOTIFICATION)), receive_finished_order_notification_called, this);
+        object_method_info omi = node_browser_helper().get_method_id(conveyor_client_, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
+        if (omi == OBJECT_METHOD_INFO_NULL) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
+            running_ = false;
+            return;        
+        }
+        UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, receive_finished_order_notification_called, this);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification", __FUNCTION__);
             running_ = false;
@@ -598,8 +617,15 @@ robot::start() {
     UA_Variant capabilities;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
     register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);   
-    UA_StatusCode status = register_robot_caller.call_method_node(controller_client_, UA_NODEID_STRING(1, const_cast<char*>(REGISTER_ROBOT)), register_robot_called, this);
-    if(status != UA_STATUSCODE_GOOD) {
+    object_method_info omi = node_browser_helper().get_method_id(controller_client_, CONTROLLER_TYPE, REGISTER_ROBOT);
+    if (omi == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, REGISTER_ROBOT);
+        running_ = false;
+        join_threads();
+        return;        
+    }
+    UA_StatusCode status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, register_robot_called, this);
+    if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
         running_ = false;
     }
