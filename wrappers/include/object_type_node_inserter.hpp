@@ -190,9 +190,10 @@ class object_type_node_inserter {
          * @param _instance_name the instance name
          * @param _type_object_name the object type name
          * @param _parent_node_id the parent node id under which the instance will be added
+         * @param _reference_type the reference type this object is referenced by its parent node
          * @return UA_StatusCode the status code
          */
-        UA_StatusCode add_object_instance(const char* _instance_name, const char* _type_name, UA_NodeId _parent_node_id = UA_NS0ID(OBJECTSFOLDER));
+        UA_StatusCode add_object_instance(const char* _instance_name, const char* _type_name, UA_NodeId _parent_node_id = UA_NS0ID(OBJECTSFOLDER), UA_NodeId _reference_type = UA_NS0ID(ORGANIZES));
 
         /**
          * @brief Adds the object type constructor
@@ -207,8 +208,17 @@ class object_type_node_inserter {
          * @brief Returns the object type id by its name
          * 
          * @param _object_type_name the object's name
+         * @return UA_NodeId the object's node id
          */
         UA_NodeId get_object_type_id(std::string _object_type_name);
+
+        /**
+         * @brief Returns the instance id by its name
+         * 
+         * @param _instance_name the instance name
+         * @return UA_NodeId the instance's node id
+         */
+        UA_NodeId get_instance_id(std::string _instance_name);
 
         /**
          * @brief Sets the scalar attribute for the given instance

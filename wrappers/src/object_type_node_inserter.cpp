@@ -99,7 +99,7 @@ object_type_node_inserter::make_mandatory(UA_NodeId _node_id) {
 }
 
 UA_StatusCode
-object_type_node_inserter::add_object_instance(const char* _instance_name, const char* _object_type_name, UA_NodeId _parent_node_id) {
+object_type_node_inserter::add_object_instance(const char* _instance_name, const char* _object_type_name, UA_NodeId _parent_node_id, UA_NodeId _reference_type) {
     if (!has_object_type(std::string(_object_type_name))) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Unknown type name. Instance is not added");
         return UA_STATUSCODE_BAD;
@@ -108,7 +108,7 @@ object_type_node_inserter::add_object_instance(const char* _instance_name, const
     UA_ObjectAttributes object_attribute = UA_ObjectAttributes_default;
     object_attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_instance_name));
     UA_StatusCode status = UA_Server_addObjectNode(server_, UA_NODEID_NULL,
-                            _parent_node_id, UA_NS0ID(ORGANIZES),
+                            _parent_node_id, _reference_type,
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_instance_name)),
                             object_type_ids_[std::string(_object_type_name)],
                             object_attribute, NULL, &node_id);
@@ -163,11 +163,20 @@ object_type_node_inserter::add_object_type_constructor(UA_Server* _server, UA_No
 
 UA_NodeId
 object_type_node_inserter::get_object_type_id(std::string _object_type_name) {
-    UA_NodeId object_type_id = UA_NODEID_NUMERIC(0, 0);
+    UA_NodeId object_type_id = UA_NODEID_NULL;
     if (has_object_type(_object_type_name)) {
         object_type_id = object_type_ids_[_object_type_name];
     }
     return object_type_id;
+}
+
+UA_NodeId
+object_type_node_inserter::get_instance_id(std::string _instance_name) {
+    UA_NodeId instance_id = UA_NODEID_NULL;
+    if (has_instance(_instance_name)) {
+        instance_id = instance_ids_[_instance_name];
+    }
+    return instance_id;
 }
 
 bool
