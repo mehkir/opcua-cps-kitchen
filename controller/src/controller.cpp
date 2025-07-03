@@ -15,7 +15,6 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), c
         running_ = false;
         return;
     }
-
     /* Add choose next robot method node */
     method_arguments choose_next_robot_arguments;
     choose_next_robot_arguments.add_input_argument("the robot port", "robot_port", UA_TYPES_UINT16);
@@ -42,6 +41,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), c
         running_ = false;
         return;
     }
+    /* Add place random order method node */
     method_arguments place_random_order_arguments;
     place_random_order_arguments.add_output_argument("indicates whether the robot is instructed", "robot_instructed", UA_TYPES_BOOLEAN);
     status = controller_type_inserter_.add_method(CONTROLLER_TYPE, PLACE_RANDOM_ORDER, place_random_order, place_random_order_arguments, this);

@@ -19,6 +19,7 @@
 #include "robot_state.hpp"
 #include "robot_tool.hpp"
 #include "object_type_node_inserter.hpp"
+#include "node_browser_helper.hpp"
 
 using namespace cps_kitchen;
 
@@ -155,7 +156,13 @@ struct remote_robot {
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
-            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, this);
+            object_method_info omi = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK);
+            if (omi == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
+                running_ = false;
+                return;        
+            }
+            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _callback, this);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
