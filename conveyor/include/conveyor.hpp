@@ -1,6 +1,7 @@
 #ifndef CONVEYOR_HPP
 #define CONVEYOR_HPP
 
+#define PLATE_INSTANCE_NAME "KitchenPlate"
 #define OUTPUT_POSITION 0
 
 #include <open62541/server.h>
@@ -141,45 +142,49 @@ struct plate {
     private:
         const plate_id_t id_;
         position_t position_;
-        UA_Server* conveyor_;
         recipe_id_t placed_recipe_id_;
         UA_UInt32 processed_steps_of_placed_recipe_id_;
         UA_Boolean occupied_;
         remote_robot* target_robot_;
+        std::string instance_name_id_;
+        object_type_node_inserter& plate_type_inserter_;
     public:
+        /**
+         * @brief Setup the plate object type
+         * 
+         * @param _plate_type_inserter the plate type inserter
+         * @param _conveyor the conveyor server
+         * @return UA_StatusCode the status code
+         */
+        static UA_StatusCode setup_plate_object_type(object_type_node_inserter& _plate_type_inserter, UA_Server* _conveyor) {
+            UA_StatusCode status;
+            /* Add attributes */
+            status = _plate_type_inserter.add_attribute(PLATE_TYPE, PLATE_ID);
+            status |= _plate_type_inserter.add_attribute(PLATE_TYPE, PLATE_POSITION);
+            status |= _plate_type_inserter.add_attribute(PLATE_TYPE, PLATE_RECIPE_ID);
+            status |= _plate_type_inserter.add_attribute(PLATE_TYPE, PLATE_OCCUPIED);
+            /* Add plate type constructor */
+            status |= _plate_type_inserter.add_object_type_constructor(_conveyor, _plate_type_inserter.get_object_type_id(PLATE_TYPE));
+            return status;
+        }
+
         /**
          * @brief Construct a new plate object.
          * 
          * @param _id the plate id
          * @param _position the plate position
-         * @param _conveyor the reference to the conveyor 
+         * @param _conveyor_instance_id the conveyor instance id
+         * @param _plate_type_inserter the plate type inserter
          */
-        plate(plate_id_t _id, position_t _position, UA_Server* _conveyor) : id_(_id), position_(_position), conveyor_(_conveyor), placed_recipe_id_(0), processed_steps_of_placed_recipe_id_(0), occupied_(false), target_robot_(nullptr) {
-            information_node_inserter inserter;
-            std::string id_node_id = "plate_id_" + std::to_string(id_);
-            UA_StatusCode status = inserter.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(id_node_id.c_str())), "plate id", UA_TYPES_UINT32, const_cast<plate_id_t*>(&id_));
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate id information node", __FUNCTION__);
-            }
-
-            std::string position_node_id = "plate_position_" + std::to_string(id_);
-            status = inserter.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(position_node_id.c_str())), "plate position", UA_TYPES_UINT32, &position_);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate position information node", __FUNCTION__);
-            }
-
-            std::string placed_recipe_id_node_id = "plate_placed_recipe_id_" + std::to_string(id_);
-            status = inserter.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(placed_recipe_id_node_id.c_str())), "placed recipe id", UA_TYPES_UINT32, &placed_recipe_id_);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate placed recipe id information node", __FUNCTION__);
-            }
-
-            std::string occupied_id_node_id = "plate_occupied_" + std::to_string(id_);
-            status = inserter.add_scalar_node(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), "plate occupied status", UA_TYPES_BOOLEAN, &occupied_);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the plate occupied information node", __FUNCTION__);
-            }
-
+        plate(plate_id_t _id, position_t _position, UA_NodeId _conveyor_instance_id, object_type_node_inserter& _plate_type_inserter) : id_(_id), position_(_position), placed_recipe_id_(0),
+                processed_steps_of_placed_recipe_id_(0), occupied_(false), target_robot_(nullptr), instance_name_id_(std::string(PLATE_INSTANCE_NAME) + " " + std::to_string(id_)), plate_type_inserter_(_plate_type_inserter) {
+            /* Instantiate plate type */
+            plate_type_inserter_.add_object_instance(instance_name_id_.c_str(), PLATE_TYPE, _conveyor_instance_id, UA_NS0ID(HASCOMPONENT));
+            /* Set attribute values */
+            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_ID, const_cast<plate_id_t*>(&id_), UA_TYPES_UINT32);
+            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_POSITION, &position_, UA_TYPES_UINT32);
+            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_RECIPE_ID, &placed_recipe_id_, UA_TYPES_UINT32);
+            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_OCCUPIED, &occupied_, UA_TYPES_BOOLEAN);
         }
 
         /**
@@ -194,7 +199,8 @@ struct plate {
          * 
          * @param _plate 
          */
-        plate(const plate& _plate) : id_(_plate.id_), position_(_plate.position_), conveyor_(_plate.conveyor_), placed_recipe_id_(_plate.placed_recipe_id_), occupied_(_plate.occupied_) {
+        plate(const plate& _plate) : id_(_plate.id_), position_(_plate.position_), placed_recipe_id_(_plate.placed_recipe_id_), processed_steps_of_placed_recipe_id_(_plate.processed_steps_of_placed_recipe_id_),
+            occupied_(_plate.occupied_), target_robot_(_plate.target_robot_), instance_name_id_(_plate.instance_name_id_), plate_type_inserter_(_plate.plate_type_inserter_) {
         }
 
         /**
@@ -213,12 +219,7 @@ struct plate {
          */
         void set_position(position_t _position) {
             position_ = _position;
-            std::string position_node_id = "plate_position_" + std::to_string(id_);
-            information_node_writer position_writer;
-            UA_StatusCode status = position_writer.write_value(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(position_node_id.c_str())), &position_, &UA_TYPES[UA_TYPES_UINT32]);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Plate position write failed", __FUNCTION__);
-            }
+            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_POSITION, &position_, UA_TYPES_UINT32);
         }
 
         /**
@@ -237,12 +238,7 @@ struct plate {
          */
         void place_recipe_id(recipe_id_t _placed_recipe_id) {
             placed_recipe_id_ = _placed_recipe_id;
-            std::string placed_recipe_id_node_id = "plate_placed_recipe_id_" + std::to_string(id_);
-            information_node_writer placed_recipe_id_writer;
-            UA_StatusCode status = placed_recipe_id_writer.write_value(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(placed_recipe_id_node_id.c_str())), &placed_recipe_id_, &UA_TYPES[UA_TYPES_UINT32]);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Plate placed recipe write failed", __FUNCTION__);
-            }
+            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_RECIPE_ID, &placed_recipe_id_, UA_TYPES_UINT32);
         }
 
         /**
@@ -292,12 +288,7 @@ struct plate {
          */
         void set_occupied(UA_Boolean _occupied) {
             occupied_ = _occupied;
-            std::string occupied_id_node_id = "plate_occupied_" + std::to_string(id_);
-            information_node_writer occupied_writer;
-            UA_StatusCode status = occupied_writer.write_value(conveyor_, UA_NODEID_STRING(1, const_cast<char*>(occupied_id_node_id.c_str())), &occupied_, &UA_TYPES[UA_TYPES_BOOLEAN]);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Plate occupied write failed", __FUNCTION__);
-            }
+            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_OCCUPIED, &occupied_, UA_TYPES_BOOLEAN);
         }
 
         /**
@@ -322,6 +313,7 @@ private:
     UA_Server* server_;
     port_t port_;
     object_type_node_inserter conveyor_type_inserter_;
+    object_type_node_inserter plate_type_inserter_;
     volatile UA_Boolean running_;
     state state_status_;
     std::vector<plate> plates_;

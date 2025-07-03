@@ -8,10 +8,11 @@
 #include "time_unit.hpp"
 #include "filtered_logger.hpp"
 
+#define CONVEYOR_INSTANCE_NAME "KitchenConveyor"
 #define DEBOUNCE_TIME 1LL
 #define MOVE_TIME 1LL
 
-conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), conveyor_type_inserter_(server_, CONVEYOR_TYPE), running_(true), state_status_(conveyor::state::IDLING) {
+conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE), running_(true), state_status_(conveyor::state::IDLING) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
     if(status != UA_STATUSCODE_GOOD) {
@@ -20,13 +21,6 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
         return;
     }
     *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
-
-    /* Setup plates */
-    for (size_t i = 0; i < _robot_count+1; i++) {
-        plates_.push_back(plate(i,i, server_));
-        position_plate_id_map_[i] = i;
-    }
-
     /* Add receive finished order notification method node*/
     method_arguments receive_finished_order_notification_arguments;
     receive_finished_order_notification_arguments.add_input_argument("the robot port", "robot_port", UA_TYPES_UINT16);
@@ -38,7 +32,16 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
         running_ = false;
         return;
     }
-
+    /* Add conveyor type constructor */
+    conveyor_type_inserter_.add_object_type_constructor(server_, conveyor_type_inserter_.get_object_type_id(CONVEYOR_TYPE));
+    /* Instantiate conveyor type */
+    conveyor_type_inserter_.add_object_instance(CONVEYOR_INSTANCE_NAME, CONVEYOR_TYPE);
+    /* Setup plates */
+    plate::setup_plate_object_type(plate_type_inserter_, server_);
+    for (size_t i = 0; i < _robot_count+1; i++) {
+        plates_.push_back(plate(i,i, conveyor_type_inserter_.get_instance_id(CONVEYOR_INSTANCE_NAME), plate_type_inserter_));
+        position_plate_id_map_[i] = i;
+    }
     /* Run the conveyor server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {

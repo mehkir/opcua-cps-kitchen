@@ -21,6 +21,13 @@
 /* CONVEYOR */
 // object type node
 #define CONVEYOR_TYPE "ConveyorType"
+#define PLATE_TYPE "PlateType"
+// plate information nodes
+#define PLATE_ID "Id"
+#define PLATE_POSITION "Position"
+#define PLATE_RECIPE_ID "RecipeId"
+#define PLATE_OCCUPIED "Occupied"
+
 // method nodes
 #define FINISHED_ORDER_NOTIFICATION "FinishedOrderNotification"
 
