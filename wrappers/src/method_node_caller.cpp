@@ -42,9 +42,9 @@ method_node_caller::add_input_argument(UA_Variant& _input_argument, bool _copy) 
 }
 
 UA_StatusCode
-method_node_caller::call_method_node(UA_Client* _client, UA_NodeId _method_node_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
+method_node_caller::call_method_node(UA_Client* _client, UA_NodeId _object_id, UA_NodeId _method_id, UA_ClientAsyncCallCallback _callback, void* _userdata) {
     UA_StatusCode status_code = UA_STATUSCODE_BAD;
-    status_code = UA_Client_call_async(_client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), _method_node_id, input_arguments_.size(), input_arguments_.data(), _callback, _userdata, NULL);
+    status_code = UA_Client_call_async(_client, _object_id, _method_id, input_arguments_.size(), input_arguments_.data(), _callback, _userdata, NULL);
     return status_code;
 }
 

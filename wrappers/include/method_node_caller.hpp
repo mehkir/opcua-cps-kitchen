@@ -19,7 +19,7 @@ public:
     add_array_input_argument(void* _argument_value, size_t _array_size, UA_UInt32 _type_index, bool _copy = false);
 
     UA_StatusCode
-    call_method_node(UA_Client* _client, UA_NodeId _method_node_id, UA_ClientAsyncCallCallback _callback, void* _userdata);
+    call_method_node(UA_Client* _client, UA_NodeId _object_id, UA_NodeId _method_id, UA_ClientAsyncCallCallback _callback, void* _userdata);
 
 private:
     void
