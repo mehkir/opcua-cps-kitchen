@@ -215,7 +215,7 @@ object_type_node_inserter::find_child_node_id(std::string _instance_name, const 
         return UA_STATUSCODE_BAD;
     }
     _node_id = bpr.targets[0].targetId.nodeId;
-    UA_BrowsePathResult_clear(&bpr); // NOTE: may be a problem if node identifier is not numeric
+    UA_BrowsePathResult_clear(&bpr); // NOTE: may be a problem if node identifier is not numeric(?)
     return UA_STATUSCODE_GOOD;
 }
 
