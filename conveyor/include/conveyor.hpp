@@ -21,6 +21,7 @@
 #include "node_value_subscriber.hpp"
 #include "robot_tool.hpp"
 #include "object_type_node_inserter.hpp"
+#include "node_browser_helper.hpp"
 
 using namespace cps_kitchen;
 
@@ -107,7 +108,13 @@ struct remote_robot {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d with port %d", position_, port_);
             method_node_caller handover_finished_order_caller;
-            UA_StatusCode status = handover_finished_order_caller.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(HANDOVER_FINISHED_ORDER)), _callback, _userdata);
+            object_method_info omi = node_browser_helper().get_method_id(client_, ROBOT_TYPE, HANDOVER_FINISHED_ORDER);
+            if (omi == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, HANDOVER_FINISHED_ORDER);
+                running_ = false;
+                return;        
+            }
+            UA_StatusCode status = handover_finished_order_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
@@ -130,7 +137,13 @@ struct remote_robot {
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
-            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, UA_NODEID_STRING(1, const_cast<char*>(RECEIVE_TASK)), _callback, _userdata);
+            object_method_info omi = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK);
+            if (omi == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
+                running_ = false;
+                return;        
+            }
+            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _callback, _userdata);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
