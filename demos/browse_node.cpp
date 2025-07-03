@@ -49,6 +49,43 @@ void browse_objects(UA_Client* _client, UA_BrowseResult& _browse_result) {
     _browse_result = UA_Client_browse(_client, NULL, 0, &bd);
 }
 
+void browse_methods(UA_Client* _client, UA_NodeId _instance_id, UA_BrowseResult& _browse_result) {
+    UA_BrowseDescription bd;
+    UA_BrowseDescription_init(&bd);
+    bd.nodeId = _instance_id;
+    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
+    bd.includeSubtypes = true;
+    bd.nodeClassMask = UA_NODECLASS_METHOD;
+    bd.resultMask = UA_BROWSERESULTMASK_ALL;
+    _browse_result = UA_Client_browse(_client, NULL, 0, &bd);
+}
+
+void browse_objects(UA_Client* _client, UA_NodeId _instance_id, UA_BrowseResult& _browse_result) {
+    UA_BrowseDescription bd;
+    UA_BrowseDescription_init(&bd);
+    bd.nodeId = _instance_id;
+    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
+    bd.includeSubtypes = true;
+    bd.nodeClassMask = UA_NODECLASS_OBJECT;
+    bd.resultMask = UA_BROWSERESULTMASK_ALL;
+    _browse_result = UA_Client_browse(_client, NULL, 0, &bd);
+}
+
+void browse_attributes(UA_Client* _client, UA_NodeId _instance_id, UA_BrowseResult& _browse_result) {
+    UA_BrowseDescription bd;
+    UA_BrowseDescription_init(&bd);
+    bd.nodeId = _instance_id;
+    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
+    bd.includeSubtypes = true;
+    bd.nodeClassMask = UA_NODECLASS_VARIABLE;
+    bd.resultMask = UA_BROWSERESULTMASK_ALL;
+    _browse_result = UA_Client_browse(_client, NULL, 0, &bd);
+}
+
+/* Returns the node id of the instance if its type definition equals the target type */
 UA_NodeId browse_instance(UA_Client* _client, UA_NodeId _start_node_id, UA_NodeId _target_type_node_id) {
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
@@ -78,31 +115,80 @@ int main(int argc, char* argv[]) {
 
     UA_Client* client = UA_Client_new();
     client_connection_establisher con_estab;
-    UA_SessionState session_state = con_estab.establish_connection(client, 5000);
+    UA_SessionState session_state = con_estab.establish_connection(client, 6000);
     if (session_state != UA_SESSIONSTATE_ACTIVATED) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session", __FUNCTION__);
         running = false;
         return UA_STATUSCODE_BAD;
     }
-
-    UA_NodeId node_id = browse_object_type(client, UA_NS0ID(BASEOBJECTTYPE), "ControllerType");
-    std::cout << "ControllerType Node id(" << node_id.namespaceIndex << "," << node_id.identifier.numeric << ")" << std::endl;
-
-    UA_BrowseResult browse_result;
-    browse_objects(client, browse_result);
-
-    for (size_t i = 0; i < browse_result.referencesSize; i++) {
-        const UA_ReferenceDescription* reference_description = &browse_result.references[i];
-        UA_NodeId instance_node_id = browse_instance(client, reference_description->nodeId.nodeId, node_id);
-        if (!UA_NodeId_equal(&instance_node_id, &UA_NODEID_NULL)) {
-            UA_QualifiedName instance_browse_name;
-            UA_Client_readBrowseNameAttribute(client, instance_node_id, &instance_browse_name);
-            std::string bm((char*) instance_browse_name.name.data, instance_browse_name.name.length);
-            std::cout << bm << " Node id(" << instance_node_id.namespaceIndex << "," << instance_node_id.identifier.numeric << ")" << std::endl;
+    /* Check if server has object type definition*/
+    std::string target_browse_name("ConveyorType");
+    UA_NodeId object_type_id = browse_object_type(client, UA_NS0ID(BASEOBJECTTYPE), target_browse_name);
+    std::cout << target_browse_name << " " << "Node id(" << object_type_id.namespaceIndex << "," << object_type_id.identifier.numeric << ")" << std::endl;
+    /* Filter objects which equal the type definition */
+    UA_BrowseResult browse_objects_result;
+    browse_objects(client, browse_objects_result);
+    for (size_t i = 0; i < browse_objects_result.referencesSize; i++) {
+        const UA_ReferenceDescription* reference_description = &browse_objects_result.references[i];
+        if (UA_NodeId_equal(&reference_description->typeDefinition.nodeId, &object_type_id)) {
+            UA_QualifiedName instance_browse_name = reference_description->browseName;
+            std::string bn((char*) instance_browse_name.name.data, instance_browse_name.name.length);
+            std::cout << bn << " Node id(" << reference_description->nodeId.nodeId.namespaceIndex << "," << reference_description->nodeId.nodeId.identifier.numeric << ")" << std::endl;
+            /* Browse methods */
+            UA_BrowseResult browse_methods_result;
+            browse_methods(client, reference_description->nodeId.nodeId, browse_methods_result);
+            for (size_t i = 0; i < browse_methods_result.referencesSize; i++) {
+                const UA_ReferenceDescription* reference_description = &browse_methods_result.references[i];
+                UA_QualifiedName method_browse_name = reference_description->browseName;
+                std::string bn((char*) method_browse_name.name.data, method_browse_name.name.length);
+                std::cout << "\t" << bn << " Node id(" << reference_description->nodeId.nodeId.namespaceIndex << "," << reference_description->nodeId.nodeId.identifier.numeric << ")" << std::endl;
+            }
+            UA_BrowseResult_clear(&browse_methods_result);
+            /* Browse attributes */
+            UA_BrowseResult browse_attributes_result;
+            browse_attributes(client, reference_description->nodeId.nodeId, browse_attributes_result);
+            for (size_t i = 0; i < browse_attributes_result.referencesSize; i++) {
+                const UA_ReferenceDescription* reference_description = &browse_attributes_result.references[i];
+                UA_QualifiedName attribute_browse_name = reference_description->browseName;
+                std::string bn((char*) attribute_browse_name.name.data, attribute_browse_name.name.length);
+                std::cout << "\t" << bn << " Node id(" << reference_description->nodeId.nodeId.namespaceIndex << "," << reference_description->nodeId.nodeId.identifier.numeric << ")" << std::endl;
+            }
+            UA_BrowseResult_clear(&browse_attributes_result);
+            /* Browse object attributes */
+            UA_BrowseResult browse_object_attributes_result;
+            browse_objects(client, reference_description->nodeId.nodeId, browse_object_attributes_result);
+            for (size_t i = 0; i < browse_object_attributes_result.referencesSize; i++) {
+                const UA_ReferenceDescription* reference_description = &browse_object_attributes_result.references[i];
+                UA_QualifiedName object_browse_name = reference_description->browseName;
+                std::string bn((char*) object_browse_name.name.data, object_browse_name.name.length);
+                std::cout << "\t" << bn << " Node id(" << reference_description->nodeId.nodeId.namespaceIndex << "," << reference_description->nodeId.nodeId.identifier.numeric << ")" << std::endl;
+                /* Browse methods */
+                UA_BrowseResult browse_methods_result;
+                browse_methods(client, reference_description->nodeId.nodeId, browse_methods_result);
+                for (size_t i = 0; i < browse_methods_result.referencesSize; i++) {
+                    const UA_ReferenceDescription* reference_description = &browse_methods_result.references[i];
+                    UA_QualifiedName method_browse_name = reference_description->browseName;
+                    std::string bn((char*) method_browse_name.name.data, method_browse_name.name.length);
+                    std::cout << "\t" << bn << " Node id(" << reference_description->nodeId.nodeId.namespaceIndex << "," << reference_description->nodeId.nodeId.identifier.numeric << ")" << std::endl;
+                }
+                UA_BrowseResult_clear(&browse_methods_result);
+                /* Browse attributes */
+                UA_BrowseResult browse_attributes_result;
+                browse_attributes(client, reference_description->nodeId.nodeId, browse_attributes_result);
+                for (size_t i = 0; i < browse_attributes_result.referencesSize; i++) {
+                    const UA_ReferenceDescription* reference_description = &browse_attributes_result.references[i];
+                    UA_QualifiedName attribute_browse_name = reference_description->browseName;
+                    std::string bn((char*) attribute_browse_name.name.data, attribute_browse_name.name.length);
+                    std::cout << "\t" << bn << " Node id(" << reference_description->nodeId.nodeId.namespaceIndex << "," << reference_description->nodeId.nodeId.identifier.numeric << ")" << std::endl;
+                }
+                UA_BrowseResult_clear(&browse_attributes_result);
+            }
+            
+            UA_BrowseResult_clear(&browse_object_attributes_result);
+            
         }
     }
-
-    UA_BrowseResult_clear(&browse_result);
+    UA_BrowseResult_clear(&browse_objects_result);
     UA_Client_delete(client);
     return 0;
 }
