@@ -33,8 +33,8 @@ int main(int argc, char* argv[]) {
     cc->securityMode = UA_MESSAGESECURITYMODE_NONE;
     cc->timeout = 1000;
 
-    client_connection_establisher con_estab;
-    con_estab.establish_connection(client, 4000);
+    client_connection_establisher con_estab(client);
+    con_estab.establish_connection("opc.tcp://localhost:" + std::to_string(4000));
 
     UA_UInt32 sample_data = 12345;
 

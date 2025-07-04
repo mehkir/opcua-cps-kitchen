@@ -27,8 +27,9 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, stopHandler);
 
     UA_Client* client = UA_Client_new();
-    client_connection_establisher con_estab;
-    con_estab.establish_connection(client, 4840);
+    client_connection_establisher con_estab(client);
+    bool connected = con_estab.establish_connection("opc.tcp://localhost:" + std::to_string(4840));
+    running = connected;
 
     UA_UInt32 sample_data = 12345;
 

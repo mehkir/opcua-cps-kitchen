@@ -43,9 +43,9 @@ struct remote_robot {
          * @param _position the position of the remote robot
          */
         remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), running_(true) {
-            client_connection_establisher robot_client_connection_establisher;
-            UA_SessionState session_state = robot_client_connection_establisher.establish_connection(client_, port_);
-            if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+            client_connection_establisher robot_client_connection_establisher(client_);
+            bool connected = robot_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(port_));
+            if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session");
                 running_ = false;
                 return;

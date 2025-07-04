@@ -120,9 +120,9 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         return;
     }
     /* Setup controller client */
-    client_connection_establisher controller_client_connection_establisher;
-    UA_SessionState controller_session_state = controller_client_connection_establisher.establish_connection(controller_client_, _controller_port);
-    if (controller_session_state != UA_SESSIONSTATE_ACTIVATED) {
+    client_connection_establisher controller_client_connection_establisher(controller_client_);
+    bool connected = controller_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(_controller_port));
+    if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing controller client session", __FUNCTION__);
         running_ = false;
         return;
@@ -138,9 +138,9 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     });
 
     /* Setup conveyor client */
-    client_connection_establisher conveyor_client_connection_establisher;
-    UA_SessionState conveyor_session_state = conveyor_client_connection_establisher.establish_connection(conveyor_client_, _conveyor_port);
-    if (conveyor_session_state != UA_SESSIONSTATE_ACTIVATED) {
+    client_connection_establisher conveyor_client_connection_establisher(conveyor_client_);
+    connected = conveyor_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(_conveyor_port));
+    if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing conveyor client session", __FUNCTION__);
         running_ = false;
         return;
