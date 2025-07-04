@@ -126,7 +126,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing controller client session", __FUNCTION__);
         running_ = false;
         return;
-    }     
+    }
     controller_client_iterate_thread_ = std::thread([this]() {
         while(running_) {
             UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
@@ -234,7 +234,9 @@ robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_p
     method_node_caller receive_finished_order_notification_caller;
     receive_finished_order_notification_caller.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
     receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-    object_method_info omi = node_browser_helper().get_method_id(conveyor_client_, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
+    UA_ClientConfig* conveyor_config = UA_Client_getConfig(conveyor_client_);
+    std::string conveyor_endpoint((char*) conveyor_config->endpointUrl.data, conveyor_config->endpointUrl.length);
+    object_method_info omi = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
     if (omi == OBJECT_METHOD_INFO_NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
         running_ = false;
@@ -434,7 +436,9 @@ robot::determine_next_action() {
             choose_next_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
             choose_next_robot_caller.add_scalar_input_argument(&recipe_id_in_process, UA_TYPES_UINT32);
             choose_next_robot_caller.add_scalar_input_argument(&processed_steps_of_recipe_id_in_process_, UA_TYPES_UINT32);
-            object_method_info omi = node_browser_helper().get_method_id(controller_client_, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT);
+            UA_ClientConfig* controller_config = UA_Client_getConfig(controller_client_);
+            std::string controller_endpoint((char*) controller_config->endpointUrl.data, controller_config->endpointUrl.length);
+            object_method_info omi = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT);
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
                 running_ = false;
@@ -476,7 +480,9 @@ robot::determine_next_action() {
         method_node_caller receive_finished_order_notification_caller;
         receive_finished_order_notification_caller.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
         receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-        object_method_info omi = node_browser_helper().get_method_id(conveyor_client_, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
+        UA_ClientConfig* conveyor_config = UA_Client_getConfig(conveyor_client_);
+        std::string conveyor_endpoint((char*) conveyor_config->endpointUrl.data, conveyor_config->endpointUrl.length);
+        object_method_info omi = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
         if (omi == OBJECT_METHOD_INFO_NULL) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
             running_ = false;
@@ -616,8 +622,10 @@ robot::start() {
     register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
     UA_Variant capabilities;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
-    register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);   
-    object_method_info omi = node_browser_helper().get_method_id(controller_client_, CONTROLLER_TYPE, REGISTER_ROBOT);
+    register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
+    UA_ClientConfig* controller_config = UA_Client_getConfig(controller_client_);
+    std::string controller_endpoint((char*) controller_config->endpointUrl.data, controller_config->endpointUrl.length);
+    object_method_info omi = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, REGISTER_ROBOT);
     if (omi == OBJECT_METHOD_INFO_NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, REGISTER_ROBOT);
         running_ = false;
