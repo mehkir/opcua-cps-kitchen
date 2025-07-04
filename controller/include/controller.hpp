@@ -50,15 +50,30 @@ struct remote_robot {
                 running_ = false;
                 return;
             }
-            node_value_subscriber nv_subscriber;
-            UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(OVERALL_TIME)), overall_time_changed, this);
-            if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to remote robot's overall time at position %d", position_);
+            UA_NodeId overall_time_id;
+            overall_time_id = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, OVERALL_TIME);
+            if (UA_NodeId_equal(&overall_time_id, &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, OVERALL_TIME);
                 running_ = false;
+                return;
             }
-            status = nv_subscriber.subscribe_node_value(client_, UA_NODEID_STRING(1, const_cast<char*>(LAST_EQUIPPED_TOOL)), last_equipped_tool_changed, this);
+            node_value_subscriber nv_subscriber;
+            UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, overall_time_id, overall_time_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error subscribing to remote robot's last equipped tool at position %d", position_);
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, OVERALL_TIME, position_);
+                running_ = false;
+                return;
+            }
+            UA_NodeId last_equipped_tool_id;
+            last_equipped_tool_id = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, LAST_EQUIPPED_TOOL);
+            if (UA_NodeId_equal(&last_equipped_tool_id, &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, LAST_EQUIPPED_TOOL);
+                running_ = false;
+                return;
+            }
+            status = nv_subscriber.subscribe_node_value(client_, last_equipped_tool_id, last_equipped_tool_changed, this);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, LAST_EQUIPPED_TOOL, position_);
                 running_ = false;
             }
         }
