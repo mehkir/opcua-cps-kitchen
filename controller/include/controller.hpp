@@ -171,7 +171,9 @@ struct remote_robot {
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
-            object_method_info omi = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK);
+            UA_ClientConfig* remote_robot_config = UA_Client_getConfig(client_);
+            std::string remote_robot_endpoint((char*) remote_robot_config->endpointUrl.data, remote_robot_config->endpointUrl.length);
+            object_method_info omi = node_browser_helper().get_method_id(remote_robot_endpoint, ROBOT_TYPE, RECEIVE_TASK);
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 running_ = false;
@@ -192,7 +194,7 @@ struct remote_robot {
                     return;
                 }
                 remote_robot* self = static_cast<remote_robot*>(_mon_context);
-                if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT64])) {
+                if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
                     return;
                 }
