@@ -51,6 +51,26 @@ public:
      * @return UA_NodeId the attribute id
      */
     UA_NodeId get_attribute_id(UA_Client* _client, std::string _object_type_name, std::string _attribute_name);
+
+        /**
+     * @brief Returns the method and object id of the first instance with the given object type
+     * 
+     * @param _server_endpoint the server endpoint
+     * @param _object_type_name the object type browsename
+     * @param _method_name the method browsename
+     * @return object_method_info the node id of the instance and method if found, else UA_NODEID_NULL for both
+     */
+    object_method_info get_method_id(std::string _server_endpoint, std::string _object_type_name, std::string _method_name);
+
+    /**
+     * @brief Returns the attribute id of the first instance with the given object type
+     * 
+     * @param _server_endpoint the server endpoint
+     * @param _object_type_name the object type browsename
+     * @param _attribute_name the attribute browsename
+     * @return UA_NodeId the attribute id
+     */
+    UA_NodeId get_attribute_id(std::string _server_endpoint, std::string _object_type_name, std::string _attribute_name);
 };
 
 #endif // NODE_BROWSER_HELPER_HPP

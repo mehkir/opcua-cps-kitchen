@@ -1,5 +1,6 @@
 #include "../include/node_browser_helper.hpp"
 #include "../include/node_browser.hpp"
+#include "../include/client_connection_establisher.hpp"
 
 node_browser_helper::node_browser_helper() {
 }
@@ -76,4 +77,33 @@ node_browser_helper::get_attribute_id(UA_Client* _client, std::string _object_ty
     }
     UA_BrowseResult_clear(&browse_objects_result);
     return attribute_id;
+}
+
+object_method_info
+node_browser_helper::get_method_id(std::string _server_endpoint, std::string _object_type_name, std::string _method_name) {
+    UA_Client* client = UA_Client_new();
+    client_connection_establisher cce(client);
+    bool connected = cce.establish_connection(_server_endpoint);
+    if (!connected) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session to endpoint %s", __FUNCTION__, _server_endpoint.c_str());
+        return OBJECT_METHOD_INFO_NULL;
+    }
+    object_method_info omi = get_method_id(client, _object_type_name, _method_name);
+    UA_Client_delete(client);
+    return omi;
+}
+
+
+UA_NodeId
+node_browser_helper::get_attribute_id(std::string _server_endpoint, std::string _object_type_name, std::string _attribute_name) {
+    UA_Client* client = UA_Client_new();
+    client_connection_establisher cce(client);
+    bool connected = cce.establish_connection(_server_endpoint);
+    if (!connected) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session to endpoint %s", __FUNCTION__, _server_endpoint.c_str());
+        return UA_NODEID_NULL;
+    }
+    UA_NodeId node_id = get_attribute_id(client, _object_type_name, _attribute_name);
+    UA_Client_delete(client);
+    return node_id;
 }
