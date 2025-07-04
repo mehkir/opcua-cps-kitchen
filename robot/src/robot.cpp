@@ -30,7 +30,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         running_ = false;
         return;
     }
-    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add attributes */
     robot_type_inserter_.add_attribute(ROBOT_TYPE, RECIPE_ID);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, DISH_NAME);

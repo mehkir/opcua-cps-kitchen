@@ -19,7 +19,7 @@ UA_SessionState client_connection_establisher::establish_connection(UA_Client* _
     UA_ClientConfig_setDefault(client_config);
     client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
     client_config->timeout = 1000;
-    *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    // *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     std::string server_endpoint = "opc.tcp://localhost:" + std::to_string(_server_port);
 
     /* Connect to a server */

@@ -20,7 +20,7 @@ conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new
         running_ = false;
         return;
     }
-    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add receive finished order notification method node*/
     method_arguments receive_finished_order_notification_arguments;
     receive_finished_order_notification_arguments.add_input_argument("the robot port", "robot_port", UA_TYPES_UINT16);
