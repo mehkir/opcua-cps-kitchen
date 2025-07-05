@@ -5,8 +5,12 @@ method_node_inserter::method_node_inserter() : is_method_node_added_(false) {
 }
 
 method_node_inserter::~method_node_inserter() {
-    input_arguments_.clear();
-    output_arguments_.clear();
+    for (UA_Argument& input_argument: input_arguments_) {
+        UA_Argument_clear(&input_argument);
+    }
+    for (UA_Argument& output_argument: output_arguments_) {
+        UA_Argument_clear(&output_argument);
+    }
 }
 
 void method_node_inserter::add_input_argument(std::string _description, std::string _name, UA_UInt32 _type_index) {
@@ -15,8 +19,8 @@ void method_node_inserter::add_input_argument(std::string _description, std::str
     }
     UA_Argument input_argument;
     UA_Argument_init(&input_argument);
-    input_argument.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
-    input_argument.name = UA_STRING(const_cast<char*>(_name.c_str()));
+    input_argument.description = UA_LOCALIZEDTEXT_ALLOC(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
+    input_argument.name = UA_STRING_ALLOC(const_cast<char*>(_name.c_str()));
     input_argument.dataType = UA_TYPES[_type_index].typeId;
     input_argument.valueRank = UA_VALUERANK_ANY;
     input_arguments_.push_back(input_argument);
@@ -28,8 +32,8 @@ void method_node_inserter::add_output_argument(std::string _description, std::st
     }
     UA_Argument output_argument;
     UA_Argument_init(&output_argument);
-    output_argument.description = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
-    output_argument.name = UA_STRING(const_cast<char*>(_name.c_str()));
+    output_argument.description = UA_LOCALIZEDTEXT_ALLOC(const_cast<char*>("en-US"), const_cast<char*>(_description.c_str()));
+    output_argument.name = UA_STRING_ALLOC(const_cast<char*>(_name.c_str()));
     output_argument.dataType = UA_TYPES[_type_index].typeId;
     output_argument.valueRank = UA_VALUERANK_ANY;
     output_arguments_.push_back(output_argument);
@@ -38,7 +42,7 @@ void method_node_inserter::add_output_argument(std::string _description, std::st
 UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_NodeId _method_node_id, std::string _browse_name, UA_MethodCallback _method_callback, void* _node_context) {
     UA_StatusCode status_code = UA_STATUSCODE_BAD;
     if (is_method_node_added_) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Method node already added");
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Method node already added");
         return status_code;
     }
     method_attributes_ = UA_MethodAttributes_default;
