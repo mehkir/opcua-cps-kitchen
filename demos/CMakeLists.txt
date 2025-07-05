@@ -40,3 +40,11 @@ target_include_directories(client_discovery_lookup PUBLIC ${PROJECT_BINARY_DIR} 
 add_executable(client_discovery_lookup_minimal client_discovery_lookup_minimal.c)
 target_link_libraries(client_discovery_lookup_minimal PUBLIC open62541)
 target_include_directories(client_discovery_lookup_minimal PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR})
+
+add_executable(server_method server_method.cpp)
+target_link_libraries(server_method PUBLIC wrappers_lib open62541)
+target_include_directories(server_method PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
+
+add_executable(client_call_method client_call_method.cpp)
+target_link_libraries(client_call_method PUBLIC wrappers_lib open62541)
+target_include_directories(client_call_method PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)
