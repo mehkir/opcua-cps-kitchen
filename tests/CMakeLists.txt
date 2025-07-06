@@ -8,3 +8,7 @@ target_include_directories(recipe_testframe PUBLIC ${PROJECT_BINARY_DIR} ${PROJE
 
 add_executable(session_id_testframe session_id_testframe.cpp)
 target_include_directories(session_id_testframe PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR})
+
+add_executable(test_now_monotonic test_now_monotonic.cpp)
+target_link_libraries(test_now_monotonic PUBLIC wrappers_lib open62541)
+target_include_directories(test_now_monotonic PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/wrappers/include)

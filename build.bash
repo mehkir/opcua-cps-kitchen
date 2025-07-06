@@ -15,6 +15,7 @@ $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/de
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target server_method -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target client_call_method -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/tests --config Release --target information_node_tester -- -j$(nproc)
+$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/tests --config Release --target test_now_monotonic -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_robot_instance -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_controller_instance -- -j$(nproc)
 $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target start_conveyor_instance -- -j$(nproc)
