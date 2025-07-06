@@ -3,6 +3,15 @@ project(opcua_cps_kitchen)
 
 set(CMAKE_CXX_STANDARD 26)
 
+# Choose your version with a variable
+set(OPEN62541_VERSION "1.4.12")
+set(OPEN62541_DIR "${CMAKE_SOURCE_DIR}/deps/open62541-${OPEN62541_VERSION}")
+
+include_directories("${OPEN62541_DIR}/include")
+include_directories("${OPEN62541_DIR}/src_generated")
+include_directories("${OPEN62541_DIR}/plugins/include")
+link_directories("${OPEN62541_DIR}/lib")
+
 add_subdirectory(statistics)
 add_subdirectory(wrappers)
 add_subdirectory(demos)
