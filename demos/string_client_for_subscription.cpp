@@ -27,9 +27,13 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, stopHandler);
 
     UA_Client* client = UA_Client_new();
+    std::string server_endpoint = "opc.tcp://localhost:" + std::to_string(4840);
     client_connection_establisher con_estab(client);
-    bool connected = con_estab.establish_connection("opc.tcp://localhost:" + std::to_string(4840));
-    running = connected;
+    bool connected = con_estab.establish_connection(server_endpoint);
+    if (!connected) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Connection server endpoint %s failed", server_endpoint.c_str());
+        return EXIT_FAILURE;
+    }
 
     UA_UInt32 sample_data = 12345;
 
@@ -41,5 +45,5 @@ int main(int argc, char* argv[]) {
             running = false;
         }
     }
-    return 0;
+    return EXIT_SUCCESS;
 }

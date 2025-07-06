@@ -97,10 +97,16 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     UA_String ua_capabilities[capabilities.size()];
     int i = 0;
     for (std::string capability : capabilities) {
-        ua_capabilities[i] = UA_STRING(const_cast<char*>(capability.c_str()));
+        UA_String_init(&(ua_capabilities[i]));
+        UA_String tmp = UA_STRING(const_cast<char*>(capability.c_str()));
+        UA_String_copy(&tmp, &(ua_capabilities[i]));
         i++;
     }
     robot_type_inserter_.set_array_attribute(INSTANCE_NAME, CAPABILITIES, ua_capabilities, capabilities.size(), UA_TYPES_STRING);
+    for (size_t i = 0; i < capabilities.size(); i++) {
+        UA_String_clear(&(ua_capabilities[i]));
+    }
+    
     /* Run the robot server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
