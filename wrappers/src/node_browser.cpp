@@ -1,4 +1,5 @@
 #include "../include/node_browser.hpp"
+#include "../include/client_browse.h"
 
 node_browser::node_browser(/* args */) {
 }
@@ -11,7 +12,7 @@ node_browser::browse_object_type(UA_Client* _client, UA_NodeId _start_node_id, s
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _start_node_id;
-    bd.referenceTypeId = UA_NS0ID(HASSUBTYPE);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASSUBTYPE);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_OBJECTTYPE;
@@ -36,8 +37,8 @@ void
 node_browser::browse_objects(UA_Client* _client, UA_BrowseResult& _browse_result) {
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
-    bd.nodeId = UA_NS0ID(OBJECTSFOLDER);
-    bd.referenceTypeId = UA_NS0ID(ORGANIZES);
+    bd.nodeId = UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_OBJECT;
@@ -50,7 +51,7 @@ node_browser::browse_methods(UA_Client* _client, UA_NodeId _instance_id, UA_Brow
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _instance_id;
-    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_METHOD;
@@ -63,7 +64,7 @@ node_browser::browse_objects(UA_Client* _client, UA_NodeId _instance_id, UA_Brow
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _instance_id;
-    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_OBJECT;
@@ -76,7 +77,7 @@ node_browser::browse_attributes(UA_Client* _client, UA_NodeId _instance_id, UA_B
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _instance_id;
-    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_VARIABLE;

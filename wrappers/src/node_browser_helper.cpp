@@ -12,7 +12,7 @@ object_method_info
 node_browser_helper::get_method_id(UA_Client* _client, std::string _object_type_name, std::string _method_name) {
     object_method_info omi;
     node_browser nb;
-    UA_NodeId object_type_id = nb.browse_object_type(_client, UA_NS0ID(BASEOBJECTTYPE), _object_type_name);
+    UA_NodeId object_type_id = nb.browse_object_type(_client, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE), _object_type_name);
     if (UA_NodeId_equal(&object_type_id, &UA_NODEID_NULL)) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
         return omi;
@@ -48,7 +48,7 @@ UA_NodeId
 node_browser_helper::get_attribute_id(UA_Client* _client, std::string _object_type_name, std::string _attribute_name) {
     UA_NodeId attribute_id = UA_NODEID_NULL;
     node_browser nb;
-    UA_NodeId object_type_id = nb.browse_object_type(_client, UA_NS0ID(BASEOBJECTTYPE), _object_type_name);
+    UA_NodeId object_type_id = nb.browse_object_type(_client, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE), _object_type_name);
     if (UA_NodeId_equal(&object_type_id, &UA_NODEID_NULL)) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
         return attribute_id;

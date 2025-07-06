@@ -13,12 +13,54 @@ static void stopHandler(int sig) {
     running = false;
 }
 
+/* Convenience method copied from v1.4.12 */
+UA_BrowseResult
+UA_Client_browse(UA_Client *client, const UA_ViewDescription *view,
+                 UA_UInt32 requestedMaxReferencesPerNode,
+                 const UA_BrowseDescription *nodesToBrowse) {
+    UA_BrowseResult res;
+    UA_BrowseRequest request;
+    UA_BrowseResponse response;
+    UA_StatusCode retval = UA_STATUSCODE_GOOD;
+    if(!nodesToBrowse) {
+        retval = UA_STATUSCODE_BADINTERNALERROR;
+        goto error;
+    }
+
+    /* Set up the request */
+    UA_BrowseRequest_init(&request);
+    if(view)
+        request.view = *view;
+    request.requestedMaxReferencesPerNode = requestedMaxReferencesPerNode;
+    request.nodesToBrowse = (UA_BrowseDescription*)(uintptr_t)nodesToBrowse;
+    request.nodesToBrowseSize = 1;
+
+    /* Call the service */
+    response = UA_Client_Service_browse(client, request);
+    retval = response.responseHeader.serviceResult;
+    if(retval == UA_STATUSCODE_GOOD && response.resultsSize != 1)
+        retval = UA_STATUSCODE_BADUNEXPECTEDERROR;
+    if(UA_StatusCode_isBad(retval))
+        goto error;
+
+    /* Return the result */
+    res = response.results[0];
+    response.resultsSize = 0;
+    UA_BrowseResponse_clear(&response);
+    return res;
+
+ error:
+    UA_BrowseResponse_clear(&response);
+    UA_BrowseResult_init(&res);
+    res.statusCode = retval;
+    return res;
+}
 
 UA_NodeId browse_object_type(UA_Client* _client, UA_NodeId _start_node_id, std::string _target_browsename) {
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _start_node_id;
-    bd.referenceTypeId = UA_NS0ID(HASSUBTYPE);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASSUBTYPE);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_OBJECTTYPE;
@@ -40,8 +82,8 @@ UA_NodeId browse_object_type(UA_Client* _client, UA_NodeId _start_node_id, std::
 void browse_objects(UA_Client* _client, UA_BrowseResult& _browse_result) {
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
-    bd.nodeId = UA_NS0ID(OBJECTSFOLDER);
-    bd.referenceTypeId = UA_NS0ID(ORGANIZES);
+    bd.nodeId = UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_OBJECT;
@@ -53,7 +95,7 @@ void browse_methods(UA_Client* _client, UA_NodeId _instance_id, UA_BrowseResult&
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _instance_id;
-    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_METHOD;
@@ -65,7 +107,7 @@ void browse_objects(UA_Client* _client, UA_NodeId _instance_id, UA_BrowseResult&
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _instance_id;
-    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_OBJECT;
@@ -77,7 +119,7 @@ void browse_attributes(UA_Client* _client, UA_NodeId _instance_id, UA_BrowseResu
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _instance_id;
-    bd.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.nodeClassMask = UA_NODECLASS_VARIABLE;
@@ -90,7 +132,7 @@ UA_NodeId browse_instance(UA_Client* _client, UA_NodeId _start_node_id, UA_NodeI
     UA_BrowseDescription bd;
     UA_BrowseDescription_init(&bd);
     bd.nodeId = _start_node_id;
-    bd.referenceTypeId = UA_NS0ID(HASTYPEDEFINITION);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASTYPEDEFINITION);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
     bd.resultMask = UA_BROWSERESULTMASK_ALL;
@@ -123,7 +165,7 @@ int main(int argc, char* argv[]) {
     }
     /* Check if server has object type definition*/
     std::string target_browse_name("ConveyorType");
-    UA_NodeId object_type_id = browse_object_type(client, UA_NS0ID(BASEOBJECTTYPE), target_browse_name);
+    UA_NodeId object_type_id = browse_object_type(client, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE), target_browse_name);
     std::cout << target_browse_name << " " << "Node id(" << object_type_id.namespaceIndex << "," << object_type_id.identifier.numeric << ")" << std::endl;
     /* Filter objects which equal the type definition */
     UA_BrowseResult browse_objects_result;

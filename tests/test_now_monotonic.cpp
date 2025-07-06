@@ -30,8 +30,8 @@ int main(int argc, char* argv[]) {
 
     callback_scheduler cs(server, callback_method, NULL, NULL);
     UA_DateTime now = UA_DateTime_nowMonotonic();
-    cs.schedule_from_now(now + UA_DATETIME_SEC);
-    // cs.schedule_from_now_relative(1000);
+    // cs.schedule_from_now(now + UA_DATETIME_SEC);
+    cs.schedule_from_now_relative(1000);
 
     /* Run the server loop */
     status = UA_Server_run(server, &running);

@@ -7,7 +7,7 @@ object_type_node_inserter::object_type_node_inserter(UA_Server* _server, const c
     UA_ObjectTypeAttributes attribute = UA_ObjectTypeAttributes_default;
     attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_parent_object_type_name));
     status = UA_Server_addObjectTypeNode(server_, UA_NODEID_NULL,
-                                UA_NS0ID(BASEOBJECTTYPE), UA_NS0ID(HASSUBTYPE),
+                                UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE), UA_NODEID_NUMERIC(0, UA_NS0ID_HASSUBTYPE),
                                 UA_QUALIFIEDNAME(1, const_cast<char*>(_parent_object_type_name)), attribute,
                                 NULL, &parent_object_type_id);
     if (status != UA_STATUSCODE_GOOD) {
@@ -31,9 +31,9 @@ object_type_node_inserter::add_attribute(std::string _parent_object_type_name, c
     attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_attribute_name));
     UA_NodeId attribute_id;
     UA_StatusCode status = UA_Server_addVariableNode(server_, UA_NODEID_NULL, object_type_ids_[_parent_object_type_name],
-                            UA_NS0ID(HASCOMPONENT),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_attribute_name)),
-                            UA_NS0ID(BASEDATAVARIABLETYPE),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_BASEDATAVARIABLETYPE),
                             attribute, NULL, &attribute_id);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Adding attribute node %s failed", _attribute_name);
@@ -57,7 +57,7 @@ object_type_node_inserter::add_method(std::string _parent_object_type_name, cons
     method_attributes.userExecutable = true;
     UA_NodeId method_id;
     UA_StatusCode status = UA_Server_addMethodNode(server_, UA_NODEID_NULL, object_type_ids_[_parent_object_type_name],
-                            UA_NS0ID(HASCOMPONENT),
+                            UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT),
                             UA_QUALIFIEDNAME(1, const_cast<char*>(_method_name)),
                             method_attributes, _method_callback,
                             _method_arguments.get_input_arguments().size(), _method_arguments.get_input_arguments().data(),
@@ -76,7 +76,7 @@ object_type_node_inserter::add_object_sub_type(const char* _object_type_name) {
     UA_NodeId object_type_id;
     UA_ObjectTypeAttributes object_type_attribute = UA_ObjectTypeAttributes_default;
     object_type_attribute.displayName = UA_LOCALIZEDTEXT(const_cast<char*>("en-US"), const_cast<char*>(_object_type_name));
-    UA_StatusCode status = UA_Server_addObjectTypeNode(server_, UA_NODEID_NULL, parent_object_type_id_, UA_NS0ID(HASSUBTYPE),
+    UA_StatusCode status = UA_Server_addObjectTypeNode(server_, UA_NODEID_NULL, parent_object_type_id_, UA_NODEID_NUMERIC(0, UA_NS0ID_HASSUBTYPE),
                                 UA_QUALIFIEDNAME(1, const_cast<char*>(_object_type_name)), object_type_attribute,
                                 NULL, &object_type_id);
     if (status != UA_STATUSCODE_GOOD) {
@@ -89,8 +89,8 @@ object_type_node_inserter::add_object_sub_type(const char* _object_type_name) {
 
 UA_StatusCode
 object_type_node_inserter::make_mandatory(UA_NodeId _node_id) {
-    UA_StatusCode status = UA_Server_addReference(server_, _node_id, UA_NS0ID(HASMODELLINGRULE),
-                           UA_NS0EXID(MODELLINGRULE_MANDATORY), true);
+    UA_StatusCode status = UA_Server_addReference(server_, _node_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASMODELLINGRULE),
+                           UA_EXPANDEDNODEID_NUMERIC(0, UA_NS0ID_MODELLINGRULE_MANDATORY), true);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Making attribute/method node mandatory failed");
         return status;
@@ -130,7 +130,7 @@ object_type_node_inserter::object_type_constructor(UA_Server* _server,
     UA_BrowseDescription_init(&bd);
     bd.browseDirection = UA_BROWSEDIRECTION_FORWARD;
     bd.includeSubtypes = true;
-    bd.referenceTypeId = UA_NS0ID(HASTYPEDEFINITION);
+    bd.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASTYPEDEFINITION);
     bd.resultMask = UA_BROWSERESULTMASK_DISPLAYNAME;
     bd.nodeId = *_node_id;
     bd.nodeClassMask = UA_NODECLASS_OBJECTTYPE;
@@ -198,7 +198,7 @@ object_type_node_inserter::find_child_node_id(std::string _instance_name, const 
 
     UA_RelativePathElement rpe;
     UA_RelativePathElement_init(&rpe);
-    rpe.referenceTypeId = UA_NS0ID(HASCOMPONENT);
+    rpe.referenceTypeId = UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT);
     rpe.isInverse = false;
     rpe.includeSubtypes = false;
     rpe.targetName = UA_QUALIFIEDNAME(1, const_cast<char*>(_child_name));

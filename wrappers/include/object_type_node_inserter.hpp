@@ -193,7 +193,7 @@ class object_type_node_inserter {
          * @param _reference_type the reference type this object is referenced by its parent node
          * @return UA_StatusCode the status code
          */
-        UA_StatusCode add_object_instance(const char* _instance_name, const char* _type_name, UA_NodeId _parent_node_id = UA_NS0ID(OBJECTSFOLDER), UA_NodeId _reference_type = UA_NS0ID(ORGANIZES));
+        UA_StatusCode add_object_instance(const char* _instance_name, const char* _type_name, UA_NodeId _parent_node_id = UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NodeId _reference_type = UA_NODEID_NUMERIC(0, UA_NS0ID_ORGANIZES));
 
         /**
          * @brief Adds the object type constructor
