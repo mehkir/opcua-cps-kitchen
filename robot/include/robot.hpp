@@ -12,6 +12,7 @@
 #include "recipe_parser.hpp"
 #include "capability_parser.hpp"
 #include "object_type_node_inserter.hpp"
+#include "node_browser_helper.hpp"
 
 using namespace cps_kitchen;
 
@@ -56,6 +57,7 @@ private:
     std::thread server_iterate_thread_;
     recipe_parser recipe_parser_;
     capability_parser capability_parser_;
+    std::unordered_map<std::string, object_method_info> method_id_map_;
     /* controller related member variables */
     UA_Client* controller_client_;
     std::thread controller_client_iterate_thread_;
