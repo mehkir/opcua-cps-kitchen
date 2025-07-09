@@ -247,44 +247,41 @@ controller::handle_random_order_request(UA_Variant* _output) {
     recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
     remote_robot* next_suitable_robot = find_suitable_robot(recipe_id, 0);
     if (next_suitable_robot != NULL) {
-        next_suitable_robot->instruct(recipe_id, 0, receive_robot_task_called);
+        UA_Variant* output;
+        size_t output_size;
+        UA_StatusCode status = next_suitable_robot->instruct(recipe_id, 0, &output_size, &output);
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling instruct on remote robot failed", __FUNCTION__);
+            instructed = false;
+            UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
+            return;
+        }
+        receive_robot_task_called(output_size, output);
         instructed = true;
     }
-    UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);   
+    UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
 
 void
-controller::receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+controller::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_userdata == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
-        return;
-    }
-
-    response_checker response(_response);
-    UA_StatusCode status_code = response.get_service_result();
-    if(status_code != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
-        return;
-    }
-
-    if(response.get_output_arguments_size(0) != 3) {
+    if(_output_size != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         return;
     }
 
-    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
-      || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT16])
+      || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])
+      || !UA_Variant_hasScalarType(&_output[2], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
 
-    port_t remote_robot_port = *(port_t*) response.get_data(0,0);
-    position_t remote_robot_position = *(position_t*) response.get_data(0,1);
-    UA_Boolean result = *(position_t*) response.get_data(0,2);
+    port_t remote_robot_port = *(port_t*) _output[0].data;
+    position_t remote_robot_position = *(position_t*) _output[1].data;
+    UA_Boolean result = *(position_t*) _output[2].data;
 
-    remote_robot* robot = static_cast<remote_robot*>(_userdata);
+    remote_robot* robot = position_remote_robot_map_[remote_robot_position].get();
     // Sanity check
     if(robot->get_port() != remote_robot_port || robot->get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on <port,position>. Received<%d,%d>, actually<%d,%d>", __FUNCTION__, remote_robot_port, remote_robot_position, robot->get_port(), robot->get_position());

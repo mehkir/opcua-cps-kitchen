@@ -25,7 +25,8 @@ using namespace cps_kitchen;
 
 struct remote_robot {
     private:
-        UA_Client* client_;
+        UA_Client* async_client_;
+        UA_Client* sync_client_;
         const port_t port_;
         const position_t position_;
         std::unordered_set<std::string> capabilities_;
@@ -44,40 +45,51 @@ struct remote_robot {
          * @param _port the port of the remote robot
          * @param _position the position of the remote robot at the conveyor
          */
-        remote_robot(port_t _port, position_t _position, std::unordered_set<std::string> _capabilities) :  port_(_port), position_(_position), capabilities_(_capabilities), client_(UA_Client_new()), running_(true) {
-            client_connection_establisher robot_client_connection_establisher(client_);
-            bool connected = robot_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(port_));
+        remote_robot(port_t _port, position_t _position, std::unordered_set<std::string> _capabilities) :  port_(_port), position_(_position), capabilities_(_capabilities), async_client_(UA_Client_new()), sync_client_(UA_Client_new()), running_(true) {
+            std::string robot_server_endpoint = "opc.tcp://localhost:" + std::to_string(port_);
+            client_connection_establisher cce_async(async_client_);
+            bool connected = cce_async.establish_connection(robot_server_endpoint);
             if (!connected) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d", position_);
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d (async)", position_);
                 running_ = false;
                 return;
             }
-            attribute_id_map_[OVERALL_TIME] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, OVERALL_TIME);
+            attribute_id_map_[OVERALL_TIME] = node_browser_helper().get_attribute_id(async_client_, ROBOT_TYPE, OVERALL_TIME);
             if (UA_NodeId_equal(&attribute_id_map_[OVERALL_TIME], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, OVERALL_TIME);
                 running_ = false;
                 return;
             }
             node_value_subscriber nv_subscriber;
-            UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[OVERALL_TIME], overall_time_changed, this);
+            UA_StatusCode status = nv_subscriber.subscribe_node_value(async_client_, attribute_id_map_[OVERALL_TIME], overall_time_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, OVERALL_TIME, position_);
                 running_ = false;
                 return;
             }
-            attribute_id_map_[LAST_EQUIPPED_TOOL] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, LAST_EQUIPPED_TOOL);
+            attribute_id_map_[LAST_EQUIPPED_TOOL] = node_browser_helper().get_attribute_id(async_client_, ROBOT_TYPE, LAST_EQUIPPED_TOOL);
             if (UA_NodeId_equal(&attribute_id_map_[LAST_EQUIPPED_TOOL], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, LAST_EQUIPPED_TOOL);
                 running_ = false;
                 return;
             }
-            status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[LAST_EQUIPPED_TOOL], last_equipped_tool_changed, this);
+            status = nv_subscriber.subscribe_node_value(async_client_, attribute_id_map_[LAST_EQUIPPED_TOOL], last_equipped_tool_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, LAST_EQUIPPED_TOOL, position_);
                 running_ = false;
+                return;
             }
-
-            method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK);
+            client_connection_establisher cce_sync(sync_client_);
+            connected = cce_sync.establish_connection(robot_server_endpoint);
+            if (!connected) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d (sync)", position_);
+                running_ = false;
+                return;
+            }
+            if ((method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(sync_client_, ROBOT_TYPE, RECEIVE_TASK)) == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
+                running_ = false;
+            }
         }
 
         /**
@@ -88,7 +100,8 @@ struct remote_robot {
             running_ = false;
             if (client_thread_.joinable())
                 client_thread_.join();
-            UA_Client_delete(client_);
+            UA_Client_delete(async_client_);
+            UA_Client_delete(sync_client_);
         }
         
         /**
@@ -98,7 +111,7 @@ struct remote_robot {
         void start_thread() {
             client_thread_ = std::thread([this]() {
                 while(running_) {
-                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
+                    UA_StatusCode status = UA_Client_run_iterate(async_client_, 100);
                     if (status != UA_STATUSCODE_GOOD) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running robot client");
                         running_ = false;
@@ -166,8 +179,8 @@ struct remote_robot {
          * @param _processed_steps the processed steps of the recipe ID so far
          * @param _callback the callback called after the robot is instructed
          */
-        void
-        instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback) {
+        UA_StatusCode
+        instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d from step %d", position_, port_, _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
@@ -177,13 +190,15 @@ struct remote_robot {
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 running_ = false;
-                return;        
+                return UA_STATUSCODE_BAD;
             }
-            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _callback, this);
+            UA_StatusCode status = receive_robot_task_caller.call_method_node(sync_client_, omi.object_id_, omi.method_id_, _output_size, _output);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
                 running_ = false;
+                return UA_STATUSCODE_BAD;
             }
+            return status;
         }
 
         static void
@@ -350,15 +365,13 @@ private:
     handle_random_order_request(UA_Variant* _output);
 
     /**
-     * @brief Callback called after robot is instructed. Extracts the returned robot state parameters.
+     * @brief Extracts the returned robot state parameters.
      * 
-     * @param _client the client instance from which this method is called
-     * @param _userdata the userdata passed to the instruct call
-     * @param _request_id 
-     * @param _response the pointer to the returned parameters
+     * @param _output_size the count of returned output values
+     * @param _output the variant containing the output values
      */
-    static void
-    receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+    void
+    receive_robot_task_called(size_t _output_size, UA_Variant* _output);
 
     /**
      * @brief Joins all started threads.
