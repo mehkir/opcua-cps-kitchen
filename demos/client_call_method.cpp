@@ -28,7 +28,7 @@ int main(int argc, char* argv[]) {
 
     method_node_caller mnc;
     UA_Variant* output;
-    size_t output_size = 1;
+    size_t output_size;
     UA_StatusCode status = mnc.call_method_node(client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_STRING(0,const_cast<char*>("server_method")), &output_size, &output);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling server method failed", __FUNCTION__);
