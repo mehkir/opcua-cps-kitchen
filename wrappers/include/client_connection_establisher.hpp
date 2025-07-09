@@ -9,7 +9,7 @@ class client_connection_establisher {
 private:
     UA_Client* client_;
 public:
-    client_connection_establisher(UA_Client* _client);
+    client_connection_establisher(UA_Client*& _client);
     ~client_connection_establisher();
     bool establish_connection(std::string _server_endpoint);
 };

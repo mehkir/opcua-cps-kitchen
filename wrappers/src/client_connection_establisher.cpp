@@ -6,7 +6,7 @@
 
 #define TIMEOUT 10
 
-client_connection_establisher::client_connection_establisher(UA_Client* _client) : client_(_client) {
+client_connection_establisher::client_connection_establisher(UA_Client*& _client) : client_(_client) {
 }
 
 client_connection_establisher::~client_connection_establisher() {
