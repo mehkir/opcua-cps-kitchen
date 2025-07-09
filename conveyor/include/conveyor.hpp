@@ -30,6 +30,7 @@ struct remote_robot {
         UA_Client* client_;
         const port_t port_;
         const position_t position_;
+        std::unordered_map<std::string, object_method_info> method_id_map_;
         bool running_;
         std::thread client_thread_;
         recipe_id_t recipe_id_;
@@ -50,6 +51,8 @@ struct remote_robot {
                 running_ = false;
                 return;
             }
+            method_id_map_[HANDOVER_FINISHED_ORDER] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, HANDOVER_FINISHED_ORDER);
+            method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK);
         }
 
         /**
@@ -108,9 +111,7 @@ struct remote_robot {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d with port %d", position_, port_);
             method_node_caller handover_finished_order_caller;
-            UA_ClientConfig* remote_robot_config = UA_Client_getConfig(client_);
-            std::string remote_robot_endpoint((char*) remote_robot_config->endpointUrl.data, remote_robot_config->endpointUrl.length);
-            object_method_info omi = node_browser_helper().get_method_id(remote_robot_endpoint, ROBOT_TYPE, HANDOVER_FINISHED_ORDER);
+            object_method_info omi = method_id_map_[HANDOVER_FINISHED_ORDER];
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, HANDOVER_FINISHED_ORDER);
                 running_ = false;
@@ -139,9 +140,7 @@ struct remote_robot {
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
-            UA_ClientConfig* remote_robot_config = UA_Client_getConfig(client_);
-            std::string remote_robot_endpoint((char*) remote_robot_config->endpointUrl.data, remote_robot_config->endpointUrl.length);
-            object_method_info omi = node_browser_helper().get_method_id(remote_robot_endpoint, ROBOT_TYPE, RECEIVE_TASK);
+            object_method_info omi = method_id_map_[RECEIVE_TASK];
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 running_ = false;
