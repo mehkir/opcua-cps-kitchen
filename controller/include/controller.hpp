@@ -177,7 +177,10 @@ struct remote_robot {
          * 
          * @param _recipe_id the recipe ID of the dish
          * @param _processed_steps the processed steps of the recipe ID so far
-         * @param _callback the callback called after the robot is instructed
+         * @param _output_size the count of returned output values
+         * @param _output the variant containing the output values
+         * 
+         * @return UA_StatusCode the status whether the method call was successful
          */
         UA_StatusCode
         instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
@@ -265,7 +268,7 @@ private:
      * @param _input the input pointer of the input parameters
      * @param _output_size the allocated output size
      * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode 
+     * @return UA_StatusCode the status whether the registration was successful
      */
     static UA_StatusCode
     register_robot(UA_Server* _server,
@@ -300,7 +303,7 @@ private:
      * @param _input the input pointer of the input parameters
      * @param _output_size the allocated output size
      * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode 
+     * @return UA_StatusCode the status whether a suitable robot was found
      */
     static UA_StatusCode
     choose_next_robot(UA_Server* _server,
@@ -346,7 +349,7 @@ private:
      * @param _input the input pointer of the input parameters
      * @param _output_size the allocated output size
      * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode 
+     * @return UA_StatusCode TODO
      */
     static UA_StatusCode
     place_random_order(UA_Server* _server,
