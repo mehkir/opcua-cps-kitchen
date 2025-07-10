@@ -33,8 +33,6 @@ struct remote_robot {
         std::unordered_map<std::string, object_method_info> method_id_map_;
         bool running_;
         std::thread client_thread_;
-        recipe_id_t recipe_id_;
-        UA_UInt32 processed_steps_;
 
     public:
         /**
@@ -134,12 +132,10 @@ struct remote_robot {
          */
         void instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback, void* _userdata) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            recipe_id_ = _recipe_id;
-            processed_steps_ = _processed_steps;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d after step %d", position_, port_, _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
-            receive_robot_task_caller.add_scalar_input_argument(&recipe_id_, UA_TYPES_UINT32);
-            receive_robot_task_caller.add_scalar_input_argument(&processed_steps_, UA_TYPES_UINT32);
+            receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
+            receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
             object_method_info omi = method_id_map_[RECEIVE_TASK];
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
