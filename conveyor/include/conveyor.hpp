@@ -31,8 +31,6 @@ struct remote_robot {
         const port_t port_;
         const position_t position_;
         std::unordered_map<std::string, object_method_info> method_id_map_;
-        bool running_;
-        std::thread client_thread_;
 
     public:
         /**
@@ -41,12 +39,11 @@ struct remote_robot {
          * @param _port the port of the remote robot
          * @param _position the position of the remote robot
          */
-        remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()), running_(true) {
+        remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()) {
             client_connection_establisher robot_client_connection_establisher(client_);
             bool connected = robot_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(port_));
             if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session");
-                running_ = false;
                 return;
             }
             method_id_map_[HANDOVER_FINISHED_ORDER] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, HANDOVER_FINISHED_ORDER);
@@ -58,26 +55,7 @@ struct remote_robot {
          * 
          */
         ~remote_robot() {
-            running_ = false;
-            if (client_thread_.joinable())
-                client_thread_.join();
             UA_Client_delete(client_);
-        }
-
-        /**
-         * @brief Starts the housekeeping thread
-         * 
-         */
-        void start_thread() {
-            client_thread_ = std::thread([this]() {
-                while(running_) {
-                    UA_StatusCode status = UA_Client_run_iterate(client_, 100);
-                    if (status != UA_STATUSCODE_GOOD) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running robot client");
-                        running_ = false;
-                    }
-                }
-            });
         }
 
         /**
@@ -102,24 +80,25 @@ struct remote_robot {
         /**
          * @brief Notifies the robot to hand over the finished order
          * 
-         * @param _callback the callback called after the robot is notified to hand over the finished order
-         * @param _userdata the conveyor client
+         * @param _output_size the count of returned output values
+         * @param _output the variant containing the output values
+         * 
+         * @return UA_StatusCode the status whether the method call was successful
          */
-        void handover_finished_order(UA_ClientAsyncCallCallback _callback, void* _userdata) {
+        UA_StatusCode handover_finished_order(size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d with port %d", position_, port_);
             method_node_caller handover_finished_order_caller;
             object_method_info omi = method_id_map_[HANDOVER_FINISHED_ORDER];
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, HANDOVER_FINISHED_ORDER);
-                running_ = false;
-                return;        
+                return UA_STATUSCODE_BAD;
             }
-            UA_StatusCode status = handover_finished_order_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _callback, _userdata);
+            UA_StatusCode status = handover_finished_order_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
-                running_ = false;
             }
+            return status;
         }
 
         /**
@@ -127,10 +106,12 @@ struct remote_robot {
          * 
          * @param _recipe_id the recipe ID of the dish
          * @param _processed_steps the processed steps of the recipe ID so far
-         * @param _callback the callback called after the robot is instructed
-         * @param _userdata the conveyor client
+         * @param _output_size the count of returned output values
+         * @param _output the variant containing the output values
+         * 
+         * @return UA_StatusCode the status whether the method call was successful
          */
-        void instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_ClientAsyncCallCallback _callback, void* _userdata) {
+        UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d after step %d", position_, port_, _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
@@ -139,14 +120,13 @@ struct remote_robot {
             object_method_info omi = method_id_map_[RECEIVE_TASK];
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
-                running_ = false;
-                return;        
+                return UA_STATUSCODE_BAD;
             }
-            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _callback, _userdata);
+            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
-                running_ = false;
             }
+            return status;
         }
 };
 
@@ -191,12 +171,19 @@ struct plate {
         plate(plate_id_t _id, position_t _position, UA_NodeId _conveyor_instance_id, object_type_node_inserter& _plate_type_inserter) : id_(_id), position_(_position), placed_recipe_id_(0),
                 processed_steps_of_placed_recipe_id_(0), occupied_(false), target_robot_(nullptr), instance_name_id_(std::string(PLATE_INSTANCE_NAME) + " " + std::to_string(id_)), plate_type_inserter_(_plate_type_inserter) {
             /* Instantiate plate type */
-            plate_type_inserter_.add_object_instance(instance_name_id_.c_str(), PLATE_TYPE, _conveyor_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+            UA_StatusCode status = plate_type_inserter_.add_object_instance(instance_name_id_.c_str(), PLATE_TYPE, _conveyor_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding plate object instance");
+                return;
+            }
             /* Set attribute values */
-            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_ID, const_cast<plate_id_t*>(&id_), UA_TYPES_UINT32);
-            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_POSITION, &position_, UA_TYPES_UINT32);
-            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_RECIPE_ID, &placed_recipe_id_, UA_TYPES_UINT32);
-            plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_OCCUPIED, &occupied_, UA_TYPES_BOOLEAN);
+            status = plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_ID, const_cast<plate_id_t*>(&id_), UA_TYPES_UINT32);
+            status |= plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_POSITION, &position_, UA_TYPES_UINT32);
+            status |= plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_RECIPE_ID, &placed_recipe_id_, UA_TYPES_UINT32);
+            status |= plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_OCCUPIED, &occupied_, UA_TYPES_BOOLEAN);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting plate attributes");
+            }
         }
 
         /**
@@ -330,13 +317,7 @@ private:
     state state_status_;
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
-    std::mutex conveyor_mutex_;
-    std::condition_variable condition_variable_;
     std::set<plate_id_t> occupied_plates_;
-    std::set<position_t> retrievable_positions_;
-    std::set<position_t> retrieved_positions_;
-    std::set<position_t> deliverable_positions_;
-    std::set<position_t> delivered_positions_;
     std::unordered_map<position_t, plate_id_t> position_plate_id_map_;
     std::unordered_map<position_t, port_t> notifications_map_;
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
@@ -448,15 +429,13 @@ private:
     perform_movement(UA_Server* _server, void* _data);
 
     /**
-     * @brief Callback called after robot is instructed. Extracts the returned robot state parameters.
+     * @brief Extracts the returned robot state parameters and updates plates
      * 
-     * @param _client the client instance from which this method is called
-     * @param _userdata the userdata passed to the instruct call
-     * @param _request_id 
-     * @param _response the pointer to the returned parameters
+     * @param _output_size the count of returned output values
+     * @param _output the variant containing the output values
      */
-    static void
-    receive_robot_task_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+    void
+    receive_robot_task_called(size_t _output_size, UA_Variant* _output);
 
     /**
      * @brief Timed callback to call determine_next_movement.
