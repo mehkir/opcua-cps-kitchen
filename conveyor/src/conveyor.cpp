@@ -122,7 +122,7 @@ conveyor::retrieve_finished_orders(UA_Server* _server, void* _data) {
 
 void
 conveyor::handle_retrieve_finished_orders() {
-    for (auto notification = notifications_map_.begin(); notification != notifications_map_.end(); notification++) {
+    for (auto notification = notifications_map_.begin(); notification != notifications_map_.end();) {
         if (!plates_[position_plate_id_map_[notification->first]].is_occupied()){
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: Dish at position %d is retrievable", notification->first);
             size_t output_size;
@@ -134,7 +134,9 @@ conveyor::handle_retrieve_finished_orders() {
                 return;
             }
             handover_finished_order_called(output_size, output);
-
+            notification = notifications_map_.erase(notification);
+        } else {
+            notification++;
         }
     }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: All retrievable dishes passed by robots.");
@@ -183,7 +185,6 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0 && position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_port, _next_remote_robot_position);
     }
-    notifications_map_.erase(_remote_robot_position);
     plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
     p.place_recipe_id(_finished_recipe);
     p.set_occupied(true);
