@@ -124,71 +124,52 @@ void
 conveyor::handle_retrieve_finished_orders() {
     for (auto notification = notifications_map_.begin(); notification != notifications_map_.end(); notification++) {
         if (!plates_[position_plate_id_map_[notification->first]].is_occupied()){
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE RETRIEVAL: Dish at position %d is retrievable", notification->first);
-            retrievable_positions_.insert(notification->first);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: Dish at position %d is retrievable", notification->first);
+            size_t output_size;
+            UA_Variant* output;
+            UA_StatusCode status = position_remote_robot_map_[notification->first]->handover_finished_order(&output_size, &output);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: RETRIEVAL: Retrieving for dish at position %d failed", __FUNCTION__, notification->first);
+                running_ = false;
+                return;
+            }
+            handover_finished_order_called(output_size, output);
+
         }
     }
-
-    if (retrievable_positions_.empty() && !occupied_plates_.empty()) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE RETRIEVAL: No retrievables, but occupied plates, scheduling movement.");
-        callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
-        movement_scheduler.schedule_from_now_relative(MOVE_TIME * TIME_UNIT);
-        return;
-    }
-
-    std::unique_lock<std::mutex> lock(conveyor_mutex_);
-    for (position_t position : retrievable_positions_) {
-        remote_robot& robot = position_remote_robot_map_[position].operator*();
-        robot.handover_finished_order(handover_finished_order_called, this);
-    }
-    // Avoids notifications map inconsistencies (handle_finished_order_notification <---> handle_handover_finished_order)
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE RETRIEVAL: Waiting for all robots to pass their (partially) finished dishes.");
-    condition_variable_.wait(lock);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE RETRIEVAL: All robots passed their dishes.");
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: All retrievable dishes passed by robots.");
+    callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
+    movement_scheduler.schedule_from_now_relative(MOVE_TIME * TIME_UNIT);
 }
 
 void
-conveyor::handover_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_userdata == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
-        return;
-    }
-    conveyor* self = static_cast<conveyor*>(_userdata);
-
-    response_checker response(_response);
-    UA_StatusCode status_code = response.get_service_result();
-    if(status_code != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
-        self->running_ = false;
-        return;
-    }
-
-    if(response.get_output_arguments_size(0) != 6) {
+    if(_output_size != 6) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        self->running_ = false;
+        running_ = false;
         return;
     }
 
-    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16])
-      || !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 2, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 3, &UA_TYPES[UA_TYPES_UINT32])
-      || !response.has_scalar_type(0, 4, &UA_TYPES[UA_TYPES_UINT16])
-      || !response.has_scalar_type(0, 5, &UA_TYPES[UA_TYPES_UINT32])) {
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT16])
+      || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])
+      || !UA_Variant_hasScalarType(&_output[2], &UA_TYPES[UA_TYPES_UINT32])
+      || !UA_Variant_hasScalarType(&_output[3], &UA_TYPES[UA_TYPES_UINT32])
+      || !UA_Variant_hasScalarType(&_output[4], &UA_TYPES[UA_TYPES_UINT16])
+      || !UA_Variant_hasScalarType(&_output[5], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        self->running_ = false;
+        running_ = false;
         return;
     }
 
-    port_t remote_robot_port = *(port_t*) response.get_data(0,0);
-    position_t remote_robot_position = *(position_t*) response.get_data(0,1);
-    recipe_id_t finished_recipe = *(recipe_id_t*) response.get_data(0,2);
-    UA_UInt32 processed_steps = *(UA_UInt32*) response.get_data(0,3);
-    port_t next_remote_robot_port = *(port_t*) response.get_data(0,4);
-    position_t next_remote_robot_position = *(position_t*) response.get_data(0,5);
+    port_t remote_robot_port = *(port_t*) _output[0].data;
+    position_t remote_robot_position = *(position_t*) _output[1].data;
+    recipe_id_t finished_recipe = *(recipe_id_t*) _output[2].data;
+    UA_UInt32 processed_steps = *(UA_UInt32*) _output[3].data;
+    port_t next_remote_robot_port = *(port_t*) _output[4].data;
+    position_t next_remote_robot_position = *(position_t*) _output[5].data;
 
-    self->handle_handover_finished_order(remote_robot_port, remote_robot_position, finished_recipe, processed_steps, next_remote_robot_port, next_remote_robot_position);
+    handle_handover_finished_order(remote_robot_port, remote_robot_position, finished_recipe, processed_steps, next_remote_robot_port, next_remote_robot_position);
 }
 
 void
@@ -199,29 +180,17 @@ conveyor::handle_handover_finished_order(port_t _remote_robot_port, position_t _
     } else {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d with port %d passed recipe ID %d with processed steps of %d", _remote_robot_position, _remote_robot_port, _finished_recipe, _processed_steps);
     }
-    
-    {
-        std::lock_guard<std::mutex> lock(conveyor_mutex_);
-        if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0 && position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
-            position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_port, _next_remote_robot_position);
-        }
-        notifications_map_.erase(_remote_robot_position);
-        plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
-        p.place_recipe_id(_finished_recipe);
-        p.set_occupied(true);
-        p.set_processed_steps(_processed_steps);
-        if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0)
-            p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get());
-        occupied_plates_.insert(p.get_plate_id());
-        retrieved_positions_.insert(_remote_robot_position);
-        if (retrieved_positions_ != retrievable_positions_)
-            return;
+    if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0 && position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
+        position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_port, _next_remote_robot_position);
     }
-    retrieved_positions_.clear();
-    retrievable_positions_.clear();
-    condition_variable_.notify_one();
-    callback_scheduler movement_scheduler(server_, perform_movement, this, NULL);
-    movement_scheduler.schedule_from_now_relative(MOVE_TIME * TIME_UNIT);
+    notifications_map_.erase(_remote_robot_position);
+    plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
+    p.place_recipe_id(_finished_recipe);
+    p.set_occupied(true);
+    p.set_processed_steps(_processed_steps);
+    if (_next_remote_robot_port != 0 && _next_remote_robot_position != 0)
+        p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get());
+    occupied_plates_.insert(p.get_plate_id());
 }
 
 
@@ -326,16 +295,6 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     p.set_target_robot(nullptr);
     occupied_plates_.erase(p.get_plate_id());
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: Delivered dish at position %d successfully", remote_robot_position);
-}
-
-void
-conveyor::determine_next_movement_callback(UA_Server* _server, void* _data) {
-    if (_data == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
-        return;
-    }
-    conveyor* self = static_cast<conveyor*>(_data);
-    self->determine_next_movement();
 }
 
 void

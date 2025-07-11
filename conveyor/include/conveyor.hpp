@@ -96,7 +96,7 @@ struct remote_robot {
             }
             UA_StatusCode status = handover_finished_order_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
             if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method", __FUNCTION__, __FUNCTION__);
             }
             return status;
         }
@@ -124,7 +124,7 @@ struct remote_robot {
             }
             UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
             if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method", __FUNCTION__, __FUNCTION__);
             }
             return status;
         }
@@ -398,13 +398,11 @@ private:
     /**
      * @brief Extracts the robot port and position as well as the recipe id of the finished dish.
      * 
-     * @param _client the client instance from which this method is called
-     * @param _userdata the conveyor instance passed to the handover finished order call
-     * @param _request_id 
-     * @param _response the pointer to the returned parameters
+     * @param _output_size the count of returned output values
+     * @param _output the variant containing the output values
      */
-    static void
-    handover_finished_order_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response);
+    void
+    handover_finished_order_called(size_t _output_size, UA_Variant* _output);
 
     /**
      * @brief Retrieves finished orders if corresponding plate is not occupied and schedules the next movement.
@@ -436,15 +434,6 @@ private:
      */
     void
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
-
-    /**
-     * @brief Timed callback to call determine_next_movement.
-     * 
-     * @param _server the server instance from which this method is called
-     * @param _data the conveyor instance passed to the scheduling call
-     */
-    static void
-    determine_next_movement_callback(UA_Server* _server, void* _data);
 
     /**
      * @brief Joins all started threads.
