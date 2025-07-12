@@ -13,7 +13,6 @@
 #include <set>
 #include <unordered_map>
 #include <memory>
-#include <condition_variable>
 #include "method_node_caller.hpp"
 #include "client_connection_establisher.hpp"
 #include "types.hpp"
