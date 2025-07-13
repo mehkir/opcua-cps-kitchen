@@ -1,7 +1,7 @@
 #include "../include/controller.hpp"
 #include <open62541/server_config_default.h>
 #include <string>
-#include <response_checker.hpp>
+#include "filtered_logger.hpp"
 
 #define INSTANCE_NAME "KitchenController"
 #define RECIPE_PATH "recipes.json"
@@ -15,6 +15,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), c
         running_ = false;
         return;
     }
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add choose next robot method node */
     method_arguments choose_next_robot_arguments;
     choose_next_robot_arguments.add_input_argument("the robot port", "robot_port", UA_TYPES_UINT16);
