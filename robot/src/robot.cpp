@@ -5,9 +5,9 @@
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel_async.h>
 #include <string>
+#include <chrono>
 #include "client_connection_establisher.hpp"
 #include "response_checker.hpp"
-#include "callback_scheduler.hpp"
 #include "time_unit.hpp"
 #include "filtered_logger.hpp"
 #include "browsenames.h"
@@ -17,9 +17,9 @@
 #define CAPABILITIES_PATH "./capabilities/"
 
 robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
-        server_(UA_Server_new()), position_(_position), port_(_port), robot_type_inserter_(server_, ROBOT_TYPE), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()), running_(true),
-        current_tool_(robot_tool::ROBOT_TOOLS_COUNT), processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_port_for_recipe_id_in_process_(0), next_suitable_robot_position_for_recipe_id_in_process_(0),
-        current_action_duration_(0), recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position) {
+        server_(UA_Server_new()), position_(_position), port_(_port), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
+        processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_port_for_recipe_id_in_process_(0), next_suitable_robot_position_for_recipe_id_in_process_(0), current_action_duration_(0),
+        recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -137,17 +137,6 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     std::string controller_endpoint((char*) controller_config->endpointUrl.data, controller_config->endpointUrl.length);
     method_id_map_[REGISTER_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, REGISTER_ROBOT);
     method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT);
-    /*Start controller client iterate thread */
-    controller_client_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_StatusCode status = UA_Client_run_iterate(controller_client_, 100);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the controller client", __FUNCTION__);
-                running_ = false;
-            }
-        }
-    });
-
     /* Setup conveyor client */
     client_connection_establisher conveyor_client_connection_establisher(conveyor_client_);
     connected = conveyor_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(_conveyor_port));
@@ -160,79 +149,40 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     UA_ClientConfig* conveyor_config = UA_Client_getConfig(conveyor_client_);
     std::string conveyor_endpoint((char*) conveyor_config->endpointUrl.data, conveyor_config->endpointUrl.length);
     method_id_map_[FINISHED_ORDER_NOTIFICATION] = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
-    /* Start conveyor client iterate thread */
-    conveyor_client_iterate_thread_ = std::thread([this]() {
-        while(running_) {
-            UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 100);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the conveyor client", __FUNCTION__);
-                running_ = false;
-            }
-        }
-    });
 }
 
 void
-robot::register_robot_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+robot::register_robot_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_userdata == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
-        return;
-    }
-    response_checker response(_response);
-    UA_StatusCode status_code = response.get_service_result();
-    if(status_code != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
-        return;
-    }
-    if(response.get_output_arguments_size(0) != 1) {
+    if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         return;
     }
-    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
-    UA_Boolean register_robot_received = *(UA_Boolean*)response.get_data(0,0);
-    robot* self = static_cast<robot*>(_userdata);
-    self->handle_register_robot_result(register_robot_received);
-}
-
-void
-robot::handle_register_robot_result(UA_Boolean _register_robot_received) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (!_register_robot_received) {
+    UA_Boolean register_robot_received = *(UA_Boolean*) _output[0].data;
+    if (!register_robot_received) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Controller returned false", __FUNCTION__);
-        return;
     }
 }
 
 void
-robot::choose_next_robot_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+robot::choose_next_robot_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_userdata == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
-        return;
-    }
-    response_checker response(_response);
-    UA_StatusCode status_code = response.get_service_result();
-    if(status_code != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
-        return;
-    }
-    if(response.get_output_arguments_size(0) != 2) {
+    if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         return;
     }
-    if( !response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_UINT16]) ||
-        !response.has_scalar_type(0, 1, &UA_TYPES[UA_TYPES_UINT32])) {
+    if( !UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT16]) ||
+        !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
-    port_t target_port = *(port_t*)response.get_data(0,0);
-    position_t target_position = *(position_t*)response.get_data(0,1);
-    robot* self = static_cast<robot*>(_userdata);
-    self->handle_choose_next_robot_result(target_port, target_position);
+    port_t target_port = *(port_t*) _output[0].data;
+    position_t target_position = *(position_t*) _output[1].data;
+    handle_choose_next_robot_result(target_port, target_position);
 }
 
 void
@@ -256,11 +206,15 @@ robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_p
         running_ = false;
         return;        
     }
-    UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, receive_finished_order_notification_called, this);
+    size_t output_size;
+    UA_Variant* output;
+    UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
         running_ = false;
+        return;
     }
+    receive_finished_order_notification_called(output_size, output);
 }
 
 UA_StatusCode
@@ -290,12 +244,23 @@ robot::receive_task(UA_Server *_server,
         return UA_STATUSCODE_BAD;
     }
     robot* self = static_cast<robot*>(_method_context);
-    self->handle_receive_task(recipe_id, processed_steps, _output);
+    // Set output parameters
+    UA_Boolean task_received = true;
+    status = UA_Variant_setScalarCopy(&_output[0], &self->port_, &UA_TYPES[UA_TYPES_UINT16]);
+    status |= UA_Variant_setScalarCopy(&_output[1], &self->position_, &UA_TYPES[UA_TYPES_UINT32]);
+    status |= UA_Variant_setScalarCopy(&_output[2], &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
+        self->running_ = false;
+    }
+    self->io_context_.post([self, recipe_id, processed_steps] {
+        self->handle_receive_task(recipe_id, processed_steps);
+    });
     return UA_STATUSCODE_GOOD;
 }
 
 void
-robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output) {
+robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Received instruction to cook recipe_id=%d with already %d processed steps", _recipe_id, _processed_steps);
     if (!recipe_parser_.has_recipe(_recipe_id)) {
@@ -311,21 +276,9 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, U
     compute_overall_time_and_determine_last_tool(action_queue);
     // Setup incoming order
     order_queue_.push(order(_recipe_id, _processed_steps, action_queue));
-    // Set output parameters
-    UA_Boolean task_received = true;
-    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
-    status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
-    status |= UA_Variant_setScalarCopy(&_output[2], &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
-        running_ = false;
-    }
-    /* Get recipe id in process */
-    UA_Variant recipe_id_in_process_var;
-    robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
-    UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
-    if (recipe_id_in_process == 0)
+    if (!preparing_dish_) {
         cook_next_order();
+    }
 }
 
 void
@@ -333,16 +286,23 @@ robot::cook_next_order() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (order_queue_.empty())
         return;
+    preparing_dish_ = true;
     order next_order = order_queue_.front();
     order_queue_.pop();
     // Update recipe id in process
     recipe_id_t recipe_id_in_process = next_order.get_recipe_id();
-    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, RECIPE_ID, &recipe_id_in_process, UA_TYPES_UINT32);
+    UA_StatusCode status = robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, RECIPE_ID, &recipe_id_in_process, UA_TYPES_UINT32);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Setting %s failed", __FUNCTION__, RECIPE_ID);
+    }
     processed_steps_of_recipe_id_in_process_ = next_order.get_processed_steps();
     // Update dish name
     recipe current_recipe = recipe_parser_.get_recipe(recipe_id_in_process);
     UA_String dish_in_process = UA_STRING(const_cast<char*>(current_recipe.get_dish_name().c_str()));
-    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
+    status = robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Setting %s failed", __FUNCTION__, DISH_NAME);
+    }
     action_queue_in_process_ = next_order.get_action_queue();
     determine_next_action();
 }
@@ -377,7 +337,7 @@ robot::handover_finished_order(UA_Server *_server,
         const UA_NodeId *_object_id, void *_object_context,
         size_t _input_size, const UA_Variant *_input,
         size_t _output_size, UA_Variant *_output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_input_size != 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
@@ -394,7 +354,7 @@ robot::handover_finished_order(UA_Server *_server,
 
 void
 robot::handle_handover_finished_order(UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Get recipe id in process */
     UA_Variant recipe_id_in_process_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
@@ -417,12 +377,15 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     processed_steps_of_recipe_id_in_process_ = 0;
     next_suitable_robot_port_for_recipe_id_in_process_ = 0;
     next_suitable_robot_position_for_recipe_id_in_process_ = 0;
+    preparing_dish_ = false;
     /* Update recipe id in process */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, RECIPE_ID, &recipe_id_in_process, UA_TYPES_UINT32);
     /* Update dish in process */
     UA_String dish_in_process = UA_STRING(const_cast<char*>("None"));
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
-    cook_next_order();
+    io_context_.post([this] {
+        cook_next_order();
+    });
 }
 
 robot::~robot() {
@@ -431,6 +394,7 @@ robot::~robot() {
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
     UA_Client_delete(controller_client_);
+    UA_Client_delete(conveyor_client_);
 }
 
 void
@@ -456,18 +420,30 @@ robot::determine_next_action() {
                 running_ = false;
                 return;        
             }
-            choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, choose_next_robot_called, this);
+            size_t output_size;
+            UA_Variant* output;
+            UA_StatusCode status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to get next robot", __FUNCTION__);
+                running_ = false;
+                return;
+
+            }
+            choose_next_robot_called(output_size, output);
             return;
         }
         robot_tool required_tool = robot_act.get_required_tool();
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
-            callback_scheduler retool_scheduler(server_, retool, this, NULL);
-            UA_StatusCode status = retool_scheduler.schedule_from_now_relative(RETOOLING_TIME * TIME_UNIT);
-            if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
-                running_ = false;
-            }
+            steady_timer_.expires_from_now(std::chrono::milliseconds(RETOOLING_TIME * TIME_UNIT));
+            steady_timer_.async_wait([this](const boost::system::error_code& _error) {
+                if (_error) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
+                    running_ = false;
+                    return;
+                }
+                retool();
+            });
         } else {
             /* Update action in process */
             UA_String action_in_process = UA_STRING(const_cast<char*>(robot_act.get_name().c_str()));
@@ -478,12 +454,15 @@ robot::determine_next_action() {
             /* Schedule next action */
             current_action_duration_ = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), current_action_duration_);
-            callback_scheduler action_scheduler(server_, pass_time, this, NULL);
-            UA_StatusCode status = action_scheduler.schedule_from_now_relative(TIME_UNIT_UPDATE_RATE * TIME_UNIT);
-            if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time", __FUNCTION__);
-                running_ = false;
-            }
+            steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT_UPDATE_RATE * TIME_UNIT));
+            steady_timer_.async_wait([this](const boost::system::error_code& _error) {
+                if (_error) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
+                    running_ = false;
+                    return;
+                }
+                pass_time();
+            });
         }
     } else {
         reset_in_process_fields();
@@ -498,11 +477,15 @@ robot::determine_next_action() {
             running_ = false;
             return;        
         }
-        UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, receive_finished_order_notification_called, this);
+        size_t output_size;
+        UA_Variant* output;
+        UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification", __FUNCTION__);
             running_ = false;
+            return;
         }
+        receive_finished_order_notification_called(output_size, output);
     }
 }
 
@@ -517,63 +500,46 @@ robot::reset_in_process_fields() {
 }
 
 void
-robot::receive_finished_order_notification_called(UA_Client* _client, void* _userdata, UA_UInt32 _request_id, UA_CallResponse* _response) {
+robot::receive_finished_order_notification_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_userdata == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Userdata is NULL", __FUNCTION__);
+    if(_output_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        running_ = false;
         return;
     }
-    response_checker response(_response);
-    UA_StatusCode status_code = response.get_service_result();
-    if(status_code != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad service result", __FUNCTION__);
-        return;
-    }
-
-    UA_Boolean finished_order_notification_received = false;
-    if(!response.has_scalar_type(0, 0, &UA_TYPES[UA_TYPES_BOOLEAN])) {
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
-    finished_order_notification_received = *(UA_Boolean*)response.get_data(0,0);
+    UA_Boolean finished_order_notification_received = *(UA_Boolean*) _output[0].data;
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, finished_order_notification_received);
-    
-    robot* self = static_cast<robot*>(_userdata);
-    self->handle_finished_order_notification_result(finished_order_notification_received);
-}
-
-void
-robot::handle_finished_order_notification_result(UA_Boolean _finished_order_notification_received) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (!_finished_order_notification_received) {
+    if (!finished_order_notification_received) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Conveyor returned false", __FUNCTION__);
     }
 }
 
 void
-robot::pass_time(UA_Server* _server, void* _data) {
-    if (_data == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
-        return;
-    }
-    robot* self = static_cast<robot*>(_data);
+robot::pass_time() {
     /* Get overall time */
     UA_Variant overall_time_var;
-    self->robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
+    robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
     overall_time -= TIME_UNIT_UPDATE_RATE;
     /* Update overall time */
-    self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
-    self->current_action_duration_ -= TIME_UNIT_UPDATE_RATE;
-    if (self->current_action_duration_ != 0) {
-        callback_scheduler action_scheduler(_server, pass_time, _data, NULL);
-        UA_StatusCode status = action_scheduler.schedule_from_now_relative(TIME_UNIT_UPDATE_RATE * TIME_UNIT);
-        if (status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time", __FUNCTION__);
-            self->running_ = false;
-        }
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
+    current_action_duration_ -= TIME_UNIT_UPDATE_RATE;
+    if (current_action_duration_ != 0) {
+        steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT_UPDATE_RATE * TIME_UNIT));
+        steady_timer_.async_wait([this](const boost::system::error_code& _error) {
+            if (_error) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
+                running_ = false;
+                return;
+            }
+            pass_time();
+        });
     } else {
-        self->action_performed();
+        action_performed();
     }
 }
 
@@ -592,35 +558,28 @@ robot::action_performed() {
 }
 
 void
-robot::retool(UA_Server* _server, void* _data) {
-    if (_data == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
-        return;
-    }
-    robot* self = static_cast<robot*>(_data);
-    self->current_tool_ = self->action_queue_in_process_.front().get_required_tool();
-    UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(self->current_tool_)));
+robot::retool() {
+    current_tool_ = action_queue_in_process_.front().get_required_tool();
+    UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(current_tool_)));
     /* Update current tool */
-    self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
     /* Get overall time */
     UA_Variant overall_time_var;
-    self->robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
+    robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
     overall_time -= RETOOLING_TIME;
     /* Update overall time */
-    self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Current tool now is %s", robot_tool_to_string(self->current_tool_));
-    self->determine_next_action();
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Current tool now is %s", robot_tool_to_string(current_tool_));
+    determine_next_action();
 }
 
 void
 robot::join_threads() {
     if (server_iterate_thread_.joinable())
         server_iterate_thread_.join();
-    if (controller_client_iterate_thread_.joinable())
-        controller_client_iterate_thread_.join();
-    if (conveyor_client_iterate_thread_.joinable())
-        conveyor_client_iterate_thread_.join();
+    if(worker_thread_.joinable())
+        worker_thread_.join();
 }
 
 void
@@ -640,15 +599,26 @@ robot::start() {
         join_threads();
         return;        
     }
-    UA_StatusCode status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, register_robot_called, this);
+
+    worker_thread_ = std::thread([this]() {
+        io_context_.run();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
+    });
+
+    size_t output_size;
+    UA_Variant* output;
+    UA_StatusCode status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
         running_ = false;
     }
+    register_robot_called(output_size, output);
     join_threads();
 }
 
 void
 robot::stop() {
     running_ = false;
+    work_guard_.reset();
+    io_context_.stop();
 }
