@@ -18,7 +18,7 @@ client_connection_establisher::establish_connection(std::string _server_endpoint
     UA_ClientConfig_setDefault(client_config);
     client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
     client_config->timeout = 1000;
-    // *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 
     auto start = std::chrono::steady_clock::now();
     UA_SessionState session_state = UA_SESSIONSTATE_CLOSED;
