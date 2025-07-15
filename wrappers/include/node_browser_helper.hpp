@@ -52,7 +52,17 @@ public:
      */
     UA_NodeId get_attribute_id(UA_Client* _client, std::string _object_type_name, std::string _attribute_name);
 
-        /**
+    /**
+     * @brief Returns whether an instance of the given object type is present
+     * 
+     * @param _client the client
+     * @param _object_type_name the object type browsename
+     * @return true if instance of given object type is present
+     * @return false if instance of given object type is not present
+     */
+    bool has_instance(UA_Client* _client, std::string _object_type_name);
+
+    /**
      * @brief Returns the method and object id of the first instance with the given object type
      * 
      * @param _server_endpoint the server endpoint
@@ -71,6 +81,16 @@ public:
      * @return UA_NodeId the attribute id
      */
     UA_NodeId get_attribute_id(std::string _server_endpoint, std::string _object_type_name, std::string _attribute_name);
+
+    /**
+     * @brief Returns whether an instance of the given object type is present
+     * 
+     * @param _server_endpoint the server endpoint
+     * @param _object_type_name the object type browsename
+     * @return true if instance of given object type is present
+     * @return false if instance of given object type is not present
+     */
+    bool has_instance(std::string _server_endpoint, std::string _object_type_name);
 };
 
 #endif // NODE_BROWSER_HELPER_HPP

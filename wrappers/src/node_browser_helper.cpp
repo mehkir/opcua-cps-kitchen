@@ -19,7 +19,7 @@ node_browser_helper::get_method_id(UA_Client* _client, std::string _object_type_
     }
     UA_BrowseResult browse_objects_result;
     nb.browse_objects(_client, browse_objects_result);
-    /* Browse methods and find instance with object type definition */
+    /* Iterate over objects and check if instance with object type definition is present */
     for (size_t i = 0; i < browse_objects_result.referencesSize; i++) {
         const UA_ReferenceDescription* object_reference_description = &browse_objects_result.references[i];
         if (UA_NodeId_equal(&object_reference_description->typeDefinition.nodeId, &object_type_id)) {
@@ -55,7 +55,7 @@ node_browser_helper::get_attribute_id(UA_Client* _client, std::string _object_ty
     }
     UA_BrowseResult browse_objects_result;
     nb.browse_objects(_client, browse_objects_result);
-    /* Browse attributes and find instance with object type definition */
+    /* Iterate over objects and check if instance with object type definition is present */
     for (size_t i = 0; i < browse_objects_result.referencesSize; i++) {
         const UA_ReferenceDescription* object_reference_description = &browse_objects_result.references[i];
         if (UA_NodeId_equal(&object_reference_description->typeDefinition.nodeId, &object_type_id)) {
@@ -79,13 +79,35 @@ node_browser_helper::get_attribute_id(UA_Client* _client, std::string _object_ty
     return attribute_id;
 }
 
+bool
+node_browser_helper::has_instance(UA_Client* _client, std::string _object_type_name) {
+    bool has_instance = false;
+    node_browser nb;
+    UA_NodeId object_type_id = nb.browse_object_type(_client, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE), _object_type_name);
+    if (UA_NodeId_equal(&object_type_id, &UA_NODEID_NULL)) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
+        return has_instance;
+    }
+    UA_BrowseResult browse_objects_result;
+    nb.browse_objects(_client, browse_objects_result);
+    /* Iterate over objects and check if instance with object type definition is present */
+    for (size_t i = 0; i < browse_objects_result.referencesSize; i++) {
+        const UA_ReferenceDescription* object_reference_description = &browse_objects_result.references[i];
+        if (has_instance = UA_NodeId_equal(&object_reference_description->typeDefinition.nodeId, &object_type_id)) {
+            break;
+        }
+    }
+    UA_BrowseResult_clear(&browse_objects_result);
+    return has_instance;
+}
+
 object_method_info
 node_browser_helper::get_method_id(std::string _server_endpoint, std::string _object_type_name, std::string _method_name) {
     UA_Client* client = UA_Client_new();
     client_connection_establisher cce(client);
     bool connected = cce.establish_connection(_server_endpoint);
     if (!connected) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session to endpoint %s", __FUNCTION__, _server_endpoint.c_str());
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session with endpoint %s", __FUNCTION__, _server_endpoint.c_str());
         return OBJECT_METHOD_INFO_NULL;
     }
     object_method_info omi = get_method_id(client, _object_type_name, _method_name);
@@ -100,10 +122,25 @@ node_browser_helper::get_attribute_id(std::string _server_endpoint, std::string 
     client_connection_establisher cce(client);
     bool connected = cce.establish_connection(_server_endpoint);
     if (!connected) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session to endpoint %s", __FUNCTION__, _server_endpoint.c_str());
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session with endpoint %s", __FUNCTION__, _server_endpoint.c_str());
         return UA_NODEID_NULL;
     }
     UA_NodeId node_id = get_attribute_id(client, _object_type_name, _attribute_name);
     UA_Client_delete(client);
     return node_id;
+}
+
+bool
+node_browser_helper::has_instance(std::string _server_endpoint, std::string _object_type_name) {
+    bool has_instance = false;
+    UA_Client* client = UA_Client_new();
+    client_connection_establisher cce(client);
+    bool connected = cce.establish_connection(_server_endpoint);
+    if (!connected) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session with endpoint %s", __FUNCTION__, _server_endpoint.c_str());
+        return has_instance;
+    }
+    has_instance = this->has_instance(client, _object_type_name);
+    UA_Client_delete(client);
+    return has_instance;
 }
