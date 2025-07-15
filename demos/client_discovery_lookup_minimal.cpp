@@ -8,9 +8,6 @@
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel.h>
 #include <open62541/plugin/log_stdout.h>
-
-#include <stdlib.h>
-#include <stdio.h>
 #include <string>
 
 #define DISCOVERY_SERVER_ENDPOINT "opc.tcp://localhost:4840"
@@ -49,21 +46,16 @@ int main(void) {
         if(description->applicationType != UA_APPLICATIONTYPE_SERVER)
             continue;
 
-        printf("\nEndpoints for Server[%lu]: %.*s\n", (unsigned long) i,
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoints for Server[%lu]: %.*s", (unsigned long) i,
                (int) description->applicationUri.length, description->applicationUri.data);
 
         UA_Client *client = UA_Client_new();
         UA_ClientConfig_setDefault(UA_Client_getConfig(client));
 
-        // char *discoveryUrl = (char *) UA_malloc(sizeof(char) * description->discoveryUrls[0].length + 1);
-        // memcpy(discoveryUrl, description->discoveryUrls[0].data, description->discoveryUrls[0].length);
-        // discoveryUrl[description->discoveryUrls[0].length] = '\0';
-
         std::string discovery_url((char*) description->discoveryUrls[0].data, description->discoveryUrls[0].length);
         UA_EndpointDescription* enpoint_array = NULL;
         size_t enpoint_array_size = 0;
         retval = UA_Client_getEndpoints(client, discovery_url.c_str(), &enpoint_array_size, &enpoint_array);
-        // UA_free(discoveryUrl);
         if(retval != UA_STATUSCODE_GOOD) {
             UA_Client_disconnect(client);
             UA_Client_delete(client);
@@ -72,7 +64,7 @@ int main(void) {
 
         for(size_t j = 0; j < enpoint_array_size; j++) {
             UA_EndpointDescription *endpoint = &enpoint_array[j];
-            printf("Endpoint URL: %.*s\n", (int) endpoint->endpointUrl.length, endpoint->endpointUrl.data);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint URL: %.*s\n", (int) endpoint->endpointUrl.length, endpoint->endpointUrl.data);
         }
 
         UA_Array_delete(enpoint_array, enpoint_array_size, &UA_TYPES[UA_TYPES_ENDPOINTDESCRIPTION]);
