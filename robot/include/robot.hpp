@@ -6,6 +6,8 @@
 #include <thread>
 #include <queue>
 #include <boost/asio.hpp>
+#include <condition_variable>
+#include <atomic>
 
 #include "method_node_caller.hpp"
 #include "types.hpp"
@@ -55,8 +57,11 @@ private:
     duration_t current_action_duration_;
     std::queue<robot_action> action_queue_in_process_;
     bool preparing_dish_;
-    volatile UA_Boolean running_;
+    std::atomic<bool> running_;
     std::thread server_iterate_thread_;
+    std::mutex discovery_mutex_;
+    std::condition_variable discovery_cv_;
+    std::thread discovery_thread_;
     recipe_parser recipe_parser_;
     capability_parser capability_parser_;
     std::unordered_map<std::string, object_method_info> method_id_map_;
@@ -234,10 +239,9 @@ public:
      * 
      * @param _position the position of the robot at the conveyor
      * @param _port the port of the robot
-     * @param _controller_port the port of the controller
      * @param _conveyor_port the port of the conveyor
      */
-    robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port);
+    robot(position_t _position, port_t _port, port_t _conveyor_port);
 
     /**
      * @brief Destroy the robot object.

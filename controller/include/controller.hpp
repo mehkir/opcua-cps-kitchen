@@ -10,6 +10,8 @@
 #include <unordered_set>
 #include <memory>
 #include <random>
+#include <condition_variable>
+#include <atomic>
 #include "node_value_subscriber.hpp"
 #include "browsenames.h"
 #include "method_node_caller.hpp"
@@ -243,8 +245,11 @@ private:
     UA_Server* server_;
     port_t port_;
     object_type_node_inserter controller_type_inserter_;
-    volatile UA_Boolean running_;
+    std::atomic<bool> running_;
     std::thread server_iterate_thread_;
+    std::mutex discovery_mutex_;
+    std::condition_variable discovery_cv_;
+    std::thread discovery_thread_;
     /* robot related member variables */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
     /* recipe related member variables */
@@ -387,9 +392,8 @@ public:
     /**
      * @brief Construct a new controller object.
      * 
-     * @param _port the controller port
      */
-    controller(port_t _port);
+    controller();
 
     /**
      * @brief Destroy the controller object.

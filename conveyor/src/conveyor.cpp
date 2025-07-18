@@ -14,6 +14,8 @@
 conveyor::conveyor(port_t _port, UA_UInt32 _robot_count) : server_(UA_Server_new()), port_(_port), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE), running_(true), state_status_(conveyor::state::IDLING) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
+    UA_String_clear(&server_config->applicationDescription.applicationUri);
+    server_config->applicationDescription.applicationUri = UA_STRING_ALLOC("urn:kitchen:conveyor");
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the conveyor server");
         running_ = false;

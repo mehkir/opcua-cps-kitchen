@@ -2,4 +2,4 @@
 PROJECT_DIRECTORY=/home/mehmet/vscode-workspaces/opcua-cps-kitchen
 $PROJECT_DIRECTORY/build.bash
 # _controller_port
-$PROJECT_DIRECTORY/build/start_controller_instance 5000
+$PROJECT_DIRECTORY/build/start_controller_instance

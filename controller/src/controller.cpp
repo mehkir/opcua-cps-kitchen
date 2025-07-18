@@ -1,20 +1,24 @@
 #include "../include/controller.hpp"
 #include <open62541/server_config_default.h>
 #include <string>
+#include <chrono>
 #include "filtered_logger.hpp"
+#include "discovery_util.hpp"
 
 #define INSTANCE_NAME "KitchenController"
 #define RECIPE_PATH "recipes.json"
 
-controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), recipe_parser_(RECIPE_PATH), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3) {
+controller::controller() : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), recipe_parser_(RECIPE_PATH), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3) {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
-    UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
+    UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the controller server");
         running_ = false;
         return;
     }
+    UA_String_clear(&server_config->applicationDescription.applicationUri);
+    server_config->applicationDescription.applicationUri = UA_STRING_ALLOC("urn:kitchen:controller");
     // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add choose next robot method node */
     method_arguments choose_next_robot_arguments;
@@ -62,6 +66,31 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), c
         running_ = false;
         return;
     }
+    /* Register at discovery and repeatedly */
+    try {
+        discovery_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = register_server(server_);
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registered on discovery server. Renewal in 50 minutes", __FUNCTION__);
+                std::unique_lock<std::mutex> lock(discovery_mutex_);
+                discovery_cv_.wait_for(lock, std::chrono::minutes(50), [this] { return !running_.load(); });
+                if (!running_) {
+                    deregister_server(server_);
+                    break;
+                }
+                if (status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running discovery thread", __FUNCTION__);
+                    stop();
+                    return;
+                }
+            }
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error registering on the discovery server");
+        stop();
+        return;
+    }
+    /* Start the controller event loop */
     try {
         server_iterate_thread_ = std::thread([this]() {
             while(running_) {
@@ -76,7 +105,7 @@ controller::controller(port_t _port) : server_(UA_Server_new()), port_(_port), c
 }
 
 controller::~controller() {
-    running_ = false;
+    stop();
     join_threads();
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
@@ -197,7 +226,7 @@ controller::handle_next_robot_request(port_t _port, position_t _position, recipe
     status |= UA_Variant_setScalarCopy(&_output[1], &next_suitable_robot_position, &UA_TYPES[UA_TYPES_UINT32]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
-        running_ = false;
+        stop();
         return;
     }
 }
@@ -295,6 +324,8 @@ void
 controller::join_threads() {
     if (server_iterate_thread_.joinable())
         server_iterate_thread_.join();
+    if (discovery_thread_.joinable())
+        discovery_thread_.join();
 }
 
 void
@@ -307,4 +338,5 @@ controller::start() {
 void
 controller::stop() {
     running_ = false;
+    discovery_cv_.notify_all();
 }

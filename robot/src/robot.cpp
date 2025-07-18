@@ -11,12 +11,13 @@
 #include "time_unit.hpp"
 #include "filtered_logger.hpp"
 #include "browsenames.h"
+#include "discovery_util.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
 #define RECIPE_PATH "recipes.json"
 #define CAPABILITIES_PATH "./capabilities/"
 
-robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t _conveyor_port) :
+robot::robot(position_t _position, port_t _port, port_t _conveyor_port) :
         server_(UA_Server_new()), position_(_position), port_(_port), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
         processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_port_for_recipe_id_in_process_(0), next_suitable_robot_position_for_recipe_id_in_process_(0), current_action_duration_(0),
         recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()) {
@@ -29,6 +30,10 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         running_ = false;
         return;
     }
+    // Set a unique application URI for the robot
+    UA_String_clear(&server_config->applicationDescription.applicationUri);
+    std::string robot_uri = "urn:kitchen:robot:" + std::to_string(port_);
+    server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(robot_uri.c_str());
     // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add attributes */
     robot_type_inserter_.add_attribute(ROBOT_TYPE, RECIPE_ID);
@@ -113,6 +118,31 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
         running_ = false;
         return;
     }
+    /* Register at discovery and repeatedly */
+    try {
+        discovery_thread_ = std::thread([this]() {
+            while(running_) {
+                UA_StatusCode status = register_server(server_);
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registered on discovery server. Renewal in 50 minutes", __FUNCTION__);
+                std::unique_lock<std::mutex> lock(discovery_mutex_);
+                discovery_cv_.wait_for(lock, std::chrono::minutes(50), [this] { return !running_.load(); });
+                if (!running_) {
+                    deregister_server(server_);
+                    break;
+                }
+                if (status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running discovery thread", __FUNCTION__);
+                    stop();
+                    return;
+                }
+            }
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error registering on the discovery server");
+        stop();
+        return;
+    }
+    /* Start the robot eventloop */
     try {
         server_iterate_thread_ = std::thread([this]() {
             while(running_) {
@@ -126,15 +156,27 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     }
     /* Setup controller client */
     client_connection_establisher controller_client_connection_establisher(controller_client_);
-    bool connected = controller_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(_controller_port));
+    std::vector<std::string> endpoints;
+    status = lookup_endpoints(endpoints);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed looking up endpoints (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        stop();
+        return;
+    }
+    std::string controller_endpoint;
+    for (std::string endpoint : endpoints) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint URL: %s\n", endpoint.c_str());
+        controller_endpoint = endpoint;
+        if (node_browser_helper().has_instance(controller_endpoint, CONTROLLER_TYPE))
+            break;
+    }
+    bool connected = controller_client_connection_establisher.establish_connection(controller_endpoint);
     if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing controller client session", __FUNCTION__);
-        running_ = false;
+        stop();
         return;
     }
     /* Gather method ids */
-    UA_ClientConfig* controller_config = UA_Client_getConfig(controller_client_);
-    std::string controller_endpoint((char*) controller_config->endpointUrl.data, controller_config->endpointUrl.length);
     method_id_map_[REGISTER_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, REGISTER_ROBOT);
     method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT);
     /* Setup conveyor client */
@@ -142,7 +184,7 @@ robot::robot(position_t _position, port_t _port, port_t _controller_port, port_t
     connected = conveyor_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(_conveyor_port));
     if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing conveyor client session", __FUNCTION__);
-        running_ = false;
+        stop();
         return;
     }
     /* Gather method ids */
@@ -190,7 +232,7 @@ robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_p
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_target_port == 0 || _target_position == 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No suitable robot for next steps received", __FUNCTION__);
-        running_ = false;
+        stop();
         return;
     }
     next_suitable_robot_port_for_recipe_id_in_process_ = _target_port;
@@ -203,7 +245,7 @@ robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_p
     object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
     if (omi == OBJECT_METHOD_INFO_NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
-        running_ = false;
+        stop();
         return;        
     }
     size_t output_size;
@@ -211,7 +253,7 @@ robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_p
     UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-        running_ = false;
+        stop();
         return;
     }
     receive_finished_order_notification_called(output_size, output);
@@ -251,7 +293,7 @@ robot::receive_task(UA_Server *_server,
     status |= UA_Variant_setScalarCopy(&_output[2], &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
-        self->running_ = false;
+        self->stop();
     }
     self->io_context_.post([self, recipe_id, processed_steps] {
         self->handle_receive_task(recipe_id, processed_steps);
@@ -368,7 +410,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     status |= UA_Variant_setScalarCopy(&_output[5], &next_suitable_robot_position_for_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
-        running_ = false;
+        stop();
         return;
     }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Pass finished recipe_id=%d (port=%d, position=%d)", recipe_id_in_process, port_, position_);
@@ -417,7 +459,7 @@ robot::determine_next_action() {
             object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
-                running_ = false;
+                stop();
                 return;        
             }
             size_t output_size;
@@ -425,7 +467,7 @@ robot::determine_next_action() {
             UA_StatusCode status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to get next robot", __FUNCTION__);
-                running_ = false;
+                stop();
                 return;
 
             }
@@ -439,7 +481,7 @@ robot::determine_next_action() {
             steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                 if (_error) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
-                    running_ = false;
+                    stop();
                     return;
                 }
                 retool();
@@ -458,7 +500,7 @@ robot::determine_next_action() {
             steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                 if (_error) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
-                    running_ = false;
+                    stop();
                     return;
                 }
                 pass_time();
@@ -474,7 +516,7 @@ robot::determine_next_action() {
         object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
         if (omi == OBJECT_METHOD_INFO_NULL) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
-            running_ = false;
+            stop();
             return;        
         }
         size_t output_size;
@@ -482,7 +524,7 @@ robot::determine_next_action() {
         UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification", __FUNCTION__);
-            running_ = false;
+            stop();
             return;
         }
         receive_finished_order_notification_called(output_size, output);
@@ -504,7 +546,7 @@ robot::receive_finished_order_notification_called(size_t _output_size, UA_Varian
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        running_ = false;
+        stop();
         return;
     }
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
@@ -533,7 +575,7 @@ robot::pass_time() {
         steady_timer_.async_wait([this](const boost::system::error_code& _error) {
             if (_error) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
-                running_ = false;
+                stop();
                 return;
             }
             pass_time();
@@ -580,6 +622,8 @@ robot::join_threads() {
         server_iterate_thread_.join();
     if(worker_thread_.joinable())
         worker_thread_.join();
+    if (discovery_thread_.joinable())
+        discovery_thread_.join();
 }
 
 void
@@ -595,7 +639,7 @@ robot::start() {
     object_method_info omi = method_id_map_[REGISTER_ROBOT];
     if (omi == OBJECT_METHOD_INFO_NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, REGISTER_ROBOT);
-        running_ = false;
+        stop();
         join_threads();
         return;        
     }
@@ -610,7 +654,7 @@ robot::start() {
     UA_StatusCode status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
-        running_ = false;
+        stop();
     }
     register_robot_called(output_size, output);
     join_threads();
@@ -621,4 +665,5 @@ robot::stop() {
     running_ = false;
     work_guard_.reset();
     io_context_.stop();
+    discovery_cv_.notify_all();
 }
