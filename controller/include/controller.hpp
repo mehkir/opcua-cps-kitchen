@@ -112,7 +112,7 @@ struct remote_robot {
         void start_thread() {
             client_thread_ = std::thread([this]() {
                 while(running_) {
-                    UA_StatusCode status = UA_Client_run_iterate(async_client_, 1000);
+                    UA_StatusCode status = UA_Client_run_iterate(async_client_, 100);
                     if (status != UA_STATUSCODE_GOOD) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
                         running_ = false;
