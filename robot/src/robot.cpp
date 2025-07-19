@@ -235,7 +235,8 @@ robot::choose_next_robot_called(size_t _output_size, UA_Variant* _output) {
     }
     UA_String target_endpoint = *(UA_String*) _output[0].data;
     position_t target_position = *(position_t*) _output[1].data;
-    handle_choose_next_robot_result(std::string((char*) target_endpoint.data, target_endpoint.length), target_position);
+    std::string target_endpoint_std_str((char*) target_endpoint.data, target_endpoint.length);
+    handle_choose_next_robot_result(target_endpoint_std_str, target_position);
 }
 
 void
@@ -336,8 +337,10 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps) {
 void
 robot::cook_next_order() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (order_queue_.empty())
+    if (order_queue_.empty()) {
+        preparing_dish_ = false;
         return;
+    }
     preparing_dish_ = true;
     order next_order = order_queue_.front();
     order_queue_.pop();
@@ -412,13 +415,14 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     /* Set output values */
-    UA_String next_suitable_robot_endpoint_for_recipe_id_in_process = UA_STRING(const_cast<char*>(next_suitable_robot_endpoint_for_recipe_id_in_process_.c_str()));
+    UA_String next_suitable_robot_endpoint_for_recipe_id_in_process = UA_STRING_ALLOC(const_cast<char*>(next_suitable_robot_endpoint_for_recipe_id_in_process_.c_str()));
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &server_endpoint_, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[2], &recipe_id_in_process, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[3], &processed_steps_of_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[4], &next_suitable_robot_endpoint_for_recipe_id_in_process, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[5], &next_suitable_robot_position_for_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
+    UA_String_clear(&next_suitable_robot_endpoint_for_recipe_id_in_process);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
         stop();
@@ -430,7 +434,6 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     processed_steps_of_recipe_id_in_process_ = 0;
     next_suitable_robot_endpoint_for_recipe_id_in_process_ = "";
     next_suitable_robot_position_for_recipe_id_in_process_ = 0;
-    preparing_dish_ = false;
     /* Update recipe id in process */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, RECIPE_ID, &recipe_id_in_process, UA_TYPES_UINT32);
     /* Update dish in process */
