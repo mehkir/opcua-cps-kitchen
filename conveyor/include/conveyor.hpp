@@ -13,6 +13,8 @@
 #include <set>
 #include <unordered_map>
 #include <memory>
+#include <condition_variable>
+#include <atomic>
 #include "method_node_caller.hpp"
 #include "client_connection_establisher.hpp"
 #include "types.hpp"
@@ -27,7 +29,7 @@ using namespace cps_kitchen;
 struct remote_robot {
     private:
         UA_Client* client_;
-        const port_t port_;
+        std::string endpoint_;
         const position_t position_;
         std::unordered_map<std::string, object_method_info> method_id_map_;
 
@@ -35,12 +37,12 @@ struct remote_robot {
         /**
          * @brief Construct a new remote robot object.
          * 
-         * @param _port the port of the remote robot
+         * @param _endpoint the remote robot's endpoint
          * @param _position the position of the remote robot
          */
-        remote_robot(port_t _port, position_t _position) :  port_(_port), position_(_position), client_(UA_Client_new()) {
+        remote_robot(std::string _endpoint, position_t _position) :  endpoint_(_endpoint), position_(_position), client_(UA_Client_new()) {
             client_connection_establisher robot_client_connection_establisher(client_);
-            bool connected = robot_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(port_));
+            bool connected = robot_client_connection_establisher.establish_connection(endpoint_);
             if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session");
                 return;
@@ -58,13 +60,13 @@ struct remote_robot {
         }
 
         /**
-         * @brief Returns the robot's port
+         * @brief Returns the robot's endpoint
          * 
-         * @return port_t the robot's port
+         * @return std::string the robot's endpoint url
          */
-        port_t
-        get_port() const {
-            return port_;
+        std::string
+        get_endpoint() const {
+            return endpoint_;
         }
 
         /**
@@ -86,7 +88,7 @@ struct remote_robot {
          */
         UA_StatusCode handover_finished_order(size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d with port %d", position_, port_);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d", position_);
             method_node_caller handover_finished_order_caller;
             object_method_info omi = method_id_map_[HANDOVER_FINISHED_ORDER];
             if (omi == OBJECT_METHOD_INFO_NULL) {
@@ -112,7 +114,7 @@ struct remote_robot {
          */
         UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d after step %d", position_, port_, _recipe_id, _processed_steps);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", position_, _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
@@ -309,16 +311,18 @@ enum state {
 private:
     /* conveyor related member variables */
     UA_Server* server_;
-    port_t port_;
     object_type_node_inserter conveyor_type_inserter_;
     object_type_node_inserter plate_type_inserter_;
-    volatile UA_Boolean running_;
+    std::atomic<bool> running_;
     state state_status_;
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
+    std::mutex discovery_mutex_;
+    std::condition_variable discovery_cv_;
+    std::thread discovery_thread_;
     std::set<plate_id_t> occupied_plates_;
     std::unordered_map<position_t, plate_id_t> position_plate_id_map_;
-    std::unordered_map<position_t, port_t> notifications_map_;
+    std::unordered_map<position_t, std::string> notifications_map_;
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
 
     /**
@@ -349,12 +353,12 @@ private:
      * @brief Stores the extracted finished order notification parameters from the receive_finished_order_notification method
      * and schedules the retrieval of finished orders if the conveyor is idling.
      * 
-     * @param _robot_port the port from which the finished order notification is sent
+     * @param _robot_endpoint the endpoint from which the finished order notification is sent
      * @param _robot_position the position on which the finished order is ready to be retrieved
      * @param _output the output pointer to store return parameters
      */
     void
-    handle_finished_order_notification(port_t _robot_port, position_t _robot_position, UA_Variant* _output);
+    handle_finished_order_notification(std::string _robot_endpoint, position_t _robot_position, UA_Variant* _output);
 
     /**
      * @brief Timed callback to call handle_retrieve_finished_orders.
@@ -406,15 +410,15 @@ private:
     /**
      * @brief Retrieves finished orders if corresponding plate is not occupied and schedules the next movement.
      * 
-     * @param _remote_robot_port the port from which the finished dish is retrieved
+     * @param _remote_robot_endpoint the endpoint from which the finished dish is retrieved
      * @param _remote_robot_position the position on which the finished dish is retrieved
      * @param _finished_recipe the recipe id of the finished dish
      * @param _processed_steps the steps count processed so far
-     * @param _next_remote_robot_port the port of the next suitable robot
+     * @param _next_remote_robot_endpoint the endpoint of the next suitable robot
      * @param _next_remote_robot_position the position of the next suitable robot
      */
     void
-    handle_handover_finished_order(port_t _remote_robot_port, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, port_t _next_remote_robot_port, position_t _next_remote_robot_position);
+    handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, std::string _next_remote_robot_endpoint, position_t _next_remote_robot_position);
 
     /**
      * @brief Timed callback to call move_conveyor, deliver_finished_order and determine_next_movement.
@@ -445,10 +449,9 @@ public:
     /**
      * @brief Construct a new conveyor object.
      * 
-     * @param _port the conveyor port
      * @param _robot_count the robot count
      */
-    conveyor(port_t _port, UA_UInt32 _robot_count);
+    conveyor(UA_UInt32 _robot_count);
 
     /**
      * @brief Destroy the conveyor object.

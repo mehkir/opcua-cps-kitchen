@@ -17,14 +17,14 @@
 #define RECIPE_PATH "recipes.json"
 #define CAPABILITIES_PATH "./capabilities/"
 
-robot::robot(position_t _position, port_t _port, port_t _conveyor_port) :
-        server_(UA_Server_new()), position_(_position), port_(_port), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
-        processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_port_for_recipe_id_in_process_(0), next_suitable_robot_position_for_recipe_id_in_process_(0), current_action_duration_(0),
+robot::robot(position_t _position) :
+        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
+        processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_endpoint_for_recipe_id_in_process_(""), next_suitable_robot_position_for_recipe_id_in_process_(0), current_action_duration_(0),
         recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
-    status = UA_ServerConfig_setMinimal(server_config, port_, NULL);
+    status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error with setting up the server", __FUNCTION__);
         running_ = false;
@@ -32,8 +32,7 @@ robot::robot(position_t _position, port_t _port, port_t _conveyor_port) :
     }
     // Set a unique application URI for the robot
     UA_String_clear(&server_config->applicationDescription.applicationUri);
-    std::string robot_uri = "urn:kitchen:robot:" + std::to_string(port_);
-    server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(robot_uri.c_str());
+    server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(robot_uri_.c_str());
     // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add attributes */
     robot_type_inserter_.add_attribute(ROBOT_TYPE, RECIPE_ID);
@@ -48,7 +47,6 @@ robot::robot(position_t _position, port_t _port, port_t _conveyor_port) :
     method_arguments receive_task_method_arguments;
     receive_task_method_arguments.add_input_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
     receive_task_method_arguments.add_input_argument("the processed steps", "processed_steps", UA_TYPES_UINT32);
-    receive_task_method_arguments.add_output_argument("the robot port", "robot_port", UA_TYPES_UINT16);
     receive_task_method_arguments.add_output_argument("the robot position", "robot_position", UA_TYPES_UINT32);
     receive_task_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
     status = robot_type_inserter_.add_method(ROBOT_TYPE, RECEIVE_TASK, receive_task, receive_task_method_arguments, this);
@@ -59,11 +57,11 @@ robot::robot(position_t _position, port_t _port, port_t _conveyor_port) :
     }
     /* Add handover finished order method node */
     method_arguments handover_finished_order_method_arguments;
-    handover_finished_order_method_arguments.add_output_argument("the robot port", "robot_port", UA_TYPES_UINT16);
+    handover_finished_order_method_arguments.add_output_argument("the robot endpoint", "robot_port", UA_TYPES_STRING);
     handover_finished_order_method_arguments.add_output_argument("the robot position", "robot_position", UA_TYPES_UINT32);
     handover_finished_order_method_arguments.add_output_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
     handover_finished_order_method_arguments.add_output_argument("the processed steps", "processed_steps", UA_TYPES_UINT32);
-    handover_finished_order_method_arguments.add_output_argument("the target port", "target_port", UA_TYPES_UINT16);
+    handover_finished_order_method_arguments.add_output_argument("the target endpoint", "target_port", UA_TYPES_STRING);
     handover_finished_order_method_arguments.add_output_argument("the target position", "target_position", UA_TYPES_UINT32);
     status = robot_type_inserter_.add_method(ROBOT_TYPE, HANDOVER_FINISHED_ORDER, handover_finished_order, handover_finished_order_method_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
@@ -181,7 +179,21 @@ robot::robot(position_t _position, port_t _port, port_t _conveyor_port) :
     method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT);
     /* Setup conveyor client */
     client_connection_establisher conveyor_client_connection_establisher(conveyor_client_);
-    connected = conveyor_client_connection_establisher.establish_connection("opc.tcp://localhost:" + std::to_string(_conveyor_port));
+    endpoints.clear();
+    status = lookup_endpoints(endpoints);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed looking up endpoints (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        stop();
+        return;
+    }
+    std::string conveyor_endpoint;
+    for (std::string endpoint : endpoints) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint URL: %s\n", endpoint.c_str());
+        conveyor_endpoint = endpoint;
+        if (node_browser_helper().has_instance(conveyor_endpoint, CONVEYOR_TYPE))
+            break;
+    }
+    connected = conveyor_client_connection_establisher.establish_connection(conveyor_endpoint);
     if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing conveyor client session", __FUNCTION__);
         stop();
@@ -189,7 +201,6 @@ robot::robot(position_t _position, port_t _port, port_t _conveyor_port) :
     }
     /* Gather method ids */
     UA_ClientConfig* conveyor_config = UA_Client_getConfig(conveyor_client_);
-    std::string conveyor_endpoint((char*) conveyor_config->endpointUrl.data, conveyor_config->endpointUrl.length);
     method_id_map_[FINISHED_ORDER_NOTIFICATION] = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
 }
 
@@ -217,30 +228,30 @@ robot::choose_next_robot_called(size_t _output_size, UA_Variant* _output) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         return;
     }
-    if( !UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT16]) ||
-        !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])) {
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_STRING])
+       || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         return;
     }
-    port_t target_port = *(port_t*) _output[0].data;
+    UA_String target_endpoint = *(UA_String*) _output[0].data;
     position_t target_position = *(position_t*) _output[1].data;
-    handle_choose_next_robot_result(target_port, target_position);
+    handle_choose_next_robot_result(std::string((char*) target_endpoint.data, target_endpoint.length), target_position);
 }
 
 void
-robot::handle_choose_next_robot_result(port_t _target_port, position_t _target_position) {
+robot::handle_choose_next_robot_result(std::string _target_endpoint, position_t _target_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (_target_port == 0 || _target_position == 0) {
+    if (_target_endpoint.empty() || _target_position == 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No suitable robot for next steps received", __FUNCTION__);
         stop();
         return;
     }
-    next_suitable_robot_port_for_recipe_id_in_process_ = _target_port;
+    next_suitable_robot_endpoint_for_recipe_id_in_process_ = _target_endpoint;
     next_suitable_robot_position_for_recipe_id_in_process_ = _target_position;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with port %d", next_suitable_robot_position_for_recipe_id_in_process_, next_suitable_robot_port_for_recipe_id_in_process_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", next_suitable_robot_position_for_recipe_id_in_process_, next_suitable_robot_endpoint_for_recipe_id_in_process_);
     /* Notify conveyor about finished order */
     method_node_caller receive_finished_order_notification_caller;
-    receive_finished_order_notification_caller.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
+    receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
     receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
     object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
     if (omi == OBJECT_METHOD_INFO_NULL) {
@@ -288,9 +299,8 @@ robot::receive_task(UA_Server *_server,
     robot* self = static_cast<robot*>(_method_context);
     // Set output parameters
     UA_Boolean task_received = true;
-    status = UA_Variant_setScalarCopy(&_output[0], &self->port_, &UA_TYPES[UA_TYPES_UINT16]);
-    status |= UA_Variant_setScalarCopy(&_output[1], &self->position_, &UA_TYPES[UA_TYPES_UINT32]);
-    status |= UA_Variant_setScalarCopy(&_output[2], &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    status = UA_Variant_setScalarCopy(&_output[0], &self->position_, &UA_TYPES[UA_TYPES_UINT32]);
+    status |= UA_Variant_setScalarCopy(&_output[1], &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
         self->stop();
@@ -402,22 +412,22 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     /* Set output values */
-    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &port_, &UA_TYPES[UA_TYPES_UINT16]);
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &server_endpoint_, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[2], &recipe_id_in_process, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[3], &processed_steps_of_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
-    status |= UA_Variant_setScalarCopy(&_output[4], &next_suitable_robot_port_for_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT16]);
+    status |= UA_Variant_setScalarCopy(&_output[4], &next_suitable_robot_endpoint_for_recipe_id_in_process_, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[5], &next_suitable_robot_position_for_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
         stop();
         return;
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Pass finished recipe_id=%d (port=%d, position=%d)", recipe_id_in_process, port_, position_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Pass finished recipe_id=%d from position %d", recipe_id_in_process, position_);
     /* Set recipe id in process*/
     recipe_id_in_process = 0;
     processed_steps_of_recipe_id_in_process_ = 0;
-    next_suitable_robot_port_for_recipe_id_in_process_ = 0;
+    next_suitable_robot_endpoint_for_recipe_id_in_process_ = "";
     next_suitable_robot_position_for_recipe_id_in_process_ = 0;
     preparing_dish_ = false;
     /* Update recipe id in process */
@@ -433,6 +443,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
 robot::~robot() {
     running_ = false;
     join_threads();
+    UA_String_clear(&server_endpoint_);
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
     UA_Client_delete(controller_client_);
@@ -452,7 +463,6 @@ robot::determine_next_action() {
             reset_in_process_fields();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Request next robot for recipe %d with processed steps %d", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
             method_node_caller choose_next_robot_caller;
-            choose_next_robot_caller.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
             choose_next_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
             choose_next_robot_caller.add_scalar_input_argument(&recipe_id_in_process, UA_TYPES_UINT32);
             choose_next_robot_caller.add_scalar_input_argument(&processed_steps_of_recipe_id_in_process_, UA_TYPES_UINT32);
@@ -511,7 +521,7 @@ robot::determine_next_action() {
         // Send finished order notification to conveyor
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
         method_node_caller receive_finished_order_notification_caller;
-        receive_finished_order_notification_caller.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
+        receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
         receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
         object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
         if (omi == OBJECT_METHOD_INFO_NULL) {
@@ -628,10 +638,22 @@ robot::join_threads() {
 
 void
 robot::start() {
-    if (!running_)
+    if (!running_) {
+        stop();
         return;
+    }
+    std::vector<std::string> endpoints;
+    UA_StatusCode status = lookup_endpoints(endpoints, robot_uri_);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
+        stop();
+        join_threads();
+        return;
+    }
+    UA_String_init(&server_endpoint_);
+    server_endpoint_ = UA_STRING_ALLOC(const_cast<char*>(endpoints[0].c_str()));
     method_node_caller register_robot_caller;
-    register_robot_caller.add_scalar_input_argument(&port_, UA_TYPES_UINT16);
+    register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
     register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
     UA_Variant capabilities;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
@@ -651,7 +673,7 @@ robot::start() {
 
     size_t output_size;
     UA_Variant* output;
-    UA_StatusCode status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+    status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
         stop();

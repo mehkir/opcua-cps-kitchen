@@ -47,11 +47,12 @@ private:
     /* robot related member variables */
     UA_Server* server_;
     position_t position_;
-    port_t port_;
+    std::string robot_uri_;
+    UA_String server_endpoint_;
     object_type_node_inserter robot_type_inserter_;
     robot_tool current_tool_;
     UA_UInt32 processed_steps_of_recipe_id_in_process_;
-    port_t next_suitable_robot_port_for_recipe_id_in_process_;
+    std::string next_suitable_robot_endpoint_for_recipe_id_in_process_;
     position_t next_suitable_robot_position_for_recipe_id_in_process_;
     std::queue<order> order_queue_;
     duration_t current_action_duration_;
@@ -95,11 +96,11 @@ private:
     /**
      * @brief Handles the controller response from choose_next_robot_called method to tell the conveyor where to deliver the plate next during the handover.
      * 
-     * @param _target_port next suitable robot's port
+     * @param _target_endpoint next suitable robot's endpoint
      * @param _target_position next suitable robot's position
      */
     void
-    handle_choose_next_robot_result(port_t _target_port, position_t _target_position);
+    handle_choose_next_robot_result(std::string _target_endpoint, position_t _target_position);
 
     /**
      * @brief Extracts the instruction parameters.
@@ -238,10 +239,8 @@ public:
      * @brief Construct a new robot object.
      * 
      * @param _position the position of the robot at the conveyor
-     * @param _port the port of the robot
-     * @param _conveyor_port the port of the conveyor
      */
-    robot(position_t _position, port_t _port, port_t _conveyor_port);
+    robot(position_t _position);
 
     /**
      * @brief Destroy the robot object.

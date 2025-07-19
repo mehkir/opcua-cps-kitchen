@@ -14,8 +14,8 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, stop_handler);
     signal(SIGTERM, stop_handler);
     
-    // _conveyor_port, _robot_count
-    conveyor conveyor_instance(atoi(argv[1]), atoi(argv[2]));
+    // _robot_count
+    conveyor conveyor_instance(atoi(argv[1]));
     conveyor_instance_ = &conveyor_instance;
     conveyor_instance.start();
     return 0;

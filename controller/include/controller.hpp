@@ -29,7 +29,7 @@ struct remote_robot {
     private:
         UA_Client* async_client_;
         UA_Client* sync_client_;
-        const port_t port_;
+        std::string endpoint_;
         const position_t position_;
         std::unordered_set<std::string> capabilities_;
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_;
@@ -44,13 +44,12 @@ struct remote_robot {
         /**
          * @brief Construct a new remote robot object.
          * 
-         * @param _port the port of the remote robot
+         * @param _endpoint the robot's endpoint url
          * @param _position the position of the remote robot at the conveyor
          */
-        remote_robot(port_t _port, position_t _position, std::unordered_set<std::string> _capabilities) :  port_(_port), position_(_position), capabilities_(_capabilities), async_client_(UA_Client_new()), sync_client_(UA_Client_new()), running_(true) {
-            std::string robot_server_endpoint = "opc.tcp://localhost:" + std::to_string(port_);
+        remote_robot(std::string _endpoint, position_t _position, std::unordered_set<std::string> _capabilities) :  endpoint_(_endpoint), position_(_position), capabilities_(_capabilities), async_client_(UA_Client_new()), sync_client_(UA_Client_new()), running_(true) {
             client_connection_establisher cce_async(async_client_);
-            bool connected = cce_async.establish_connection(robot_server_endpoint);
+            bool connected = cce_async.establish_connection(endpoint_);
             if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d (async)", position_);
                 running_ = false;
@@ -82,7 +81,7 @@ struct remote_robot {
                 return;
             }
             client_connection_establisher cce_sync(sync_client_);
-            connected = cce_sync.establish_connection(robot_server_endpoint);
+            connected = cce_sync.establish_connection(endpoint_);
             if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d (sync)", position_);
                 running_ = false;
@@ -123,13 +122,13 @@ struct remote_robot {
         }
 
         /**
-         * @brief Returns the port of the remote robot.
+         * @brief Returns the robot's endpoint
          * 
-         * @return port_t the remote robot port
+         * @return std::string the endpoint url
          */
-        port_t
-        get_port() const {
-            return port_;
+        std::string
+        get_endpoint() const {
+            return endpoint_;
         }
 
         /**
@@ -187,7 +186,7 @@ struct remote_robot {
         UA_StatusCode
         instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d with port %d to cook recipe %d from step %d", position_, port_, _recipe_id, _processed_steps);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d from step %d", position_, _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
@@ -286,13 +285,13 @@ private:
     /**
      * @brief Registers a remote robot.
      * 
-     * @param _port the port of the remote robot
+     * @param _endpoint the robot's endpoint url
      * @param _position the position of the remote robot
      * @param _remote_robot_capabilities the capabilities of the remote robot
      * @param _output the output pointer to store return parameters
      */
     void
-    handle_robot_registration(port_t _port, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output);
+    handle_robot_registration(std::string _endpoint, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output);
 
     /**
      * @brief Extracts the received robot and recipe parameters.
@@ -321,14 +320,13 @@ private:
     /**
      * @brief Chooses the next suitable robot
      * 
-     * @param _port the port of the remote robot
      * @param _position the position of the remote robot
      * @param _recipe_id the recipe id of the partial finished order
      * @param _processed_steps the steps until the recipe is processed
      * @param _output the output pointer to store return parameters
      */
     void
-    handle_next_robot_request(port_t _port, position_t _position, recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
+    handle_next_robot_request(position_t _position, recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
 
     /**
      * @brief Returns a suitable robot for the given recipe ID starting from the next step to be processed
