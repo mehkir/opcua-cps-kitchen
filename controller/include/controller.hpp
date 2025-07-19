@@ -112,9 +112,9 @@ struct remote_robot {
         void start_thread() {
             client_thread_ = std::thread([this]() {
                 while(running_) {
-                    UA_StatusCode status = UA_Client_run_iterate(async_client_, 100);
+                    UA_StatusCode status = UA_Client_run_iterate(async_client_, 1000);
                     if (status != UA_STATUSCODE_GOOD) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running robot client");
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
                         running_ = false;
                     }
                 }
@@ -198,7 +198,7 @@ struct remote_robot {
             }
             UA_StatusCode status = receive_robot_task_caller.call_method_node(sync_client_, omi.object_id_, omi.method_id_, _output_size, _output);
             if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error calling instruct method");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling instruct method (%s)", __FUNCTION__, UA_StatusCode_name(status));
                 running_ = false;
                 return UA_STATUSCODE_BAD;
             }

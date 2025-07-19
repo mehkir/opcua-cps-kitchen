@@ -182,9 +182,9 @@ controller::choose_next_robot(UA_Server* _server,
     }
 
     
-    UA_StatusCode status = !UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32]);
+    UA_StatusCode status = !UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32]);
+    status |= !UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32]);
     status |= !UA_Variant_hasScalarType(&_input[2], &UA_TYPES[UA_TYPES_UINT32]);
-    status |= !UA_Variant_hasScalarType(&_input[3], &UA_TYPES[UA_TYPES_UINT32]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
         return UA_STATUSCODE_BAD;
