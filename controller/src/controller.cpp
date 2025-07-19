@@ -214,15 +214,18 @@ controller::handle_next_robot_request(position_t _position, recipe_id_t _recipe_
 
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Robot at position %d requests next robot for recipe id %d processed with %d steps already", _position, _recipe_id, _processed_steps);
     remote_robot* next_suitable_robot = find_suitable_robot(_recipe_id, _processed_steps);
-    UA_String next_suitable_robot_endpoint = UA_STRING(const_cast<char*>(""));
+    UA_String next_suitable_robot_endpoint = UA_STRING_ALLOC("");
     position_t next_suitable_robot_position = 0;
     if (next_suitable_robot != NULL) {
+        UA_String_clear(&next_suitable_robot_endpoint);
+        next_suitable_robot_endpoint = UA_STRING_ALLOC(next_suitable_robot->get_endpoint().c_str());
         next_suitable_robot_endpoint = UA_STRING(const_cast<char*>(next_suitable_robot->get_endpoint().c_str()));
         next_suitable_robot_position = next_suitable_robot->get_position();
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d", next_suitable_robot_position);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d (%s)", next_suitable_robot_position, next_suitable_robot->get_endpoint().c_str());
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &next_suitable_robot_endpoint, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[1], &next_suitable_robot_position, &UA_TYPES[UA_TYPES_UINT32]);
+    UA_String_clear(&next_suitable_robot_endpoint);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
         stop();
