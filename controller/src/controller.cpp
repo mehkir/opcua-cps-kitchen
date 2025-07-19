@@ -219,7 +219,6 @@ controller::handle_next_robot_request(position_t _position, recipe_id_t _recipe_
     if (next_suitable_robot != NULL) {
         UA_String_clear(&next_suitable_robot_endpoint);
         next_suitable_robot_endpoint = UA_STRING_ALLOC(next_suitable_robot->get_endpoint().c_str());
-        next_suitable_robot_endpoint = UA_STRING(const_cast<char*>(next_suitable_robot->get_endpoint().c_str()));
         next_suitable_robot_position = next_suitable_robot->get_position();
     }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d (%s)", next_suitable_robot_position, next_suitable_robot->get_endpoint().c_str());
