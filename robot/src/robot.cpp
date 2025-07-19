@@ -248,7 +248,7 @@ robot::handle_choose_next_robot_result(std::string _target_endpoint, position_t 
     }
     next_suitable_robot_endpoint_for_recipe_id_in_process_ = _target_endpoint;
     next_suitable_robot_position_for_recipe_id_in_process_ = _target_position;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", next_suitable_robot_position_for_recipe_id_in_process_, next_suitable_robot_endpoint_for_recipe_id_in_process_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", next_suitable_robot_position_for_recipe_id_in_process_, next_suitable_robot_endpoint_for_recipe_id_in_process_.c_str());
     /* Notify conveyor about finished order */
     method_node_caller receive_finished_order_notification_caller;
     receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
@@ -412,11 +412,12 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     /* Set output values */
+    UA_String next_suitable_robot_endpoint_for_recipe_id_in_process = UA_STRING(const_cast<char*>(next_suitable_robot_endpoint_for_recipe_id_in_process_.c_str()));
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &server_endpoint_, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[2], &recipe_id_in_process, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[3], &processed_steps_of_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
-    status |= UA_Variant_setScalarCopy(&_output[4], &next_suitable_robot_endpoint_for_recipe_id_in_process_, &UA_TYPES[UA_TYPES_STRING]);
+    status |= UA_Variant_setScalarCopy(&_output[4], &next_suitable_robot_endpoint_for_recipe_id_in_process, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[5], &next_suitable_robot_position_for_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
