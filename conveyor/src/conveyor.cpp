@@ -109,15 +109,15 @@ conveyor::receive_finished_order_notification(UA_Server *_server,
         return UA_STATUSCODE_BAD;
     }
     UA_String robot_endpoint = *(UA_String*)_input[0].data;
-    std::string robot_ep((char*) robot_endpoint.data, robot_endpoint.length);
     position_t robot_position = *(position_t*)_input[1].data;
+    std::string robot_endpoint_std_str((char*) robot_endpoint.data, robot_endpoint.length);
 
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "method context is NULL");
         return UA_STATUSCODE_BAD;
     }
     conveyor* self = static_cast<conveyor*>(_method_context);
-    self->handle_finished_order_notification(robot_ep, robot_position, _output);
+    self->handle_finished_order_notification(robot_endpoint_std_str, robot_position, _output);
     return UA_STATUSCODE_GOOD;
 }
 
@@ -300,8 +300,8 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         return;
     }
 
-    position_t remote_robot_position = *(position_t*) _output[1].data;
-    UA_Boolean result = *(position_t*) _output[2].data;
+    position_t remote_robot_position = *(position_t*) _output[0].data;
+    UA_Boolean result = *(position_t*) _output[1].data;
 
     if (!result) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, remote_robot_position);
