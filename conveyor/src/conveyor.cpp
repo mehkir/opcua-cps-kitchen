@@ -198,8 +198,8 @@ conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _outpu
     UA_UInt32 processed_steps = *(UA_UInt32*) _output[3].data;
     UA_String next_remote_robot_endpoint = *(UA_String*) _output[4].data;
     position_t next_remote_robot_position = *(position_t*) _output[5].data;
-
-    handle_handover_finished_order(std::string((char*) remote_robot_endpoint.data, remote_robot_endpoint.length), remote_robot_position, finished_recipe, processed_steps, std::string((char*) next_remote_robot_endpoint.data, next_remote_robot_endpoint.length), next_remote_robot_position);
+    std::string next_remote_robot_endpoint_std_str((char*) next_remote_robot_endpoint.data, next_remote_robot_endpoint.length);
+    handle_handover_finished_order(std::string((char*) remote_robot_endpoint.data, remote_robot_endpoint.length), remote_robot_position, finished_recipe, processed_steps, next_remote_robot_endpoint_std_str, next_remote_robot_position);
 }
 
 void
