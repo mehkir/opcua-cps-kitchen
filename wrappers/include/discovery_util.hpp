@@ -27,9 +27,10 @@ deregister_server(UA_Server* _server);
  * @brief Looks the registered server endpoints on the discovery server up
  * 
  * @param _endpoints stores the returned endpoints
+ * @param _application_uri the application uri to filter endpoints by. If empty, all server endpoints are returned
  * @return UA_StatusCode the status code
  */
 UA_StatusCode
-lookup_endpoints(std::vector<std::string>& _endpoints);
+lookup_endpoints(std::vector<std::string>& _endpoints, std::string _application_uri = "");
 
 #endif // DISCOVERY_UTIL_HPP

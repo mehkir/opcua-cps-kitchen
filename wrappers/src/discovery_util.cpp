@@ -22,7 +22,7 @@ deregister_server(UA_Server* _server) {
 }
 
 UA_StatusCode
-lookup_endpoints(std::vector<std::string>& _endpoints) {
+lookup_endpoints(std::vector<std::string>& _endpoints, std::string _application_uri) {
     /* Example for calling FindServers */
     UA_ApplicationDescription* application_description_array = NULL;
     size_t application_description_array_size = 0;
@@ -56,6 +56,10 @@ lookup_endpoints(std::vector<std::string>& _endpoints) {
         if(description->applicationType != UA_APPLICATIONTYPE_SERVER)
             continue;
 
+        UA_UriString application_uri = UA_STRING(const_cast<char*>(_application_uri.c_str()));
+        if(!_application_uri.empty() && !UA_UriString_equal(&application_uri, &description->applicationUri))
+            continue;
+
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoints for Server[%lu]: %.*s", (unsigned long) i,
                (int) description->applicationUri.length, description->applicationUri.data);
 
@@ -69,7 +73,7 @@ lookup_endpoints(std::vector<std::string>& _endpoints) {
         if(retval != UA_STATUSCODE_GOOD) {
             UA_Client_disconnect(client);
             UA_Client_delete(client);
-            if(endpoint_array) // Free if allocated, even on error
+            if(endpoint_array)
                 UA_Array_delete(endpoint_array, endpoint_array_size, &UA_TYPES[UA_TYPES_ENDPOINTDESCRIPTION]);
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "GetEndpoints failed for server %.*s: %s",
                 (int)description->applicationUri.length, description->applicationUri.data, UA_StatusCode_name(retval));
