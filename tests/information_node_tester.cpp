@@ -1,7 +1,6 @@
 #include "information_node_reader.hpp"
 #include "client_connection_establisher.hpp"
 #include "node_value_subscriber.hpp"
-#include "node_ids.hpp"
 
 #include <string>
 #include <open62541/client_config_default.h>
@@ -39,7 +38,7 @@ int main(int argc, char* argv[]) {
     UA_UInt32 sample_data = 12345;
 
     node_value_subscriber string_subscriber;
-    string_subscriber.subscribe_node_value(client, UA_NODEID_STRING(1, const_cast<char*>(INGREDIENTS)), string_changed, &sample_data);
+    string_subscriber.subscribe_node_value(client, UA_NODEID_STRING(1, const_cast<char*>("ingredients")), string_changed, &sample_data);
 
     while(running) {
         if (UA_Client_run_iterate(client, 1000) != UA_STATUSCODE_GOOD) {
