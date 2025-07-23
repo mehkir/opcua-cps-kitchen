@@ -2,6 +2,7 @@
 #include <open62541/client_config_default.h>
 #include <open62541/plugin/log_stdout.h>
 #include <chrono>
+#include <unistd.h>
 #include "../include/filtered_logger.hpp"
 
 #define TIMEOUT 10
@@ -27,10 +28,11 @@ client_connection_establisher::establish_connection(std::string _server_endpoint
         UA_Client_getState(client_, NULL, &session_state, NULL);
         if (session_state != UA_SESSIONSTATE_ACTIVATED) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection attempt failed. Retrying to connect in 1 second", __FUNCTION__);
+            sleep(1);
         }
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
-        if (elapsed >= TIMEOUT) {
+        if (elapsed >= TIMEOUT && session_state != UA_SESSIONSTATE_ACTIVATED) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection attempt timed out after %d seconds", __FUNCTION__, TIMEOUT);
             break;
         }
