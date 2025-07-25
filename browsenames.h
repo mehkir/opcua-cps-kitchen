@@ -8,7 +8,7 @@
 #define RECEIVE_TASK "ReceiveTask"
 #define HANDOVER_FINISHED_ORDER "HandoverFinishedOrder"
 // information nodes
-#define AGENT_TYPE "AgentType"
+#define POSITION "Position"
 #define RECIPE_ID "RecipeId"
 #define DISH_NAME "DishName"
 #define ACTION_NAME "ActionName"
