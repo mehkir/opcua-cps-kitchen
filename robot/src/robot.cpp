@@ -35,6 +35,7 @@ robot::robot(position_t _position) :
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(robot_uri_.c_str());
     // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add attributes */
+    robot_type_inserter_.add_attribute(ROBOT_TYPE, POSITION);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, RECIPE_ID);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, DISH_NAME);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, ACTION_NAME);
@@ -74,6 +75,8 @@ robot::robot(position_t _position) :
     /* Instantiate robot type */
     robot_type_inserter_.add_object_instance(INSTANCE_NAME, ROBOT_TYPE);
     /* Set attribute values */
+    /* Set position at conveyor */
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, POSITION, &position_, UA_TYPES_UINT32);
     /* Set recipe id in process */
     UA_UInt32 recipe_id_in_process = 0;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, RECIPE_ID, &recipe_id_in_process, UA_TYPES_UINT32);
