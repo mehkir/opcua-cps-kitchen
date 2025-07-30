@@ -56,9 +56,12 @@ lookup_endpoints(std::vector<std::string>& _endpoints, std::string _application_
         if(description->applicationType != UA_APPLICATIONTYPE_SERVER)
             continue;
 
-        UA_UriString application_uri = UA_STRING(const_cast<char*>(_application_uri.c_str()));
-        if(!_application_uri.empty() && !UA_UriString_equal(&application_uri, &description->applicationUri))
+        UA_UriString application_uri = UA_STRING_ALLOC(_application_uri.c_str());
+        if(!_application_uri.empty() && !UA_UriString_equal(&application_uri, &description->applicationUri)) {
+            UA_String_clear(&application_uri);
             continue;
+        }
+        UA_String_clear(&application_uri);
 
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoints for Server[%lu]: %.*s", (unsigned long) i,
                (int) description->applicationUri.length, description->applicationUri.data);

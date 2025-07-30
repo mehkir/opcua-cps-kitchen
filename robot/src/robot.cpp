@@ -356,8 +356,9 @@ robot::cook_next_order() {
     processed_steps_of_recipe_id_in_process_ = next_order.get_processed_steps();
     // Update dish name
     recipe current_recipe = recipe_parser_.get_recipe(recipe_id_in_process);
-    UA_String dish_in_process = UA_STRING(const_cast<char*>(current_recipe.get_dish_name().c_str()));
+    UA_String dish_in_process = UA_STRING_ALLOC(current_recipe.get_dish_name().c_str());
     status = robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, DISH_NAME, &dish_in_process, UA_TYPES_STRING);
+    UA_String_clear(&dish_in_process);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Setting %s failed", __FUNCTION__, DISH_NAME);
     }
@@ -508,8 +509,9 @@ robot::determine_next_action() {
             UA_String action_in_process = UA_STRING(const_cast<char*>(robot_act.get_name().c_str()));
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ACTION_NAME, &action_in_process, UA_TYPES_STRING);
             /* Update ingredients in process */
-            UA_String ingredients_in_process = UA_STRING(const_cast<char*>(robot_act.get_ingredients().c_str()));
+            UA_String ingredients_in_process = UA_STRING_ALLOC(robot_act.get_ingredients().c_str());
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
+            UA_String_clear(&ingredients_in_process);
             /* Schedule next action */
             current_action_duration_ = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), current_action_duration_);
