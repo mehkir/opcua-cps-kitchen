@@ -89,6 +89,12 @@ struct remote_robot {
         UA_StatusCode handover_finished_order(size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d", position_);
+            /* Check if robot connection is still active and reconnect if not */
+            client_connection_establisher robot_client_connection_establisher(client_);
+            if (!robot_client_connection_establisher.check_and_reconnect_client()) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error reconnecting to robot client", __FUNCTION__);
+                return UA_STATUSCODE_BAD;
+            }
             method_node_caller handover_finished_order_caller;
             object_method_info omi = method_id_map_[HANDOVER_FINISHED_ORDER];
             if (omi == OBJECT_METHOD_INFO_NULL) {
@@ -115,6 +121,12 @@ struct remote_robot {
         UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", position_, _recipe_id, _processed_steps);
+            /* Check if robot connection is still active and reconnect if not */
+            client_connection_establisher robot_client_connection_establisher(client_);
+            if (!robot_client_connection_establisher.check_and_reconnect_client()) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error reconnecting to robot client", __FUNCTION__);
+                return UA_STATUSCODE_BAD;
+            }
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);

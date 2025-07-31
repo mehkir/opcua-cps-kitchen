@@ -203,7 +203,6 @@ robot::robot(position_t _position) :
         return;
     }
     /* Gather method ids */
-    UA_ClientConfig* conveyor_config = UA_Client_getConfig(conveyor_client_);
     method_id_map_[FINISHED_ORDER_NOTIFICATION] = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
 }
 
@@ -253,7 +252,14 @@ robot::handle_choose_next_robot_result(std::string _target_endpoint, position_t 
     next_suitable_robot_endpoint_for_recipe_id_in_process_ = _target_endpoint;
     next_suitable_robot_position_for_recipe_id_in_process_ = _target_position;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", next_suitable_robot_position_for_recipe_id_in_process_, next_suitable_robot_endpoint_for_recipe_id_in_process_.c_str());
-    /* Notify conveyor about finished order */
+    /* Check if conveyor connection is still active and reconnect if not */
+    client_connection_establisher conveyor_client_connection_establisher(conveyor_client_);
+    if (!conveyor_client_connection_establisher.check_and_reconnect_client()) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error reconnecting to conveyor client", __FUNCTION__);
+        stop();
+        return;
+    }
+    /* Notify conveyor about partially finished order */
     method_node_caller receive_finished_order_notification_caller;
     receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
     receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
@@ -464,12 +470,22 @@ robot::determine_next_action() {
     UA_Variant recipe_id_in_process_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
+    /* Process remaining actions */
     if (action_queue_in_process_.size()) {
         robot_action robot_act = action_queue_in_process_.front();
+        /* Request next robot if not capable to process the action */
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
             reset_in_process_fields();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Request next robot for recipe %d with processed steps %d", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
+            /* Check if controller connection is still active and reconnect if not */
+            client_connection_establisher controller_client_connection_establisher(controller_client_);
+            if (!controller_client_connection_establisher.check_and_reconnect_client()) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error reconnecting to controller client", __FUNCTION__);
+                stop();
+                return;
+            }
+            /* Request next robot */
             method_node_caller choose_next_robot_caller;
             choose_next_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
             choose_next_robot_caller.add_scalar_input_argument(&recipe_id_in_process, UA_TYPES_UINT32);
@@ -492,6 +508,7 @@ robot::determine_next_action() {
             choose_next_robot_called(output_size, output);
             return;
         }
+        /* Retool if necessary */
         robot_tool required_tool = robot_act.get_required_tool();
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
@@ -504,6 +521,7 @@ robot::determine_next_action() {
                 }
                 retool();
             });
+        /* Process the next action */
         } else {
             /* Update action in process */
             UA_String action_in_process = UA_STRING(const_cast<char*>(robot_act.get_name().c_str()));
@@ -527,8 +545,15 @@ robot::determine_next_action() {
         }
     } else {
         reset_in_process_fields();
-        // Send finished order notification to conveyor
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
+        /* Check if conveyor connection is still active and reconnect if not */
+        client_connection_establisher conveyor_client_connection_establisher(conveyor_client_);
+        if (!conveyor_client_connection_establisher.check_and_reconnect_client()) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error reconnecting to conveyor client", __FUNCTION__);
+            stop();
+            return;
+        }
+        /* Notify conveyor about finished order */
         method_node_caller receive_finished_order_notification_caller;
         receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
         receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);

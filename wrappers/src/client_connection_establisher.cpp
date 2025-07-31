@@ -39,3 +39,16 @@ client_connection_establisher::establish_connection(std::string _server_endpoint
     }
     return session_state == UA_SESSIONSTATE_ACTIVATED;
 }
+
+bool
+client_connection_establisher::check_and_reconnect_client() {
+    bool connected = true;
+    UA_SessionState session_state = UA_SESSIONSTATE_CLOSED;
+    UA_Client_getState(client_, NULL, &session_state, NULL);
+    if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+        UA_ClientConfig* client_config = UA_Client_getConfig(client_);
+        std::string client_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
+        connected = establish_connection(client_endpoint);
+    }
+    return connected;
+}

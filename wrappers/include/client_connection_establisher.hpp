@@ -12,9 +12,7 @@ public:
     client_connection_establisher(UA_Client*& _client);
     ~client_connection_establisher();
     bool establish_connection(std::string _server_endpoint);
+    bool check_and_reconnect_client();
 };
-
-
-
 
 #endif // CLIENT_CONNECTION_ESTABLISHER_HPP
