@@ -13,6 +13,7 @@ public:
     ~client_connection_establisher();
     bool establish_connection(std::string _server_endpoint);
     bool check_and_reconnect_client();
+    bool reconnect();
 };
 
 #endif // CLIENT_CONNECTION_ESTABLISHER_HPP

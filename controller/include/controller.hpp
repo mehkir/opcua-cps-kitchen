@@ -37,7 +37,7 @@ struct remote_robot {
         robot_state state_;
         robot_tool last_equipped_tool_;
         duration_t overall_time_;
-        bool running_;
+        std::atomic<bool> running_;
         std::thread client_thread_;
 
     public:
@@ -187,13 +187,6 @@ struct remote_robot {
         instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d from step %d", position_, _recipe_id, _processed_steps);
-            /* Check if robot connection is still active and reconnect if not */
-            client_connection_establisher robot_client_connection_establisher(sync_client_);
-            if (!robot_client_connection_establisher.check_and_reconnect_client()) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error reconnecting to robot client", __FUNCTION__);
-                running_ = false;
-                return UA_STATUSCODE_BAD;
-            }
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
@@ -206,8 +199,14 @@ struct remote_robot {
             UA_StatusCode status = receive_robot_task_caller.call_method_node(sync_client_, omi.object_id_, omi.method_id_, _output_size, _output);
             if(status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling instruct method (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                running_ = false;
-                return UA_STATUSCODE_BAD;
+                client_connection_establisher robot_connection_establisher(sync_client_);
+                if (!robot_connection_establisher.reconnect()) {
+                    running_ = false;
+                    return UA_STATUSCODE_BAD;
+                }
+                status = receive_robot_task_caller.call_method_node(sync_client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if (status != UA_STATUSCODE_GOOD)
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling instruct method after reconnect (%s)", __FUNCTION__, UA_StatusCode_name(status));
             }
             return status;
         }

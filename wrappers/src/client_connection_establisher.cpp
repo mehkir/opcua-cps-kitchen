@@ -19,36 +19,48 @@ client_connection_establisher::establish_connection(std::string _server_endpoint
     UA_ClientConfig_setDefault(client_config);
     client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
     client_config->timeout = 1000;
-    *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    // *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 
     auto start = std::chrono::steady_clock::now();
-    UA_SessionState session_state = UA_SESSIONSTATE_CLOSED;
-    while(session_state != UA_SESSIONSTATE_ACTIVATED) {
-        UA_StatusCode status = UA_Client_connect(client_, _server_endpoint.c_str());
-        UA_Client_getState(client_, NULL, &session_state, NULL);
-        if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+    UA_StatusCode status = UA_Client_connect(client_, _server_endpoint.c_str());
+    while(status != UA_STATUSCODE_GOOD) {
+        status = UA_Client_connect(client_, _server_endpoint.c_str());
+        if (status != UA_STATUSCODE_GOOD) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection attempt failed. Retrying to connect in 1 second", __FUNCTION__);
             sleep(1);
         }
         auto now = std::chrono::steady_clock::now();
         auto elapsed = std::chrono::duration_cast<std::chrono::seconds>(now - start).count();
-        if (elapsed >= TIMEOUT && session_state != UA_SESSIONSTATE_ACTIVATED) {
+        if (elapsed >= TIMEOUT && status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection attempt timed out after %d seconds", __FUNCTION__, TIMEOUT);
             break;
         }
     }
-    return session_state == UA_SESSIONSTATE_ACTIVATED;
+    return status == UA_STATUSCODE_GOOD;
 }
 
 bool
 client_connection_establisher::check_and_reconnect_client() {
-    bool connected = true;
-    UA_SessionState session_state = UA_SESSIONSTATE_CLOSED;
-    UA_Client_getState(client_, NULL, &session_state, NULL);
-    if (session_state != UA_SESSIONSTATE_ACTIVATED) {
+    UA_ClientConfig* client_config = UA_Client_getConfig(client_);
+    std::string server_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
+    UA_StatusCode status = UA_Client_connect(client_, server_endpoint.c_str());
+    bool connected = status == UA_STATUSCODE_GOOD;
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection result is %s. Reconnecting ...", __FUNCTION__, UA_StatusCode_name(status));
         UA_ClientConfig* client_config = UA_Client_getConfig(client_);
         std::string client_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
         connected = establish_connection(client_endpoint);
     }
     return connected;
+}
+
+bool
+client_connection_establisher::reconnect() {
+    UA_ClientConfig* client_config = UA_Client_getConfig(client_);
+    std::string server_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Reconnecting to endpoint %s", __FUNCTION__, server_endpoint.c_str());
+    UA_Client_delete(client_);
+    client_ = NULL;
+    client_ = UA_Client_new();
+    return establish_connection(server_endpoint);
 }
