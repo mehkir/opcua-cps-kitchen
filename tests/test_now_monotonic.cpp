@@ -3,6 +3,7 @@
 #include <open62541/server.h>
 #include <open62541/server_config_default.h>
 #include <time.h>
+#include <thread>
 #include "callback_scheduler.hpp"
 
 static void callback_method(UA_Server* _server, void *data) {
@@ -25,22 +26,42 @@ int main(int argc, char* argv[]) {
     status = UA_ServerConfig_setDefault(server_config);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the server");
-        return status;
+        return EXIT_FAILURE;
+    }
+    status = UA_Server_run_startup(server);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at server startup", __FUNCTION__);
+        running = false;
+        return EXIT_FAILURE;
+    }
+    std::thread server_iterate_thread;
+    /* Start the server eventloop */
+    try {
+        server_iterate_thread = std::thread([server]() {
+            while(running) {
+                UA_Server_run_iterate(server, true);
+            }
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running server", __FUNCTION__);
+        running = false;
+        return EXIT_FAILURE;
     }
 
     callback_scheduler cs(server, callback_method, NULL, NULL);
     UA_DateTime now = UA_DateTime_nowMonotonic();
-    // cs.schedule_from_now(now + UA_DATETIME_SEC);
+    cs.schedule_from_now(now + 5*UA_DATETIME_SEC);
+    UA_DateTime scheduled = UA_DateTime_now() + (10*UA_DATETIME_SEC);
+    UA_StatusCode cb_status = UA_Server_addTimedCallback(server, callback_method, NULL, scheduled, NULL);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Scheduled callback at %" PRIu64 ", now is %" PRIu64 ", status: 0x%08x", scheduled, UA_DateTime_now(), cb_status);
     cs.schedule_from_now_relative(1000);
 
-    /* Run the server loop */
-    status = UA_Server_run(server, &running);
-    if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the server");
-    }
+    if (server_iterate_thread.joinable())
+        server_iterate_thread.join();
 
+    /* Stop server */
+    UA_Server_run_shutdown(server);
     /* Clean up */
     UA_Server_delete(server);
-
     return 0;
 }
