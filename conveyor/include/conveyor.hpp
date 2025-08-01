@@ -32,6 +32,9 @@ struct remote_robot {
         std::string endpoint_;
         const position_t position_;
         std::unordered_map<std::string, object_method_info> method_id_map_;
+        std::atomic<bool> running_;
+        std::thread client_iterate_thread_;
+        std::mutex client_mutex_;
 
     public:
         /**
@@ -49,6 +52,26 @@ struct remote_robot {
             }
             method_id_map_[HANDOVER_FINISHED_ORDER] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, HANDOVER_FINISHED_ORDER);
             method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK);
+
+            try {
+                client_iterate_thread_ = std::thread([this]() {
+                    while(running_) {
+                        {
+                            std::lock_guard<std::mutex> lock(client_mutex_);
+                            UA_StatusCode status = UA_Client_run_iterate(client_, 500);
+                            if (status != UA_STATUSCODE_GOOD) {
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
+                                running_ = false;
+                                return;
+                            }
+                        }
+                    }
+                });
+            } catch (...) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the robot client iterate thread at position %d", __FUNCTION__, position_);
+                running_ = false;
+                return;
+            }
         }
 
         /**
@@ -95,16 +118,14 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, HANDOVER_FINISHED_ORDER);
                 return UA_STATUSCODE_BAD;
             }
-            UA_StatusCode status = handover_finished_order_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, HANDOVER_FINISHED_ORDER, UA_StatusCode_name(status));
-                client_connection_establisher robot_connection_establisher(client_);
-                if (!robot_connection_establisher.reconnect()) {
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = handover_finished_order_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, HANDOVER_FINISHED_ORDER, UA_StatusCode_name(status));
                     return UA_STATUSCODE_BAD;
                 }
-                status = handover_finished_order_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
-                if (status != UA_STATUSCODE_GOOD)
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method after reconnect (%s)", __FUNCTION__, HANDOVER_FINISHED_ORDER, UA_StatusCode_name(status));
             }
             return status;
         }
@@ -130,16 +151,14 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 return UA_STATUSCODE_BAD;
             }
-            UA_StatusCode status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECEIVE_TASK, UA_StatusCode_name(status));
-                client_connection_establisher robot_connection_establisher(client_);
-                if (!robot_connection_establisher.reconnect()) {
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECEIVE_TASK, UA_StatusCode_name(status));
                     return UA_STATUSCODE_BAD;
                 }
-                status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
-                if (status != UA_STATUSCODE_GOOD)
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method after reconnect (%s)", __FUNCTION__, RECEIVE_TASK, UA_StatusCode_name(status));
             }
             return status;
         }

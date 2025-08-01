@@ -264,17 +264,14 @@ robot::handle_choose_next_robot_result(std::string _target_endpoint, position_t 
     }
     size_t output_size;
     UA_Variant* output;
-    UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-        client_connection_establisher conveyor_connection_establisher(conveyor_client_);
-        if (!conveyor_connection_establisher.reconnect()) {
+    {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
             stop();
             return;
         }
-        status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-        if (status != UA_STATUSCODE_GOOD)
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification after reconnect (%s)", __FUNCTION__, UA_StatusCode_name(status));
     }
     receive_finished_order_notification_called(output_size, output);
 }
@@ -490,16 +487,14 @@ robot::determine_next_action() {
             }
             size_t output_size;
             UA_Variant* output;
-            UA_StatusCode status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-            if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to get next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                client_connection_establisher controller_connection_establisher(controller_client_);
-                if(!controller_connection_establisher.reconnect()) {
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                UA_StatusCode status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+                if (status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to get next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
                     stop();
                     return;
                 }
-                if (status != UA_STATUSCODE_GOOD)
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to get next robot after reconnect(%s)", __FUNCTION__, UA_StatusCode_name(status));
             }
             choose_next_robot_called(output_size, output);
             return;
@@ -554,17 +549,14 @@ robot::determine_next_action() {
         }
         size_t output_size;
         UA_Variant* output;
-        UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            client_connection_establisher conveyor_connection_establisher(conveyor_client_);
-            if (!conveyor_connection_establisher.reconnect()) {
+        {
+            std::lock_guard<std::mutex> lock(client_mutex_);
+            UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
                 stop();
                 return;
             }
-            status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-            if (status != UA_STATUSCODE_GOOD)
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification after reconnect (%s)", __FUNCTION__, UA_StatusCode_name(status));
         }
         receive_finished_order_notification_called(output_size, output);
     }
@@ -663,6 +655,8 @@ robot::join_threads() {
         worker_thread_.join();
     if (discovery_thread_.joinable())
         discovery_thread_.join();
+    if (client_iterate_thread_.joinable())
+        client_iterate_thread_.join();
 }
 
 void
@@ -702,12 +696,42 @@ robot::start() {
 
     size_t output_size;
     UA_Variant* output;
-    status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-    if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
-        stop();
+    {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registering at the controller", __FUNCTION__);
+        status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
+            stop();
+        }
     }
     register_robot_called(output_size, output);
+    /* Run the client iterate thread */
+    try {
+        client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                {
+                    std::lock_guard<std::mutex> lock(client_mutex_);
+                    UA_StatusCode status = UA_Client_run_iterate(controller_client_, 500);
+                    if (status != UA_STATUSCODE_GOOD) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running controller client iterate", __FUNCTION__);
+                        stop();
+                        return;
+                    }
+                    status = UA_Client_run_iterate(conveyor_client_, 500);
+                    if (status != UA_STATUSCODE_GOOD) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running conveyor client iterate", __FUNCTION__);
+                        stop();
+                        return;
+                    }
+                }
+            }
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the client iterate thread");
+        stop();
+        return;
+    }
     join_threads();
 }
 
