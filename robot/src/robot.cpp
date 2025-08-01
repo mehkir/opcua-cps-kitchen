@@ -712,19 +712,21 @@ robot::start() {
             while(running_) {
                 {
                     std::lock_guard<std::mutex> lock(client_mutex_);
-                    UA_StatusCode status = UA_Client_run_iterate(controller_client_, 500);
+                    UA_StatusCode status = UA_Client_run_iterate(controller_client_, 50);
                     if (status != UA_STATUSCODE_GOOD) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running controller client iterate", __FUNCTION__);
                         stop();
                         return;
                     }
-                    status = UA_Client_run_iterate(conveyor_client_, 500);
+                    status = UA_Client_run_iterate(conveyor_client_, 50);
                     if (status != UA_STATUSCODE_GOOD) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running conveyor client iterate", __FUNCTION__);
                         stop();
                         return;
                     }
                 }
+                sleep(1);
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
             }
         });
     } catch (...) {

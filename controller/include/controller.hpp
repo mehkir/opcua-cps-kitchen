@@ -107,13 +107,15 @@ struct remote_robot {
                     while(running_) {
                         {
                             std::lock_guard<std::mutex> lock(client_mutex_);
-                            UA_StatusCode status = UA_Client_run_iterate(client_, 100);
+                            UA_StatusCode status = UA_Client_run_iterate(client_, 50);
                             if (status != UA_STATUSCODE_GOOD) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
                                 running_ = false;
                                 return;
                             }
                         }
+                        sleep(1);
+                        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
                 });
             } catch (...) {

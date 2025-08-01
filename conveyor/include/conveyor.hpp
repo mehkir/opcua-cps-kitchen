@@ -43,7 +43,7 @@ struct remote_robot {
          * @param _endpoint the remote robot's endpoint
          * @param _position the position of the remote robot
          */
-        remote_robot(std::string _endpoint, position_t _position) :  endpoint_(_endpoint), position_(_position), client_(UA_Client_new()) {
+        remote_robot(std::string _endpoint, position_t _position) :  endpoint_(_endpoint), position_(_position), client_(UA_Client_new()), running_(true) {
             client_connection_establisher robot_client_connection_establisher(client_);
             bool connected = robot_client_connection_establisher.establish_connection(endpoint_);
             if (!connected) {
@@ -58,13 +58,15 @@ struct remote_robot {
                     while(running_) {
                         {
                             std::lock_guard<std::mutex> lock(client_mutex_);
-                            UA_StatusCode status = UA_Client_run_iterate(client_, 500);
+                            UA_StatusCode status = UA_Client_run_iterate(client_, 50);
                             if (status != UA_STATUSCODE_GOOD) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
                                 running_ = false;
                                 return;
                             }
                         }
+                        sleep(1);
+                        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
                 });
             } catch (...) {
@@ -116,6 +118,7 @@ struct remote_robot {
             object_method_info omi = method_id_map_[HANDOVER_FINISHED_ORDER];
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, HANDOVER_FINISHED_ORDER);
+                running_ = false;
                 return UA_STATUSCODE_BAD;
             }
             UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -124,6 +127,7 @@ struct remote_robot {
                 status = handover_finished_order_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, HANDOVER_FINISHED_ORDER, UA_StatusCode_name(status));
+                    running_ = false;
                     return UA_STATUSCODE_BAD;
                 }
             }
@@ -149,6 +153,7 @@ struct remote_robot {
             object_method_info omi = method_id_map_[RECEIVE_TASK];
             if (omi == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
+                running_ = false;
                 return UA_STATUSCODE_BAD;
             }
             UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -157,6 +162,7 @@ struct remote_robot {
                 status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECEIVE_TASK, UA_StatusCode_name(status));
+                    running_ = false;
                     return UA_STATUSCODE_BAD;
                 }
             }
