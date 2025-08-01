@@ -58,9 +58,9 @@ bool
 client_connection_establisher::reconnect() {
     UA_ClientConfig* client_config = UA_Client_getConfig(client_);
     std::string server_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Reconnecting to endpoint %s", __FUNCTION__, server_endpoint.c_str());
     UA_Client_delete(client_);
     client_ = NULL;
     client_ = UA_Client_new();
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Reconnecting to endpoint %s", __FUNCTION__, server_endpoint.c_str());
     return establish_connection(server_endpoint);
 }
