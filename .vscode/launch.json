@@ -34,7 +34,7 @@
             "request": "launch",
             // Resolved by CMake Tools:
             "program": "${workspaceFolder}/build/start_robot_instance",
-            "args": ["1","4000","6000"],
+            "args": ["1"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
