@@ -162,7 +162,6 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities);
-        position_remote_robot_map_[_position]->start_thread();
     }
     bool capabilities_received = true;
     UA_Variant_setScalarCopy(_output, &capabilities_received, &UA_TYPES[UA_TYPES_BOOLEAN]);

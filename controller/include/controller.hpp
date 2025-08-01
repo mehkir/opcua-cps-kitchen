@@ -83,6 +83,32 @@ struct remote_robot {
             if ((method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 running_ = false;
+                return;
+            }
+            try {
+                client_iterate_thread_ = std::thread([this]() {
+                    while(running_) {
+                        {
+                            std::lock_guard<std::mutex> lock(client_mutex_);
+                            UA_StatusCode status = UA_Client_run_iterate(client_, 1);
+                            if (status != UA_STATUSCODE_GOOD) {
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
+                                running_ = false;
+                                return;
+                            }
+                        }
+                        if (usleep(100*1000)) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at robot client iterate sleep", __FUNCTION__);
+                            running_ = false;
+                            return;
+                        }
+                        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                    }
+                });
+            } catch (...) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the robot client iterate thread at position %d", __FUNCTION__, position_);
+                running_ = false;
+                return;
             }
         }
 
@@ -101,29 +127,9 @@ struct remote_robot {
          * @brief Starts the housekeeping thread
          * 
          */
-        void start_thread() {
-            try {
-                client_iterate_thread_ = std::thread([this]() {
-                    while(running_) {
-                        {
-                            std::lock_guard<std::mutex> lock(client_mutex_);
-                            UA_StatusCode status = UA_Client_run_iterate(client_, 50);
-                            if (status != UA_STATUSCODE_GOOD) {
-                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
-                                running_ = false;
-                                return;
-                            }
-                        }
-                        sleep(1);
-                        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
-                    }
-                });
-            } catch (...) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the robot client iterate thread");
-                running_ = false;
-                return;
-            }
-        }
+        // void start_thread() {
+
+        // }
 
         /**
          * @brief Returns the robot's endpoint
