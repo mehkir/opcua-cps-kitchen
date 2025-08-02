@@ -125,11 +125,19 @@ void
 conveyor::handle_finished_order_notification(std::string _robot_endpoint, position_t _robot_position, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "FINISHED_ORDER_NOTIFICATION: Received notification from robot at position %d with endpoint %s", _robot_position, _robot_endpoint.c_str());
-    UA_Boolean finished_order_notification_received = true;
-    UA_Variant_setScalarCopy(_output, &finished_order_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    remove_marked_robots();
     if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position);
+        position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
     }
+    UA_Boolean finished_order_notification_received = true;
+    if (robots_to_be_removed_.find(_robot_position) != robots_to_be_removed_.end()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, _robot_position);
+        remove_marked_robots();
+        finished_order_notification_received = false;
+        UA_Variant_setScalarCopy(_output, &finished_order_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        return;
+    }
+    UA_Variant_setScalarCopy(_output, &finished_order_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     notifications_map_[_robot_position] = _robot_endpoint;
     if (state_status_ == conveyor::state::IDLING) {
         state_status_ = conveyor::state::MOVING;
@@ -150,16 +158,19 @@ conveyor::retrieve_finished_orders(UA_Server* _server, void* _data) {
 
 void
 conveyor::handle_retrieve_finished_orders() {
+    remove_marked_robots();
     for (auto notification = notifications_map_.begin(); notification != notifications_map_.end();) {
-        if (!plates_[position_plate_id_map_[notification->first]].is_occupied()){
+        if (!plates_[position_plate_id_map_[notification->first]].is_occupied()) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: Dish at position %d is retrievable", notification->first);
             size_t output_size;
             UA_Variant* output;
             UA_StatusCode status = position_remote_robot_map_[notification->first]->handover_finished_order(&output_size, &output);
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: RETRIEVAL: Retrieving for dish at position %d failed", __FUNCTION__, notification->first);
-                stop();
-                return;
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: RETRIEVAL: Retrieving for dish at position %d failed (%s)", __FUNCTION__, notification->first, UA_StatusCode_name(status));
+                // stop();
+                remove_marked_robots();
+                notification = notifications_map_.erase(notification);
+                continue;
             }
             handover_finished_order_called(output_size, output);
             notification = notifications_map_.erase(notification);
@@ -210,15 +221,20 @@ conveyor::handle_handover_finished_order(std::string _remote_robot_endpoint, pos
     } else {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d passed recipe ID %d with processed steps of %d", _remote_robot_position, _finished_recipe, _processed_steps);
     }
+    remove_marked_robots();
     if (!_next_remote_robot_endpoint.empty() && _next_remote_robot_position != 0 && position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_endpoint, _next_remote_robot_position);
+        position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_endpoint, _next_remote_robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+    }
+    if (robots_to_be_removed_.find(_next_remote_robot_position) != robots_to_be_removed_.end()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, _next_remote_robot_position);
+        remove_marked_robots();
     }
     plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
     p.place_recipe_id(_finished_recipe);
     p.set_occupied(true);
     p.set_processed_steps(_processed_steps);
     if (!_next_remote_robot_endpoint.empty() && _next_remote_robot_position != 0)
-        p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get());
+        p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get()); // TODO: Should we set target position instead of pointer? If pointer is NULL, it will crash
     occupied_plates_.insert(p.get_plate_id());
 }
 
@@ -256,7 +272,7 @@ conveyor::deliver_finished_order() {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Dish at position %d is deliverable", p.get_position());
             size_t output_size;
             UA_Variant* output;
-            UA_StatusCode status = p.get_target_robot()->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), &output_size, &output);
+            UA_StatusCode status = p.get_target_robot()->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), &output_size, &output); // TODO: Check for marked robots and remove them
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "DELIVERY: Failed to deliver dish at position %d", p.get_position());
                 continue;
@@ -322,6 +338,27 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     p.set_target_robot(nullptr);
     occupied_plates_.erase(p.get_plate_id());
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: Delivered dish at position %d successfully", remote_robot_position);
+}
+
+void
+conveyor::mark_robot_for_removal(position_t _position) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    robots_to_be_removed_.insert(_position);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Marked robot at position %d for removal", __FUNCTION__, _position);
+}
+
+void
+conveyor::remove_marked_robots() {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    for (position_t position : robots_to_be_removed_) {
+        if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
+            position_remote_robot_map_.erase(position);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Removed remote robot at position %d", __FUNCTION__, position);
+        } else {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No remote robot found at position %d", __FUNCTION__, position);
+        }
+    }
+    robots_to_be_removed_.clear();
 }
 
 void
