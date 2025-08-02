@@ -97,7 +97,7 @@ struct remote_robot {
                                 return;
                             }
                         }
-                        if (usleep(100*1000)) {
+                        if (usleep(1*1000)) {
                             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at robot client iterate sleep", __FUNCTION__);
                             running_ = false;
                             return;
@@ -122,14 +122,6 @@ struct remote_robot {
                 client_iterate_thread_.join();
             UA_Client_delete(client_);
         }
-        
-        /**
-         * @brief Starts the housekeeping thread
-         * 
-         */
-        // void start_thread() {
-
-        // }
 
         /**
          * @brief Returns the robot's endpoint
@@ -392,6 +384,14 @@ private:
      */
     void
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Removes a remote robot from the controller.
+     * 
+     * @param _position the position of the remote robot to remove
+     */
+    void
+    remove_remote_robot(position_t _position);
 
     /**
      * @brief Joins all started threads.

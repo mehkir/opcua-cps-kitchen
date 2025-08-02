@@ -725,7 +725,7 @@ robot::start() {
                         return;
                     }
                 }
-                if (usleep(100*1000)) {
+                if (usleep(1*1000)) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at client iterate sleep", __FUNCTION__);
                     stop();
                     return;

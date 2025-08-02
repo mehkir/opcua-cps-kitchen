@@ -320,6 +320,18 @@ controller::receive_robot_task_called(size_t _output_size, UA_Variant* _output) 
 }
 
 void
+controller::remove_remote_robot(position_t _position) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    auto it = position_remote_robot_map_.find(_position);
+    if (it != position_remote_robot_map_.end()) {
+        position_remote_robot_map_.erase(it);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", _position);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", _position);
+    }
+}
+
+void
 controller::join_threads() {
     if (server_iterate_thread_.joinable())
         server_iterate_thread_.join();
