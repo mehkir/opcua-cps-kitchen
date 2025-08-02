@@ -114,7 +114,7 @@ struct remote_robot {
                             mark_robot_for_removal_callback_(position_);
                             return;
                         }
-                        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
                 });
             } catch (...) {

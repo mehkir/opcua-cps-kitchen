@@ -160,6 +160,7 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
     capabilites_str.erase(capabilites_str.end()-2, capabilites_str.end());
     capabilites_str += "]";
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
+    remove_marked_robots();
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities, std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1));
     }
@@ -335,9 +336,8 @@ void
 controller::remove_marked_robots() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for (position_t position : robots_to_be_removed_) {
-        auto it = position_remote_robot_map_.find(position);
-        if (it != position_remote_robot_map_.end()) {
-            position_remote_robot_map_.erase(it);
+        if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
+            position_remote_robot_map_.erase(position);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
         } else {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
