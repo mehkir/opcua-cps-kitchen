@@ -161,10 +161,15 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
     capabilites_str += "]";
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities);
+        position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities, std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1));
     }
-    bool capabilities_received = true;
-    UA_Variant_setScalarCopy(_output, &capabilities_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    bool robot_registration_success = true;
+    if (robots_to_be_removed_.find(_position) != robots_to_be_removed_.end()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot registration at position %d failed", __FUNCTION__, _position);
+        remove_marked_robots();
+        robot_registration_success = false;
+    }
+    UA_Variant_setScalarCopy(_output, &robot_registration_success, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
 
 UA_StatusCode
@@ -234,6 +239,7 @@ controller::handle_next_robot_request(position_t _position, recipe_id_t _recipe_
 remote_robot*
 controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    remove_marked_robots();
     std::queue<robot_action> recipe_action_queue = recipe_parser_.get_recipe(_recipe_id).get_action_queue();
     for (size_t i = 0; i < _processed_steps; i++) {
         recipe_action_queue.pop();
@@ -320,15 +326,24 @@ controller::receive_robot_task_called(size_t _output_size, UA_Variant* _output) 
 }
 
 void
-controller::remove_remote_robot(position_t _position) {
+controller::mark_robot_for_removal(position_t _position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    auto it = position_remote_robot_map_.find(_position);
-    if (it != position_remote_robot_map_.end()) {
-        position_remote_robot_map_.erase(it);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", _position);
-    } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", _position);
+    robots_to_be_removed_.insert(_position);
+}
+
+void
+controller::remove_marked_robots() {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    for (position_t position : robots_to_be_removed_) {
+        auto it = position_remote_robot_map_.find(position);
+        if (it != position_remote_robot_map_.end()) {
+            position_remote_robot_map_.erase(it);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
+        } else {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
+        }
     }
+    robots_to_be_removed_.clear();
 }
 
 void
