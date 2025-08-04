@@ -18,7 +18,7 @@
 #define CAPABILITIES_PATH "./capabilities/"
 
 robot::robot(position_t _position) :
-        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
+        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), running_(true), discovery_connected_(false), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
         processed_steps_of_recipe_id_in_process_(0), next_suitable_robot_endpoint_for_recipe_id_in_process_(""), next_suitable_robot_position_for_recipe_id_in_process_(0), current_action_duration_(0),
         recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(UA_Client_new()), conveyor_client_(UA_Client_new()) {
     /* Setup robot */
@@ -128,8 +128,12 @@ robot::robot(position_t _position) :
                     std::this_thread::sleep_for(std::chrono::seconds(5));
                 }
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registered on discovery server. Renewal in 50 minutes", __FUNCTION__);
-                std::unique_lock<std::mutex> lock(discovery_mutex_);
-                discovery_cv_.wait_for(lock, std::chrono::minutes(50), [this] { return !running_.load(); });
+                discovery_connected_ = true;
+                discovery_cv_.notify_all();
+                {
+                    std::unique_lock<std::mutex> lock(discovery_mutex_);
+                    discovery_cv_.wait_for(lock, std::chrono::minutes(50), [this] { return !running_ || !discovery_connected_; });
+                }
                 if (!running_) {
                     deregister_server(server_);
                     stop();
@@ -157,12 +161,7 @@ robot::robot(position_t _position) :
     /* Setup controller client */
     client_connection_establisher controller_client_connection_establisher(controller_client_);
     std::vector<std::string> endpoints;
-    status = lookup_endpoints(endpoints);
-    if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed looking up endpoints (%s)", __FUNCTION__, UA_StatusCode_name(status));
-        stop();
-        return;
-    }
+    lookup_endpoints_helper(endpoints);
     std::string controller_endpoint;
     for (std::string endpoint : endpoints) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint URL: %s\n", endpoint.c_str());
@@ -647,6 +646,24 @@ robot::retool() {
 }
 
 void
+robot::lookup_endpoints_helper(std::vector<std::string>& _endpoints) {
+    while (UA_StatusCode status = lookup_endpoints(_endpoints) != UA_STATUSCODE_GOOD || _endpoints.empty()) {
+        _endpoints.clear();
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed looking up endpoints (%s). Waiting for reconnecting to discovery server.", __FUNCTION__, UA_StatusCode_name(status));
+        {
+            std::unique_lock<std::mutex> lock(discovery_mutex_);
+            discovery_connected_ = false;
+            discovery_cv_.notify_all();
+            discovery_cv_.wait(lock, [this] { return !running_ || discovery_connected_; });
+        }
+        if (!running_) {
+            stop();
+            return;
+        }
+    }
+}
+
+void
 robot::join_threads() {
     if (server_iterate_thread_.joinable())
         server_iterate_thread_.join();
@@ -742,7 +759,7 @@ robot::start() {
 
 void
 robot::stop() {
-    running_.store(false);
+    running_ = false;
     work_guard_.reset();
     io_context_.stop();
     discovery_cv_.notify_all();

@@ -62,6 +62,7 @@ private:
     std::thread server_iterate_thread_;
     std::mutex discovery_mutex_;
     std::condition_variable discovery_cv_;
+    std::atomic<bool> discovery_connected_;
     std::thread discovery_thread_;
     recipe_parser recipe_parser_;
     capability_parser capability_parser_;
@@ -228,6 +229,14 @@ private:
      */
     void
     retool();
+
+    /**
+     * @brief Looks up the registered server endpoints on the discovery server and handles the case if the discovery server is not reachable.
+     * 
+     * @param _endpoints the vector to store the endpoints
+     */
+    void
+    lookup_endpoints_helper(std::vector<std::string>& _endpoints);
 
     /**
      * @brief Joins all started threads.
