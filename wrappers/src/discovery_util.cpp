@@ -4,9 +4,22 @@
 #include <string>
 
 #define DISCOVERY_SERVER_ENDPOINT "opc.tcp://localhost:4840"
+#define REGISTER_RENEWAL 50
+#define REGISTER_INTERVAL 5
+
+discovery_util::discovery_util() : running_(true), discovery_connected_(false) {
+}
+
+discovery_util::~discovery_util() {
+    running_ = false;
+    discovery_connected_ = false;
+    discovery_cv_.notify_all();
+    if (discovery_thread_.joinable())
+        discovery_thread_.join();
+}
 
 UA_StatusCode
-register_server(UA_Server* _server) {
+discovery_util::register_server(UA_Server* _server) {
     UA_ClientConfig cc;
     memset(&cc, 0, sizeof(UA_ClientConfig));
     UA_ClientConfig_setDefault(&cc);
@@ -14,7 +27,7 @@ register_server(UA_Server* _server) {
 }
 
 UA_StatusCode
-deregister_server(UA_Server* _server) {
+discovery_util::deregister_server(UA_Server* _server) {
     UA_ClientConfig cc;
     memset(&cc, 0, sizeof(UA_ClientConfig));
     UA_ClientConfig_setDefault(&cc);
@@ -22,7 +35,7 @@ deregister_server(UA_Server* _server) {
 }
 
 UA_StatusCode
-lookup_endpoints(std::vector<std::string>& _endpoints, std::string _application_uri) {
+discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::string _application_uri) {
     /* Example for calling FindServers */
     UA_ApplicationDescription* application_description_array = NULL;
     size_t application_description_array_size = 0;
@@ -96,5 +109,57 @@ lookup_endpoints(std::vector<std::string>& _endpoints, std::string _application_
     UA_Array_delete(application_description_array, application_description_array_size,
                     &UA_TYPES[UA_TYPES_APPLICATIONDESCRIPTION]);
 
+    return UA_STATUSCODE_GOOD;
+}
+
+UA_StatusCode
+discovery_util::register_server_repeatedly(UA_Server* _server) {
+    try {
+        discovery_thread_ = std::thread([this, _server]() {
+            while(running_) {
+                UA_StatusCode status;
+                while ((status = register_server(_server)) != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering on discovery server. Retrying in %d seconds (%s)", __FUNCTION__, REGISTER_INTERVAL, UA_StatusCode_name(status));
+                    std::this_thread::sleep_for(std::chrono::seconds(REGISTER_INTERVAL));
+                }
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registered on discovery server. Renewal in %d minutes", __FUNCTION__, REGISTER_RENEWAL);
+                discovery_connected_ = true;
+                discovery_cv_.notify_all();
+                {
+                    std::unique_lock<std::mutex> lock(discovery_mutex_);
+                    discovery_cv_.wait_for(lock, std::chrono::minutes(REGISTER_RENEWAL), [this] { return !running_ || !discovery_connected_; });
+                }
+                if (!running_) {
+                    break;
+                }
+            }
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running discovery thread");
+        return UA_STATUSCODE_BAD;
+    }
+    return UA_STATUSCODE_GOOD;
+}
+
+UA_StatusCode
+discovery_util::lookup_endpoints_repeatedly(std::vector<std::string>& _endpoints, std::string _application_uri = "") {
+    UA_StatusCode status;
+    while ((status = lookup_endpoints(_endpoints, _application_uri)) != UA_STATUSCODE_GOOD || _endpoints.empty()) {
+        if (!running_) {
+            return UA_STATUSCODE_BAD;
+        }
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed looking up endpoints (%s). Waiting for reconnection to the discovery server.", __FUNCTION__, UA_StatusCode_name(status));
+            {
+                std::unique_lock<std::mutex> lock(discovery_mutex_);
+                discovery_connected_ = false;
+                discovery_cv_.notify_all();
+                discovery_cv_.wait(lock, [this] { return !running_ || discovery_connected_; });
+            }
+            continue;
+        }
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: No endpoints received. Looking up again in %d seconds", __FUNCTION__, LOOKUP_INTERVAL);
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+    }
     return UA_STATUSCODE_GOOD;
 }
