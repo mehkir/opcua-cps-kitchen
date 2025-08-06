@@ -7,13 +7,21 @@
 
 class client_connection_establisher {
 private:
-    UA_Client* client_;
 public:
-    client_connection_establisher(UA_Client*& _client);
+    client_connection_establisher();
     ~client_connection_establisher();
-    bool establish_connection(std::string _server_endpoint);
+
+    /**
+     * @brief Establishes a connection to a server with a new client. Ensure the pointer is deleted and is null.
+     * 
+     * @param _client the client pointer the new created one's adress is stored
+     * @param _server_endpoint the server endpoint
+     * @return true if connection is established successfully
+     * @return false if connection could not be established, _client is set to nullptr
+     */
+    bool establish_connection(UA_Client*& _client, std::string _server_endpoint);
     static bool test_connection(std::string _server_endpoint);
-    bool reconnect();
+    // bool reconnect();
 };
 
 #endif // CLIENT_CONNECTION_ESTABLISHER_HPP

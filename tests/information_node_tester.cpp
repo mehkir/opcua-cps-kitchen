@@ -26,14 +26,14 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, stopHandler);
     signal(SIGTERM, stopHandler);
 
-    UA_Client* client = UA_Client_new();
+    UA_Client* client = nullptr;
     UA_ClientConfig *cc = UA_Client_getConfig(client);
     UA_ClientConfig_setDefault(cc);
     cc->securityMode = UA_MESSAGESECURITYMODE_NONE;
     cc->timeout = 1000;
 
-    client_connection_establisher con_estab(client);
-    con_estab.establish_connection("opc.tcp://localhost:" + std::to_string(4000));
+    client_connection_establisher con_estab;
+    con_estab.establish_connection(client, "opc.tcp://localhost:" + std::to_string(4000));
 
     UA_UInt32 sample_data = 12345;
 
@@ -45,5 +45,6 @@ int main(int argc, char* argv[]) {
             running = false;
         }
     }
+    UA_Client_delete(client);
     return 0;
 }

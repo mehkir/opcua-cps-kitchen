@@ -16,10 +16,10 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, stopHandler);
     signal(SIGTERM, stopHandler);
 
-    UA_Client* client = UA_Client_new();
-    client_connection_establisher con_estab(client);
+    UA_Client* client = nullptr;
+    client_connection_establisher con_estab;
     std::string server_endpoint = "opc.tcp://localhost:" + std::to_string(4840);
-    bool connected = con_estab.establish_connection(server_endpoint.c_str());
+    bool connected = con_estab.establish_connection(client, server_endpoint.c_str());
     if (!connected) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connecting to server endpoint %s failed", __FUNCTION__, server_endpoint.c_str());
         UA_Client_delete(client);

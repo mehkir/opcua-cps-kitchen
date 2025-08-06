@@ -155,9 +155,9 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, stopHandler);
     signal(SIGTERM, stopHandler);
 
-    UA_Client* client = UA_Client_new();
-    client_connection_establisher con_estab(client);
-    bool connected = con_estab.establish_connection("opc.tcp://localhost:" + std::to_string(6000));
+    UA_Client* client = nullptr;
+    client_connection_establisher con_estab;
+    bool connected = con_estab.establish_connection(client, "opc.tcp://localhost:" + std::to_string(6000));
     if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session", __FUNCTION__);
         running = false;

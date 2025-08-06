@@ -48,9 +48,9 @@ struct remote_robot {
          * @param _endpoint the remote robot's endpoint
          * @param _position the position of the remote robot
          */
-        remote_robot(std::string _endpoint, position_t _position, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) :  endpoint_(_endpoint), position_(_position), client_(UA_Client_new()), running_(true), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
-            client_connection_establisher robot_client_connection_establisher(client_);
-            bool connected = robot_client_connection_establisher.establish_connection(endpoint_);
+        remote_robot(std::string _endpoint, position_t _position, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) :  endpoint_(_endpoint), position_(_position), client_(nullptr), running_(true), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
+            client_connection_establisher robot_client_connection_establisher;
+            bool connected = robot_client_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session");
                 running_ = false;

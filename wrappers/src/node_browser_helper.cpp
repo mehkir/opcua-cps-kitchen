@@ -103,9 +103,9 @@ node_browser_helper::has_instance(UA_Client* _client, std::string _object_type_n
 
 object_method_info
 node_browser_helper::get_method_id(std::string _server_endpoint, std::string _object_type_name, std::string _method_name) {
-    UA_Client* client = UA_Client_new();
-    client_connection_establisher cce(client);
-    bool connected = cce.establish_connection(_server_endpoint);
+    UA_Client* client = nullptr;
+    client_connection_establisher cce;
+    bool connected = cce.establish_connection(client, _server_endpoint);
     if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session with endpoint %s", __FUNCTION__, _server_endpoint.c_str());
         return OBJECT_METHOD_INFO_NULL;
@@ -118,9 +118,9 @@ node_browser_helper::get_method_id(std::string _server_endpoint, std::string _ob
 
 UA_NodeId
 node_browser_helper::get_attribute_id(std::string _server_endpoint, std::string _object_type_name, std::string _attribute_name) {
-    UA_Client* client = UA_Client_new();
-    client_connection_establisher cce(client);
-    bool connected = cce.establish_connection(_server_endpoint);
+    UA_Client* client = nullptr;
+    client_connection_establisher cce;
+    bool connected = cce.establish_connection(client, _server_endpoint);
     if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session with endpoint %s", __FUNCTION__, _server_endpoint.c_str());
         return UA_NODEID_NULL;
@@ -133,9 +133,9 @@ node_browser_helper::get_attribute_id(std::string _server_endpoint, std::string 
 bool
 node_browser_helper::has_instance(std::string _server_endpoint, std::string _object_type_name) {
     bool has_instance = false;
-    UA_Client* client = UA_Client_new();
-    client_connection_establisher cce(client);
-    bool connected = cce.establish_connection(_server_endpoint);
+    UA_Client* client = nullptr;
+    client_connection_establisher cce;
+    bool connected = cce.establish_connection(client, _server_endpoint);
     if (!connected) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing client session with endpoint %s", __FUNCTION__, _server_endpoint.c_str());
         return has_instance;

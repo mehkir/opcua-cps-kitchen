@@ -7,24 +7,27 @@
 
 #define TIMEOUT 10
 
-client_connection_establisher::client_connection_establisher(UA_Client*& _client) : client_(_client) {
+client_connection_establisher::client_connection_establisher() {
 }
 
 client_connection_establisher::~client_connection_establisher() {
 }
 
 bool
-client_connection_establisher::establish_connection(std::string _server_endpoint) {
-    UA_ClientConfig* client_config = UA_Client_getConfig(client_);
+client_connection_establisher::establish_connection(UA_Client*& _client, std::string _server_endpoint) {
+    if (_client != nullptr)
+        UA_LOG_WARNING(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: If passed client pointer is not deleted then memory leaks will occur!");
+    _client = UA_Client_new();
+    UA_ClientConfig* client_config = UA_Client_getConfig(_client);
     UA_ClientConfig_setDefault(client_config);
     client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
     client_config->timeout = 1000;
     // *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 
     auto start = std::chrono::steady_clock::now();
-    UA_StatusCode status = UA_Client_connect(client_, _server_endpoint.c_str());
+    UA_StatusCode status = UA_Client_connect(_client, _server_endpoint.c_str());
     while(status != UA_STATUSCODE_GOOD) {
-        status = UA_Client_connect(client_, _server_endpoint.c_str());
+        status = UA_Client_connect(_client, _server_endpoint.c_str());
         if (status != UA_STATUSCODE_GOOD) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection attempt failed. Retrying to connect in 1 second", __FUNCTION__);
             sleep(1);
@@ -35,6 +38,10 @@ client_connection_establisher::establish_connection(std::string _server_endpoint
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection attempt timed out after %d seconds", __FUNCTION__, TIMEOUT);
             break;
         }
+    }
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_Client_delete(_client);
+        _client = nullptr;
     }
     return status == UA_STATUSCODE_GOOD;
 }
@@ -52,13 +59,13 @@ client_connection_establisher::test_connection(std::string _server_endpoint) {
     return status == UA_STATUSCODE_GOOD;
 }
 
-bool
-client_connection_establisher::reconnect() {
-    UA_ClientConfig* client_config = UA_Client_getConfig(client_);
-    std::string server_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
-    UA_Client_delete(client_);
-    client_ = NULL;
-    client_ = UA_Client_new();
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Reconnecting to endpoint %s", __FUNCTION__, server_endpoint.c_str());
-    return establish_connection(server_endpoint);
-}
+// bool
+// client_connection_establisher::reconnect() {
+//     UA_ClientConfig* client_config = UA_Client_getConfig(client_);
+//     std::string server_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
+//     UA_Client_delete(client_);
+//     client_ = NULL;
+//     client_ = UA_Client_new();
+//     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Reconnecting to endpoint %s", __FUNCTION__, server_endpoint.c_str());
+//     return establish_connection(server_endpoint);
+// }

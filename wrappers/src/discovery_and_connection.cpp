@@ -23,8 +23,8 @@ retry_discovery_and_connect(UA_Client* _client, discovery_util& _discovery_util,
             std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
             continue;
         }
-        client_connection_establisher controller_client_connection_establisher(_client);
-        if (controller_client_connection_establisher.establish_connection(_endpoint))
+        client_connection_establisher controller_client_connection_establisher;
+        if (controller_client_connection_establisher.establish_connection(_client, _endpoint))
             break;
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing %s client session. Retrying to lookup again in %d seconds", __FUNCTION__, _object_type_name.c_str(), LOOKUP_INTERVAL);
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
