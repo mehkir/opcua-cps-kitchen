@@ -21,20 +21,8 @@ discovery_util::~discovery_util() {
 
 UA_StatusCode
 discovery_util::register_server(UA_Server* _server) {
-    // First test if the discovery server is reachable
-    UA_Client* test_client = UA_Client_new();
-    client_connection_establisher test_connection(test_client);
-    
-    if (!test_connection.establish_connection(DISCOVERY_SERVER_ENDPOINT)) {
-        UA_Client_delete(test_client);
-        return UA_STATUSCODE_BADCONNECTIONREJECTED;
-    }
-    
-    // Disconnect the test client
-    UA_Client_disconnect(test_client);
-    UA_Client_delete(test_client);
-    
-    // Now proceed with actual registration
+    if (!client_connection_establisher::test_connection(DISCOVERY_SERVER_ENDPOINT))
+        return UA_STATUSCODE_BAD;
     UA_ClientConfig cc;
     memset(&cc, 0, sizeof(UA_ClientConfig));
     UA_ClientConfig_setDefault(&cc);
@@ -139,13 +127,13 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
                     if (!running_) break;
                 }
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registered on discovery server. Renewal in %d minutes", __FUNCTION__, REGISTER_RENEWAL);
-                discovery_connected_ = true;
-                discovery_cv_.notify_all();
                 {
                     std::unique_lock<std::mutex> lock(discovery_mutex_);
-                    discovery_cv_.wait_for(lock, std::chrono::minutes(REGISTER_RENEWAL), [this] { return !running_ || !discovery_connected_; });
+                    discovery_connected_ = true;
+                    discovery_cv_.notify_all();
+                    if (running_)
+                        discovery_cv_.wait_for(lock, std::chrono::minutes(REGISTER_RENEWAL), [this] { return !running_ || !discovery_connected_; });
                 }
-                if (!running_) break;
             }
         });
     } catch (...) {
@@ -168,7 +156,8 @@ discovery_util::lookup_endpoints_repeatedly(std::vector<std::string>& _endpoints
                 std::unique_lock<std::mutex> lock(discovery_mutex_);
                 discovery_connected_ = false;
                 discovery_cv_.notify_all();
-                discovery_cv_.wait(lock, [this] { return !running_ || discovery_connected_; });
+                if (running_)
+                    discovery_cv_.wait(lock, [this] { return !running_ || discovery_connected_; });
             }
             continue;
         }
@@ -180,9 +169,12 @@ discovery_util::lookup_endpoints_repeatedly(std::vector<std::string>& _endpoints
 
 void
 discovery_util::stop() {
-    running_ = false;
-    discovery_connected_ = false;
-    discovery_cv_.notify_all();
+    {
+        std::lock_guard<std::mutex> lock(discovery_mutex_);
+        running_ = false;
+        discovery_connected_ = false;
+        discovery_cv_.notify_all();
+    }
     if (discovery_thread_.joinable())
         discovery_thread_.join();
 }
