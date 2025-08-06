@@ -40,18 +40,16 @@ client_connection_establisher::establish_connection(std::string _server_endpoint
 }
 
 bool
-client_connection_establisher::check_and_reconnect_client() {
-    UA_ClientConfig* client_config = UA_Client_getConfig(client_);
-    std::string server_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
-    UA_StatusCode status = UA_Client_connect(client_, server_endpoint.c_str());
-    bool connected = status == UA_STATUSCODE_GOOD;
-    if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection result is %s. Reconnecting ...", __FUNCTION__, UA_StatusCode_name(status));
-        UA_ClientConfig* client_config = UA_Client_getConfig(client_);
-        std::string client_endpoint((char*) client_config->endpointUrl.data, client_config->endpointUrl.length);
-        connected = establish_connection(client_endpoint);
-    }
-    return connected;
+client_connection_establisher::test_connection(std::string _server_endpoint) {
+    UA_Client* test_client = UA_Client_new();
+    UA_ClientConfig* client_config = UA_Client_getConfig(test_client);
+    UA_ClientConfig_setDefault(client_config);
+    client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
+    client_config->timeout = 1000;
+    UA_StatusCode status = UA_Client_connect(test_client, _server_endpoint.c_str());
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Test connection status: %s", __FUNCTION__, UA_StatusCode_name(status));
+    UA_Client_delete(test_client);
+    return status == UA_STATUSCODE_GOOD;
 }
 
 bool
