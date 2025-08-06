@@ -135,7 +135,7 @@ robot::robot(position_t _position) :
     }
     /* Setup controller client */
     std::string controller_endpoint;
-    if ((status = retry_discovery_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
+    if ((status = retry_discovery_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE, running_)) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed discovering controller and connecting to it (%s)", __FUNCTION__, UA_StatusCode_name(status));
         stop();
         return;
@@ -145,7 +145,7 @@ robot::robot(position_t _position) :
     method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT);
     /* Setup conveyor client */
     std::string conveyor_endpoint;
-    if ((status = retry_discovery_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
+    if ((status = retry_discovery_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE, running_)) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed discovering conveyor and connecting to it (%s)", __FUNCTION__, UA_StatusCode_name(status));
         stop();
         return;

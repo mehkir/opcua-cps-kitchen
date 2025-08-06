@@ -4,9 +4,9 @@
 #include "../include/client_connection_establisher.hpp"
 
 UA_StatusCode
-retry_discovery_and_connect(UA_Client* _client, discovery_util& _discovery_util, std::string& _endpoint, std::string _object_type_name) {
+retry_discovery_and_connect(UA_Client* _client, discovery_util& _discovery_util, std::string& _endpoint, std::string _object_type_name, std::atomic<bool>& _running) {
     std::vector<std::string> endpoints;
-    while (true) {
+    while (_running) {
         if (_discovery_util.lookup_endpoints_repeatedly(endpoints) != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to lookup endpoints", __FUNCTION__);
             return UA_STATUSCODE_BAD;
@@ -29,5 +29,5 @@ retry_discovery_and_connect(UA_Client* _client, discovery_util& _discovery_util,
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Error establishing %s client session. Retrying to lookup again in %d seconds", __FUNCTION__, _object_type_name.c_str(), LOOKUP_INTERVAL);
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
     }
-    return UA_STATUSCODE_GOOD;
+    return _running ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BAD;
 }
