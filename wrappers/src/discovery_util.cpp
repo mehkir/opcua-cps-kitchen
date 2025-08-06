@@ -2,6 +2,7 @@
 #include <open62541/client_config_default.h>
 #include <open62541/plugin/log_stdout.h>
 #include <string>
+#include "../include/client_connection_establisher.hpp"
 
 #define DISCOVERY_SERVER_ENDPOINT "opc.tcp://localhost:4840"
 #define REGISTER_RENEWAL 50
@@ -20,6 +21,20 @@ discovery_util::~discovery_util() {
 
 UA_StatusCode
 discovery_util::register_server(UA_Server* _server) {
+    // First test if the discovery server is reachable
+    UA_Client* test_client = UA_Client_new();
+    client_connection_establisher test_connection(test_client);
+    
+    if (!test_connection.establish_connection(DISCOVERY_SERVER_ENDPOINT)) {
+        UA_Client_delete(test_client);
+        return UA_STATUSCODE_BADCONNECTIONREJECTED;
+    }
+    
+    // Disconnect the test client
+    UA_Client_disconnect(test_client);
+    UA_Client_delete(test_client);
+    
+    // Now proceed with actual registration
     UA_ClientConfig cc;
     memset(&cc, 0, sizeof(UA_ClientConfig));
     UA_ClientConfig_setDefault(&cc);
@@ -121,6 +136,7 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
                 while ((status = register_server(_server)) != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering on discovery server. Retrying in %d seconds (%s)", __FUNCTION__, REGISTER_INTERVAL, UA_StatusCode_name(status));
                     std::this_thread::sleep_for(std::chrono::seconds(REGISTER_INTERVAL));
+                    if (!running_) break;
                 }
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registered on discovery server. Renewal in %d minutes", __FUNCTION__, REGISTER_RENEWAL);
                 discovery_connected_ = true;
@@ -129,9 +145,7 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
                     std::unique_lock<std::mutex> lock(discovery_mutex_);
                     discovery_cv_.wait_for(lock, std::chrono::minutes(REGISTER_RENEWAL), [this] { return !running_ || !discovery_connected_; });
                 }
-                if (!running_) {
-                    break;
-                }
+                if (!running_) break;
             }
         });
     } catch (...) {
@@ -142,7 +156,7 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
 }
 
 UA_StatusCode
-discovery_util::lookup_endpoints_repeatedly(std::vector<std::string>& _endpoints, std::string _application_uri = "") {
+discovery_util::lookup_endpoints_repeatedly(std::vector<std::string>& _endpoints, std::string _application_uri) {
     UA_StatusCode status;
     while ((status = lookup_endpoints(_endpoints, _application_uri)) != UA_STATUSCODE_GOOD || _endpoints.empty()) {
         if (!running_) {
@@ -162,4 +176,13 @@ discovery_util::lookup_endpoints_repeatedly(std::vector<std::string>& _endpoints
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
     }
     return UA_STATUSCODE_GOOD;
+}
+
+void
+discovery_util::stop() {
+    running_ = false;
+    discovery_connected_ = false;
+    discovery_cv_.notify_all();
+    if (discovery_thread_.joinable())
+        discovery_thread_.join();
 }

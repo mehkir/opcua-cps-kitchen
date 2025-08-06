@@ -24,6 +24,7 @@
 #include "robot_tool.hpp"
 #include "object_type_node_inserter.hpp"
 #include "node_browser_helper.hpp"
+#include "discovery_util.hpp"
 
 using namespace cps_kitchen;
 
@@ -373,9 +374,7 @@ private:
     state state_status_;
     std::vector<plate> plates_;
     std::thread server_iterate_thread_;
-    std::mutex discovery_mutex_;
-    std::condition_variable discovery_cv_;
-    std::thread discovery_thread_;
+    discovery_util discovery_util_;
     std::unordered_set<plate_id_t> occupied_plates_;
     std::unordered_map<position_t, plate_id_t> position_plate_id_map_;
     std::unordered_map<position_t, std::string> notifications_map_;

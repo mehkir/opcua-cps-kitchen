@@ -6,7 +6,6 @@
 #include <thread>
 #include <queue>
 #include <boost/asio.hpp>
-#include <condition_variable>
 #include <atomic>
 
 #include "method_node_caller.hpp"
@@ -16,6 +15,7 @@
 #include "capability_parser.hpp"
 #include "object_type_node_inserter.hpp"
 #include "node_browser_helper.hpp"
+#include "discovery_util.hpp"
 
 using namespace cps_kitchen;
 
@@ -59,11 +59,8 @@ private:
     std::queue<robot_action> action_queue_in_process_;
     bool preparing_dish_;
     std::atomic<bool> running_;
+    discovery_util discovery_util_;
     std::thread server_iterate_thread_;
-    std::mutex discovery_mutex_;
-    std::condition_variable discovery_cv_;
-    std::atomic<bool> discovery_connected_;
-    std::thread discovery_thread_;
     recipe_parser recipe_parser_;
     capability_parser capability_parser_;
     std::unordered_map<std::string, object_method_info> method_id_map_;
@@ -229,14 +226,6 @@ private:
      */
     void
     retool();
-
-    /**
-     * @brief Looks up the registered server endpoints on the discovery server and handles the case if the discovery server is not reachable.
-     * 
-     * @param _endpoints the vector to store the endpoints
-     */
-    void
-    lookup_endpoints_helper(std::vector<std::string>& _endpoints);
 
     /**
      * @brief Joins all started threads.

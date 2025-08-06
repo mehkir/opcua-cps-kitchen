@@ -23,6 +23,7 @@
 #include "robot_tool.hpp"
 #include "object_type_node_inserter.hpp"
 #include "node_browser_helper.hpp"
+#include "discovery_util.hpp"
 
 using namespace cps_kitchen;
 
@@ -261,9 +262,7 @@ private:
     object_type_node_inserter controller_type_inserter_;
     std::atomic<bool> running_;
     std::thread server_iterate_thread_;
-    std::mutex discovery_mutex_;
-    std::condition_variable discovery_cv_;
-    std::thread discovery_thread_;
+    discovery_util discovery_util_;
     /* robot related member variables */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
     std::unordered_set<position_t> robots_to_be_removed_;

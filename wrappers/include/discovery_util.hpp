@@ -64,6 +64,13 @@ public:
     UA_StatusCode
     lookup_endpoints_repeatedly(std::vector<std::string>& _endpoints, std::string _application_uri = "");
 
+    /**
+     * @brief Stops the discovery thread and waits for its exit
+     * 
+     */
+    void
+    stop();
+
     discovery_util();
     ~discovery_util();
 };

@@ -3,7 +3,6 @@
 #include <string>
 #include <chrono>
 #include "filtered_logger.hpp"
-#include "discovery_util.hpp"
 
 #define INSTANCE_NAME "KitchenController"
 #define RECIPE_PATH "recipes.json"
@@ -66,28 +65,7 @@ controller::controller() : server_(UA_Server_new()), controller_type_inserter_(s
         return;
     }
     /* Register at discovery server repeatedly */
-    try {
-        discovery_thread_ = std::thread([this]() {
-            while(running_) {
-                while (UA_StatusCode status = register_server(server_) != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering on discovery server. Retrying in 5 seconds (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    std::this_thread::sleep_for(std::chrono::seconds(5));
-                }
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registered on discovery server. Renewal in 50 minutes", __FUNCTION__);
-                std::unique_lock<std::mutex> lock(discovery_mutex_);
-                discovery_cv_.wait_for(lock, std::chrono::minutes(50), [this] { return !running_.load(); });
-                if (!running_) {
-                    deregister_server(server_);
-                    stop();
-                    break;
-                }
-            }
-        });
-    } catch (...) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running discovery thread");
-        stop();
-        return;
-    }
+    discovery_util_.register_server_repeatedly(server_);
     /* Start the controller event loop */
     try {
         server_iterate_thread_ = std::thread([this]() {
@@ -349,8 +327,6 @@ void
 controller::join_threads() {
     if (server_iterate_thread_.joinable())
         server_iterate_thread_.join();
-    if (discovery_thread_.joinable())
-        discovery_thread_.join();
 }
 
 void
@@ -363,5 +339,6 @@ controller::start() {
 void
 controller::stop() {
     running_ = false;
-    discovery_cv_.notify_all();
+    discovery_util_.stop();
+    discovery_util_.deregister_server(server_);
 }
