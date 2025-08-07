@@ -406,7 +406,7 @@ robot::~robot() {
     UA_Server_delete(server_);
     UA_Client_delete(controller_client_);
     UA_Client_delete(conveyor_client_);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully");
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
 }
 
 void
@@ -686,6 +686,7 @@ robot::start() {
         return;
     }
     join_threads();
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
 
 void
@@ -695,4 +696,5 @@ robot::stop() {
     io_context_.stop();
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }
