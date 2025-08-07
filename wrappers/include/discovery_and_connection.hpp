@@ -10,4 +10,7 @@
 UA_StatusCode
 retry_discovery_and_connect(UA_Client*& _client, discovery_util& _discovery_util, std::string& _endpoint, std::string _object_type_name, std::atomic<bool>& _running);
 
+UA_StatusCode
+discover_and_connect(UA_Client*& _client, discovery_util& _discovery_util, std::string& _endpoint, std::string _object_type_name);
+
 #endif // DISCOVERY_AND_CONNECTION_HPP
