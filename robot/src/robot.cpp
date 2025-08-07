@@ -404,8 +404,10 @@ robot::~robot() {
     UA_String_clear(&server_endpoint_);
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
-    UA_Client_delete(controller_client_);
-    UA_Client_delete(conveyor_client_);
+    if (controller_client_ != nullptr)
+        UA_Client_delete(controller_client_);
+    if (conveyor_client_ != nullptr)
+        UA_Client_delete(conveyor_client_);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
 }
 
@@ -659,17 +661,28 @@ robot::start() {
             while(running_) {
                 {
                     std::lock_guard<std::mutex> lock(client_mutex_);
-                    UA_StatusCode status = UA_Client_run_iterate(controller_client_, 1);
-                    if (status != UA_STATUSCODE_GOOD) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running controller client iterate", __FUNCTION__);
-                        stop();
-                        return;
+                    if (controller_client_ != nullptr) {
+                        UA_StatusCode status = UA_Client_run_iterate(controller_client_, 1);
+                        if (status != UA_STATUSCODE_GOOD) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running controller client iterate", __FUNCTION__);
+                            UA_Client_delete(controller_client_);
+                            controller_client_ = nullptr;
+                        }
+                    } else {
+                        std::string controller_endpoint;
+                        discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE);
                     }
-                    status = UA_Client_run_iterate(conveyor_client_, 1);
-                    if (status != UA_STATUSCODE_GOOD) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running conveyor client iterate", __FUNCTION__);
-                        stop();
-                        return;
+
+                    if (conveyor_client_ != nullptr) {
+                        UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 1);
+                        if (status != UA_STATUSCODE_GOOD) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running conveyor client iterate", __FUNCTION__);
+                            UA_Client_delete(conveyor_client_);
+                            conveyor_client_ = nullptr;
+                        }
+                    } else {
+                        std::string conveyor_endpoint;
+                        discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE);
                     }
                 }
                 if (usleep(1*1000)) {
