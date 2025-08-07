@@ -71,6 +71,7 @@ conveyor::~conveyor() {
     join_threads();
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully");
 }
 
 UA_StatusCode

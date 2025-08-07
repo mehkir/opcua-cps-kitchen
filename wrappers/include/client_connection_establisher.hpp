@@ -14,7 +14,7 @@ public:
     /**
      * @brief Establishes a connection to a server with a new client. Ensure the pointer is deleted and is null.
      * 
-     * @param _client the client pointer the new created one's adress is stored
+     * @param _client the client pointer where the new created one's adress is stored
      * @param _server_endpoint the server endpoint
      * @return true if connection is established successfully
      * @return false if connection could not be established, _client is set to nullptr

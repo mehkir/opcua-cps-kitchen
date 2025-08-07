@@ -4,7 +4,7 @@
 #include "../include/client_connection_establisher.hpp"
 
 UA_StatusCode
-retry_discovery_and_connect(UA_Client* _client, discovery_util& _discovery_util, std::string& _endpoint, std::string _object_type_name, std::atomic<bool>& _running) {
+retry_discovery_and_connect(UA_Client*& _client, discovery_util& _discovery_util, std::string& _endpoint, std::string _object_type_name, std::atomic<bool>& _running) {
     std::vector<std::string> endpoints;
     while (_running) {
         if (_discovery_util.lookup_endpoints_repeatedly(endpoints) != UA_STATUSCODE_GOOD) {

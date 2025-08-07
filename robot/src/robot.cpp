@@ -406,6 +406,7 @@ robot::~robot() {
     UA_Server_delete(server_);
     UA_Client_delete(controller_client_);
     UA_Client_delete(conveyor_client_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully");
 }
 
 void
@@ -614,7 +615,7 @@ robot::start() {
     std::vector<std::string> endpoints;
     UA_StatusCode status = discovery_util_.lookup_endpoints_repeatedly(endpoints, robot_uri_);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error looking up own endpoint url", __FUNCTION__);
         stop();
         join_threads();
         return;
