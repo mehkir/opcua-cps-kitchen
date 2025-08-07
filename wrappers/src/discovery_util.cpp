@@ -79,34 +79,11 @@ discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::stri
         }
         UA_String_clear(&application_uri);
 
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoints for Server[%lu]: %.*s", (unsigned long) i,
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint for Server[%lu]: %.*s", (unsigned long) i,
                (int) description->applicationUri.length, description->applicationUri.data);
 
-        UA_Client *client = UA_Client_new();
-        UA_ClientConfig_setDefault(UA_Client_getConfig(client));
-
         std::string discovery_url((char*) description->discoveryUrls[0].data, description->discoveryUrls[0].length);
-        UA_EndpointDescription* endpoint_array = NULL;
-        size_t endpoint_array_size = 0;
-        retval = UA_Client_getEndpoints(client, discovery_url.c_str(), &endpoint_array_size, &endpoint_array);
-        if(retval != UA_STATUSCODE_GOOD) {
-            UA_Client_disconnect(client);
-            UA_Client_delete(client);
-            if(endpoint_array)
-                UA_Array_delete(endpoint_array, endpoint_array_size, &UA_TYPES[UA_TYPES_ENDPOINTDESCRIPTION]);
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT, "GetEndpoints failed for server %.*s: %s",
-                (int)description->applicationUri.length, description->applicationUri.data, UA_StatusCode_name(retval));
-            continue;
-        }
-
-        for(size_t j = 0; j < endpoint_array_size; j++) {
-            UA_EndpointDescription *endpoint = &endpoint_array[j];
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint URL: %.*s\n", (int) endpoint->endpointUrl.length, endpoint->endpointUrl.data);
-            _endpoints.push_back(std::string((char*) endpoint->endpointUrl.data, endpoint->endpointUrl.length));
-        }
-        
-        UA_Array_delete(endpoint_array, endpoint_array_size, &UA_TYPES[UA_TYPES_ENDPOINTDESCRIPTION]);
-        UA_Client_delete(client);
+        _endpoints.push_back(discovery_url);
     }
 
     UA_Array_delete(application_description_array, application_description_array_size,
