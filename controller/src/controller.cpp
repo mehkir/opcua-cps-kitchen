@@ -342,4 +342,5 @@ controller::stop() {
     running_ = false;
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }
