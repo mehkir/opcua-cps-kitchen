@@ -233,7 +233,8 @@ robot::handle_choose_next_robot_result(std::string _target_endpoint, position_t 
     while (status != UA_STATUSCODE_GOOD) {
         {
             std::unique_lock<std::mutex> lock(client_mutex_);
-            status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+            if (conveyor_client_ != nullptr)
+                status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
             if (status != UA_STATUSCODE_GOOD)
                 conveyor_connected_condition.wait(lock);
         }
@@ -459,7 +460,8 @@ robot::determine_next_action() {
             while (status != UA_STATUSCODE_GOOD) {
                 {
                     std::unique_lock<std::mutex> lock(client_mutex_);
-                    status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+                    if (controller_client_ != nullptr)
+                        status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
                     if (status != UA_STATUSCODE_GOOD)
                         controller_connected_condition.wait(lock);
                 }
@@ -521,7 +523,8 @@ robot::determine_next_action() {
         while (status != UA_STATUSCODE_GOOD) {
             {
                 std::unique_lock<std::mutex> lock(client_mutex_);
-                status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+                if (conveyor_client_ != nullptr)
+                    status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
                 if (status != UA_STATUSCODE_GOOD)
                     conveyor_connected_condition.wait(lock);
             }
