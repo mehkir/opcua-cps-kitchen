@@ -5,16 +5,17 @@
 #include "../include/client_connection_establisher.hpp"
 
 #define DISCOVERY_SERVER_ENDPOINT "opc.tcp://localhost:4840"
-#define REGISTER_RENEWAL 50
 #define REGISTER_INTERVAL 5
 
-discovery_util::discovery_util() : running_(true), discovery_connected_(false) {
+discovery_util::discovery_util() : running_(true) {
 }
 
 discovery_util::~discovery_util() {
-    running_ = false;
-    discovery_connected_ = false;
-    discovery_cv_.notify_all();
+    {
+        std::lock_guard<std::mutex> lock(discovery_mutex_);
+        running_ = false;
+        discovery_cv_.notify_all();
+    }
     if (discovery_thread_.joinable())
         discovery_thread_.join();
 }
@@ -79,8 +80,8 @@ discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::stri
         }
         UA_String_clear(&application_uri);
 
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint for Server[%lu]: %.*s", (unsigned long) i,
-               (int) description->applicationUri.length, description->applicationUri.data);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint for Server[%lu]: %.*s = %.*s", (unsigned long) i,
+               (int) description->applicationUri.length, description->applicationUri.data, (int) description->discoveryUrls[0].length, description->discoveryUrls[0].data);
 
         std::string discovery_url((char*) description->discoveryUrls[0].data, description->discoveryUrls[0].length);
         _endpoints.push_back(discovery_url);
@@ -97,49 +98,19 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
     try {
         discovery_thread_ = std::thread([this, _server]() {
             while(running_) {
-                UA_StatusCode status;
-                while ((status = register_server(_server)) != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering on discovery server. Retrying in %d seconds (%s)", __FUNCTION__, REGISTER_INTERVAL, UA_StatusCode_name(status));
-                    std::this_thread::sleep_for(std::chrono::seconds(REGISTER_INTERVAL));
-                    if (!running_) break;
+                UA_StatusCode status = register_server(_server);
+                if (status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Failed to register server. Is the discovery server started? (%s)", UA_StatusCode_name(status));
+                } else {
+                    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Server registered successfully. Registering will be renewed in %d seconds", REGISTER_INTERVAL);
                 }
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registered on discovery server. Renewal in %d minutes", __FUNCTION__, REGISTER_RENEWAL);
-                {
-                    std::unique_lock<std::mutex> lock(discovery_mutex_);
-                    discovery_connected_ = true;
-                    discovery_cv_.notify_all();
-                    if (running_)
-                        discovery_cv_.wait_for(lock, std::chrono::minutes(REGISTER_RENEWAL), [this] { return !running_ || !discovery_connected_; });
-                }
+                std::unique_lock<std::mutex> lock(discovery_mutex_);
+                discovery_cv_.wait_for(lock, std::chrono::seconds(REGISTER_INTERVAL));
             }
         });
     } catch (...) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running discovery thread");
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Error running discovery thread.");
         return UA_STATUSCODE_BAD;
-    }
-    return UA_STATUSCODE_GOOD;
-}
-
-UA_StatusCode
-discovery_util::lookup_endpoints_repeatedly(std::vector<std::string>& _endpoints, std::string _application_uri) {
-    UA_StatusCode status;
-    while ((status = lookup_endpoints(_endpoints, _application_uri)) != UA_STATUSCODE_GOOD || _endpoints.empty()) {
-        if (!running_) {
-            return UA_STATUSCODE_BAD;
-        }
-        if (status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed looking up endpoints (%s). Waiting for reconnection to the discovery server.", __FUNCTION__, UA_StatusCode_name(status));
-            {
-                std::unique_lock<std::mutex> lock(discovery_mutex_);
-                discovery_connected_ = false;
-                discovery_cv_.notify_all();
-                if (running_)
-                    discovery_cv_.wait(lock, [this] { return !running_ || discovery_connected_; });
-            }
-            continue;
-        }
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: No endpoints received. Looking up again in %d seconds", __FUNCTION__, LOOKUP_INTERVAL);
-        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
     }
     return UA_STATUSCODE_GOOD;
 }
@@ -149,7 +120,6 @@ discovery_util::stop() {
     {
         std::lock_guard<std::mutex> lock(discovery_mutex_);
         running_ = false;
-        discovery_connected_ = false;
         discovery_cv_.notify_all();
     }
     if (discovery_thread_.joinable())
