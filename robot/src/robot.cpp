@@ -131,27 +131,46 @@ robot::robot(position_t _position) :
     } catch (...) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot", __FUNCTION__);
         running_ = false;
+        stop();
         return;
     }
     /* Setup controller client */
     std::string controller_endpoint;
-    if ((status = retry_discovery_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE, running_)) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed discovering controller and connecting to it (%s)", __FUNCTION__, UA_StatusCode_name(status));
-        stop();
-        return;
+    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+        if (!running_) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
+            stop();
+            return;
+        }
     }
     /* Gather method ids */
-    method_id_map_[REGISTER_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, REGISTER_ROBOT);
-    method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT);
+    if ((method_id_map_[REGISTER_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, REGISTER_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, REGISTER_ROBOT);
+        stop();
+        return;        
+    }
+    if ((method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
+        stop();
+        return;        
+    }
     /* Setup conveyor client */
     std::string conveyor_endpoint;
-    if ((status = retry_discovery_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE, running_)) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_SESSION, "%s: Failed discovering conveyor and connecting to it (%s)", __FUNCTION__, UA_StatusCode_name(status));
-        stop();
-        return;
+    while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+        if (!running_) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
+            stop();
+            return;
+        }
     }
     /* Gather method ids */
-    method_id_map_[FINISHED_ORDER_NOTIFICATION] = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION);
+    if ((method_id_map_[FINISHED_ORDER_NOTIFICATION] = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
+        stop();
+        return;        
+    }
 }
 
 void
@@ -205,11 +224,6 @@ robot::handle_choose_next_robot_result(std::string _target_endpoint, position_t 
     receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
     receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
     object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-    if (omi == OBJECT_METHOD_INFO_NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
-        stop();
-        return;        
-    }
     size_t output_size;
     UA_Variant* output;
     {
@@ -431,11 +445,6 @@ robot::determine_next_action() {
             choose_next_robot_caller.add_scalar_input_argument(&recipe_id_in_process, UA_TYPES_UINT32);
             choose_next_robot_caller.add_scalar_input_argument(&processed_steps_of_recipe_id_in_process_, UA_TYPES_UINT32);
             object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
-            if (omi == OBJECT_METHOD_INFO_NULL) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
-                stop();
-                return;        
-            }
             size_t output_size;
             UA_Variant* output;
             {
@@ -493,11 +502,6 @@ robot::determine_next_action() {
         receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
         receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
         object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-        if (omi == OBJECT_METHOD_INFO_NULL) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
-            stop();
-            return;        
-        }
         size_t output_size;
         UA_Variant* output;
         {
@@ -615,12 +619,13 @@ robot::start() {
         return;
     }
     std::vector<std::string> endpoints;
-    UA_StatusCode status = discovery_util_.lookup_endpoints_repeatedly(endpoints, robot_uri_);
-    if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error looking up own endpoint url", __FUNCTION__);
-        stop();
-        join_threads();
-        return;
+    while (endpoints.empty()) {
+        discovery_util_.lookup_endpoints(endpoints, robot_uri_);
+        if (!running_) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error looking up own endpoint url", __FUNCTION__);
+            stop();
+            return;
+        }
     }
     UA_String_init(&server_endpoint_);
     server_endpoint_ = UA_STRING_ALLOC(const_cast<char*>(endpoints[0].c_str()));
@@ -631,12 +636,6 @@ robot::start() {
     robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
     register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
     object_method_info omi = method_id_map_[REGISTER_ROBOT];
-    if (omi == OBJECT_METHOD_INFO_NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, REGISTER_ROBOT);
-        stop();
-        join_threads();
-        return;        
-    }
 
     worker_thread_ = std::thread([this]() {
         io_context_.run();
@@ -645,13 +644,22 @@ robot::start() {
 
     size_t output_size;
     UA_Variant* output;
-    {
-        std::lock_guard<std::mutex> lock(client_mutex_);
+    UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+    while (status != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registering at the controller", __FUNCTION__);
-        status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-        if (status != UA_STATUSCODE_GOOD) {
+        if ((controller_client_ != nullptr) && (status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output)) != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
+            std::string controller_endpoint;
+            UA_Client_delete(controller_client_);
+            controller_client_ = nullptr;
+            discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE);
+            std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+
+        }
+        if (!running_) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering at the contorller", __FUNCTION__);
             stop();
+            return;
         }
     }
     register_robot_called(output_size, output);
