@@ -120,7 +120,11 @@ robot::robot(position_t _position) :
         return;
     }
     /* Register at discovery server repeatedly */
-    discovery_util_.register_server_repeatedly(server_);
+    if (discovery_util_.register_server_repeatedly(server_) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to start discovery register", __FUNCTION__);
+        stop();
+        return;
+    }
     /* Start the robot eventloop */
     try {
         server_iterate_thread_ = std::thread([this]() {
@@ -130,7 +134,6 @@ robot::robot(position_t _position) :
         });
     } catch (...) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot", __FUNCTION__);
-        running_ = false;
         stop();
         return;
     }
@@ -226,10 +229,15 @@ robot::handle_choose_next_robot_result(std::string _target_endpoint, position_t 
     object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
     size_t output_size;
     UA_Variant* output;
-    {
-        std::lock_guard<std::mutex> lock(client_mutex_);
-        UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-        if(status != UA_STATUSCODE_GOOD) {
+    UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+    while (status != UA_STATUSCODE_GOOD) {
+        {
+            std::unique_lock<std::mutex> lock(client_mutex_);
+            status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+            if (status != UA_STATUSCODE_GOOD)
+                conveyor_connected_condition.wait(lock);
+        }
+        if(!running_) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
             stop();
             return;
@@ -447,10 +455,15 @@ robot::determine_next_action() {
             object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
             size_t output_size;
             UA_Variant* output;
-            {
-                std::lock_guard<std::mutex> lock(client_mutex_);
-                UA_StatusCode status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-                if (status != UA_STATUSCODE_GOOD) {
+            UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+            while (status != UA_STATUSCODE_GOOD) {
+                {
+                    std::unique_lock<std::mutex> lock(client_mutex_);
+                    status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+                    if (status != UA_STATUSCODE_GOOD)
+                        controller_connected_condition.wait(lock);
+                }
+                if(!running_) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to get next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
                     stop();
                     return;
@@ -504,10 +517,15 @@ robot::determine_next_action() {
         object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
         size_t output_size;
         UA_Variant* output;
-        {
-            std::lock_guard<std::mutex> lock(client_mutex_);
-            UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-            if(status != UA_STATUSCODE_GOOD) {
+        UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+        while (status != UA_STATUSCODE_GOOD) {
+            {
+                std::unique_lock<std::mutex> lock(client_mutex_);
+                status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+                if (status != UA_STATUSCODE_GOOD)
+                    conveyor_connected_condition.wait(lock);
+            }
+            if(!running_) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
                 stop();
                 return;
@@ -678,7 +696,20 @@ robot::start() {
                         }
                     } else {
                         std::string controller_endpoint;
-                        discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE);
+                        if (discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) == UA_STATUSCODE_GOOD) {
+                            method_node_caller register_robot_caller;
+                            register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+                            register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
+                            UA_Variant capabilities;
+                            robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
+                            register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
+                            object_method_info omi = method_id_map_[REGISTER_ROBOT];
+                            size_t output_size;
+                            UA_Variant* output;
+                            register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+                            register_robot_called(output_size, output);
+                            controller_connected_condition.notify_all();
+                        }
                     }
 
                     if (conveyor_client_ != nullptr) {
@@ -690,7 +721,8 @@ robot::start() {
                         }
                     } else {
                         std::string conveyor_endpoint;
-                        discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE);
+                        if (discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE) == UA_STATUSCODE_GOOD)
+                            conveyor_connected_condition.notify_all();
                     }
                 }
                 if (usleep(1*1000)) {
@@ -713,6 +745,11 @@ robot::start() {
 void
 robot::stop() {
     running_ = false;
+    {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        controller_connected_condition.notify_all();
+        conveyor_connected_condition.notify_all();
+    }
     work_guard_.reset();
     io_context_.stop();
     discovery_util_.stop();

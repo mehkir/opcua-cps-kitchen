@@ -72,8 +72,10 @@ private:
     std::thread client_iterate_thread_; 
     /* controller related member variables */
     UA_Client* controller_client_;
+    std::condition_variable controller_connected_condition;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
+    std::condition_variable conveyor_connected_condition;
 
     /**
      * @brief Callback called after controller received robot registration. Extracts the controller output values and idicates whether the regeistration was successful.
