@@ -51,7 +51,11 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
         return;
     }
     /* Register at discovery server repeatedly */
-    discovery_util_.register_server_repeatedly(server_);
+    if (discovery_util_.register_server_repeatedly(server_) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to start discovery register", __FUNCTION__);
+        stop();
+        return;
+    }
     /* Start the conveyor event loop */
     try {
         server_iterate_thread_ = std::thread([this]() {
