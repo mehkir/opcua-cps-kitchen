@@ -381,6 +381,11 @@ private:
     std::unordered_map<position_t, std::string> notifications_map_;
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
     std::unordered_set<position_t> robots_to_be_removed_;
+    std::unordered_map<std::string, object_method_info> method_id_map_;
+    /* controller related member variables */
+    std::mutex client_mutex_;
+    std::thread client_iterate_thread_; 
+    UA_Client* controller_client_;
 
     /**
      * @brief Extracts the remote robot port and position on which a finished order is ready to be retrieved.
@@ -471,11 +476,10 @@ private:
      * @param _remote_robot_position the position on which the finished dish is retrieved
      * @param _finished_recipe the recipe id of the finished dish
      * @param _processed_steps the steps count processed so far
-     * @param _next_remote_robot_endpoint the endpoint of the next suitable robot
-     * @param _next_remote_robot_position the position of the next suitable robot
+     * @param _is_dish_finished indicates if the dish is finished partially or completely
      */
     void
-    handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, std::string _next_remote_robot_endpoint, position_t _next_remote_robot_position);
+    handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, UA_Boolean _is_dish_finished);
 
     /**
      * @brief Timed callback to call move_conveyor, deliver_finished_order and determine_next_movement.

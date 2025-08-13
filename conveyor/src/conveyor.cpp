@@ -6,12 +6,13 @@
 #include "callback_scheduler.hpp"
 #include "time_unit.hpp"
 #include "filtered_logger.hpp"
+#include "discovery_and_connection.hpp"
 
 #define CONVEYOR_INSTANCE_NAME "KitchenConveyor"
 #define DEBOUNCE_TIME 1LL
 #define MOVE_TIME 1LL
 
-conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE), running_(true), state_status_(conveyor::state::IDLING) {
+conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE), running_(true), state_status_(conveyor::state::IDLING), controller_client_(nullptr) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
     if(status != UA_STATUSCODE_GOOD) {
@@ -67,6 +68,22 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running conveyor");
         stop();
         return;
+    }
+    /* Setup controller client */
+    std::string controller_endpoint;
+    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+        if (!running_) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
+            stop();
+            return;
+        }
+    }
+    /* Gather method ids */
+    if ((method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
+        stop();
+        return;        
     }
 }
 
@@ -149,7 +166,6 @@ conveyor::handle_retrieve_finished_orders() {
             UA_StatusCode status = position_remote_robot_map_[notification->first]->handover_finished_order(&output_size, &output);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: RETRIEVAL: Retrieving for dish at position %d failed (%s)", __FUNCTION__, notification->first, UA_StatusCode_name(status));
-                // stop();
                 remove_marked_robots();
                 notification = notifications_map_.erase(notification);
                 continue;
@@ -168,7 +184,7 @@ conveyor::handle_retrieve_finished_orders() {
 void
 conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_output_size != 6) {
+    if(_output_size != 5) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         stop();
         return;
@@ -178,8 +194,7 @@ conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _outpu
       || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])
       || !UA_Variant_hasScalarType(&_output[2], &UA_TYPES[UA_TYPES_UINT32])
       || !UA_Variant_hasScalarType(&_output[3], &UA_TYPES[UA_TYPES_UINT32])
-      || !UA_Variant_hasScalarType(&_output[4], &UA_TYPES[UA_TYPES_STRING])
-      || !UA_Variant_hasScalarType(&_output[5], &UA_TYPES[UA_TYPES_UINT32])) {
+      || !UA_Variant_hasScalarType(&_output[4], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         stop();
         return;
@@ -189,35 +204,30 @@ conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _outpu
     position_t remote_robot_position = *(position_t*) _output[1].data;
     recipe_id_t finished_recipe = *(recipe_id_t*) _output[2].data;
     UA_UInt32 processed_steps = *(UA_UInt32*) _output[3].data;
-    UA_String next_remote_robot_endpoint = *(UA_String*) _output[4].data;
-    position_t next_remote_robot_position = *(position_t*) _output[5].data;
-    std::string next_remote_robot_endpoint_std_str((char*) next_remote_robot_endpoint.data, next_remote_robot_endpoint.length);
-    handle_handover_finished_order(std::string((char*) remote_robot_endpoint.data, remote_robot_endpoint.length), remote_robot_position, finished_recipe, processed_steps, next_remote_robot_endpoint_std_str, next_remote_robot_position);
+    UA_Boolean is_dish_finished = *(UA_Boolean*) _output[4].data;
+    handle_handover_finished_order(std::string((char*) remote_robot_endpoint.data, remote_robot_endpoint.length), remote_robot_position, finished_recipe, processed_steps, is_dish_finished);
 }
 
 void
-conveyor::handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, std::string _next_remote_robot_endpoint, position_t _next_remote_robot_position) {
+conveyor::handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, UA_Boolean _is_dish_finished) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (!_next_remote_robot_endpoint.empty() && _next_remote_robot_position != 0) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d passed recipe ID %d with processed steps of %d for next robot at position %d", _remote_robot_position, _finished_recipe, _processed_steps, _next_remote_robot_position);
-    } else {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d passed recipe ID %d with processed steps of %d", _remote_robot_position, _finished_recipe, _processed_steps);
-    }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d passed recipe ID %d with processed steps of %d (%s)", _remote_robot_position, _finished_recipe, _processed_steps, (_is_dish_finished ? "completely" : "partially"));
     remove_marked_robots();
-    if (!_next_remote_robot_endpoint.empty() && _next_remote_robot_position != 0 && position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_endpoint, _next_remote_robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
-    }
-    if (robots_to_be_removed_.find(_next_remote_robot_position) != robots_to_be_removed_.end()) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, _next_remote_robot_position);
-        remove_marked_robots();
-    }
+    // if (position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
+    //     position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_endpoint, _next_remote_robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+    // }
+    // if (robots_to_be_removed_.find(_next_remote_robot_position) != robots_to_be_removed_.end()) {
+    //     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, _next_remote_robot_position);
+    //     remove_marked_robots();
+    // }
     plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
     p.place_recipe_id(_finished_recipe);
     p.set_occupied(true);
     p.set_processed_steps(_processed_steps);
-    if (!_next_remote_robot_endpoint.empty() && _next_remote_robot_position != 0)
-        p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get()); // TODO: Should we set target position instead of pointer? If pointer is NULL, it will crash
+    // if (!_next_remote_robot_endpoint.empty() && _next_remote_robot_position != 0)
+    //     p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get()); // TODO: Should we set target position instead of pointer? If pointer is NULL, it will crash
     occupied_plates_.insert(p.get_plate_id());
+
 }
 
 
@@ -353,7 +363,41 @@ void
 conveyor::start() {
     if (!running_)
         stop();
+    /* Run the client iterate thread */
+    try {
+        client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                {
+                    std::lock_guard<std::mutex> lock(client_mutex_);
+                    if (controller_client_ != nullptr) {
+                        UA_StatusCode status = UA_Client_run_iterate(controller_client_, 1);
+                        if (status != UA_STATUSCODE_GOOD) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running controller client iterate", __FUNCTION__);
+                            UA_Client_delete(controller_client_);
+                            controller_client_ = nullptr;
+                        }
+                    } else {
+                        std::string controller_endpoint;
+                        if (discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) == UA_STATUSCODE_GOOD) {
+                            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Re-established connection to controller", __FUNCTION__);
+                        }
+                    }
+                }
+                if (usleep(1*1000)) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at client iterate sleep", __FUNCTION__);
+                    stop();
+                    return;
+                }
+                // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+            }
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the client iterate thread");
+        stop();
+        return;
+    }
     join_threads();
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
 
 void

@@ -56,6 +56,7 @@ private:
     duration_t current_action_duration_;
     std::queue<robot_action> action_queue_in_process_;
     bool preparing_dish_;
+    bool is_dish_finished_;
     std::atomic<bool> running_;
     discovery_util discovery_util_;
     std::thread server_iterate_thread_;
@@ -70,7 +71,6 @@ private:
     std::thread client_iterate_thread_; 
     /* controller related member variables */
     UA_Client* controller_client_;
-    // std::condition_variable controller_connected_condition;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
     std::condition_variable conveyor_connected_condition;

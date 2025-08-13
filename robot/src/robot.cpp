@@ -18,7 +18,7 @@
 #define CAPABILITIES_PATH "./capabilities/"
 
 robot::robot(position_t _position) :
-        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
+        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
         processed_steps_of_recipe_id_in_process_(0), current_action_duration_(0),
         recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr), conveyor_client_(nullptr) {
     /* Setup robot */
@@ -58,12 +58,11 @@ robot::robot(position_t _position) :
     }
     /* Add handover finished order method node */
     method_arguments handover_finished_order_method_arguments;
-    handover_finished_order_method_arguments.add_output_argument("the robot endpoint", "robot_port", UA_TYPES_STRING);
+    handover_finished_order_method_arguments.add_output_argument("the robot endpoint", "robot_endpoint", UA_TYPES_STRING);
     handover_finished_order_method_arguments.add_output_argument("the robot position", "robot_position", UA_TYPES_UINT32);
     handover_finished_order_method_arguments.add_output_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
     handover_finished_order_method_arguments.add_output_argument("the processed steps", "processed_steps", UA_TYPES_UINT32);
-    handover_finished_order_method_arguments.add_output_argument("the target endpoint", "target_port", UA_TYPES_STRING);
-    handover_finished_order_method_arguments.add_output_argument("the target position", "target_position", UA_TYPES_UINT32);
+    handover_finished_order_method_arguments.add_output_argument("is dish finished", "is_dish_finished", UA_TYPES_BOOLEAN);
     status = robot_type_inserter_.add_method(ROBOT_TYPE, HANDOVER_FINISHED_ORDER, handover_finished_order, handover_finished_order_method_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, HANDOVER_FINISHED_ORDER);
@@ -391,6 +390,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[2], &recipe_id_in_process, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[3], &processed_steps_of_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
+    status |= UA_Variant_setScalarCopy(&_output[4], &is_dish_finished_, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
         stop();
@@ -400,6 +400,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     /* Set recipe id in process*/
     recipe_id_in_process = 0;
     processed_steps_of_recipe_id_in_process_ = 0;
+    is_dish_finished_ = false;
     /* Update recipe id in process */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, RECIPE_ID, &recipe_id_in_process, UA_TYPES_UINT32);
     /* Update dish in process */
@@ -462,6 +463,7 @@ robot::determine_next_action() {
             // }
             // choose_next_robot_called(output_size, output);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send partially finished order notification", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
+            is_dish_finished_ = false;
             /* Notify conveyor about finished order */
             method_node_caller receive_finished_order_notification_caller;
             receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
@@ -525,6 +527,7 @@ robot::determine_next_action() {
     } else {
         reset_in_process_fields();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
+        is_dish_finished_ = true;
         /* Notify conveyor about finished order */
         method_node_caller receive_finished_order_notification_caller;
         receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
