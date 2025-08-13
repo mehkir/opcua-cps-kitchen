@@ -52,8 +52,6 @@ private:
     object_type_node_inserter robot_type_inserter_;
     robot_tool current_tool_;
     UA_UInt32 processed_steps_of_recipe_id_in_process_;
-    std::string next_suitable_robot_endpoint_for_recipe_id_in_process_;
-    position_t next_suitable_robot_position_for_recipe_id_in_process_;
     std::queue<order> order_queue_;
     duration_t current_action_duration_;
     std::queue<robot_action> action_queue_in_process_;
@@ -72,7 +70,7 @@ private:
     std::thread client_iterate_thread_; 
     /* controller related member variables */
     UA_Client* controller_client_;
-    std::condition_variable controller_connected_condition;
+    // std::condition_variable controller_connected_condition;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
     std::condition_variable conveyor_connected_condition;
@@ -86,23 +84,23 @@ private:
     void
     register_robot_called(size_t _output_size, UA_Variant* _output);
 
-    /**
-     * @brief Callback called after controller received choose next robot request. Extracts the controller response.
-     * 
-     * @param _output_size the count of returned output values
-     * @param _output the variant containing the output values
-     */
-    void
-    choose_next_robot_called(size_t _output_size, UA_Variant* _output);
+    // /**
+    //  * @brief Callback called after controller received choose next robot request. Extracts the controller response.
+    //  * 
+    //  * @param _output_size the count of returned output values
+    //  * @param _output the variant containing the output values
+    //  */
+    // void
+    // choose_next_robot_called(size_t _output_size, UA_Variant* _output);
 
-    /**
-     * @brief Handles the controller response from choose_next_robot_called method to tell the conveyor where to deliver the plate next during the handover.
-     * 
-     * @param _target_endpoint next suitable robot's endpoint
-     * @param _target_position next suitable robot's position
-     */
-    void
-    handle_choose_next_robot_result(std::string _target_endpoint, position_t _target_position);
+    // /**
+    //  * @brief Handles the controller response from choose_next_robot_called method to tell the conveyor where to deliver the plate next during the handover.
+    //  * 
+    //  * @param _target_endpoint next suitable robot's endpoint
+    //  * @param _target_position next suitable robot's position
+    //  */
+    // void
+    // handle_choose_next_robot_result(std::string _target_endpoint, position_t _target_position);
 
     /**
      * @brief Extracts the instruction parameters.
