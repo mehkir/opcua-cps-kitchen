@@ -16,6 +16,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <functional>
+#include <unistd.h>
 #include "method_node_caller.hpp"
 #include "client_connection_establisher.hpp"
 #include "types.hpp"
