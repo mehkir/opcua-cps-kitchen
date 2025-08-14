@@ -196,7 +196,8 @@ struct plate {
         recipe_id_t placed_recipe_id_;
         UA_UInt32 processed_steps_of_placed_recipe_id_;
         UA_Boolean occupied_;
-        remote_robot* target_robot_;
+        UA_Boolean is_dish_finished_;
+        position_t target_position_;
         std::string instance_name_id_;
         object_type_node_inserter& plate_type_inserter_;
     public:
@@ -228,7 +229,7 @@ struct plate {
          * @param _plate_type_inserter the plate type inserter
          */
         plate(plate_id_t _id, position_t _position, UA_NodeId _conveyor_instance_id, object_type_node_inserter& _plate_type_inserter) : id_(_id), position_(_position), placed_recipe_id_(0),
-                processed_steps_of_placed_recipe_id_(0), occupied_(false), target_robot_(nullptr), instance_name_id_(std::string(PLATE_INSTANCE_NAME) + " " + std::to_string(id_)), plate_type_inserter_(_plate_type_inserter) {
+                processed_steps_of_placed_recipe_id_(0), occupied_(false), is_dish_finished_(false), target_position_(0), instance_name_id_(std::string(PLATE_INSTANCE_NAME) + " " + std::to_string(id_)), plate_type_inserter_(_plate_type_inserter) {
             /* Instantiate plate type */
             UA_StatusCode status = plate_type_inserter_.add_object_instance(instance_name_id_.c_str(), PLATE_TYPE, _conveyor_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
             if (status != UA_STATUSCODE_GOOD) {
@@ -258,7 +259,7 @@ struct plate {
          * @param _plate 
          */
         plate(const plate& _plate) : id_(_plate.id_), position_(_plate.position_), placed_recipe_id_(_plate.placed_recipe_id_), processed_steps_of_placed_recipe_id_(_plate.processed_steps_of_placed_recipe_id_),
-            occupied_(_plate.occupied_), target_robot_(_plate.target_robot_), instance_name_id_(_plate.instance_name_id_), plate_type_inserter_(_plate.plate_type_inserter_) {
+            occupied_(_plate.occupied_), is_dish_finished_(_plate.is_dish_finished_), target_position_(_plate.target_position_), instance_name_id_(_plate.instance_name_id_), plate_type_inserter_(_plate.plate_type_inserter_) {
         }
 
         /**
@@ -308,17 +309,17 @@ struct plate {
             return placed_recipe_id_;
         }
 
-        void set_target_robot(remote_robot* _target_robot) {
-            target_robot_ = _target_robot;
+        void set_target_position(position_t _target_position) {
+            target_position_ = _target_position;
         }
 
         /**
-         * @brief Get the target robot to where the dish has to be transferred
+         * @brief Get the target position to where the dish has to be transferred
          * 
-         * @return remote_robot* the target robot
+         * @return position_ the target position
          */
-        remote_robot* get_target_robot() const {
-            return target_robot_;
+        position_t get_target_position() const {
+            return target_position_;
         }
 
         /**
@@ -354,8 +355,26 @@ struct plate {
          * 
          * @return UA_Boolean indicates whether plate is occupied or not
          */
-        UA_Boolean is_occupied() {
+        UA_Boolean is_occupied() const {
             return occupied_;
+        }
+
+        /**
+         * @brief Sets the dish finished state
+         * 
+         * @param _is_dish_finished the dish finished state
+         */
+        void set_dish_finished(UA_Boolean _is_dish_finished) {
+            is_dish_finished_ = _is_dish_finished;
+        }
+
+        /**
+         * @brief Returns whether the placed dish is finished or not
+         * 
+         * @return UA_Boolean indicates whether the dish is finished (deliver to output) or needs to be processed further by another robot
+         */
+        UA_Boolean is_dish_finished() const {
+            return is_dish_finished_;
         }
 };
 
@@ -480,6 +499,13 @@ private:
      */
     void
     handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, UA_Boolean _is_dish_finished);
+
+    /**
+     * @brief Requests next robot
+     * 
+     */
+    void
+    request_next_robot(plate& _plate);
 
     /**
      * @brief Timed callback to call move_conveyor, deliver_finished_order and determine_next_movement.

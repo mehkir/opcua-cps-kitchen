@@ -130,7 +130,7 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
     }
     UA_Boolean finished_order_notification_received = true;
     if (robots_to_be_removed_.find(_robot_position) != robots_to_be_removed_.end()) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, _robot_position);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, _robot_position);
         remove_marked_robots();
         finished_order_notification_received = false;
         UA_Variant_setScalarCopy(_output, &finished_order_notification_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
@@ -213,23 +213,67 @@ conveyor::handle_handover_finished_order(std::string _remote_robot_endpoint, pos
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Robot at position %d passed recipe ID %d with processed steps of %d (%s)", _remote_robot_position, _finished_recipe, _processed_steps, (_is_dish_finished ? "completely" : "partially"));
     remove_marked_robots();
-    // if (position_remote_robot_map_.find(_next_remote_robot_position) == position_remote_robot_map_.end()) {
-    //     position_remote_robot_map_[_next_remote_robot_position] = std::make_unique<remote_robot>(_next_remote_robot_endpoint, _next_remote_robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
-    // }
-    // if (robots_to_be_removed_.find(_next_remote_robot_position) != robots_to_be_removed_.end()) {
-    //     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, _next_remote_robot_position);
-    //     remove_marked_robots();
-    // }
     plate& p = plates_[position_plate_id_map_[_remote_robot_position]];
     p.place_recipe_id(_finished_recipe);
     p.set_occupied(true);
+    p.set_dish_finished(_is_dish_finished);
     p.set_processed_steps(_processed_steps);
-    // if (!_next_remote_robot_endpoint.empty() && _next_remote_robot_position != 0)
-    //     p.set_target_robot(position_remote_robot_map_[_next_remote_robot_position].get()); // TODO: Should we set target position instead of pointer? If pointer is NULL, it will crash
     occupied_plates_.insert(p.get_plate_id());
-
+    if (_is_dish_finished)
+        return;
+    request_next_robot(p);
 }
 
+void
+conveyor::request_next_robot(plate& _plate) {
+    /* Request next robot */
+    recipe_id_t finished_recipe = _plate.get_placed_recipe_id();
+    UA_UInt32 processed_steps = _plate.get_processed_steps();
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Request next robot for recipe %d with processed steps %d", finished_recipe, processed_steps);
+    method_node_caller choose_next_robot_caller;
+    choose_next_robot_caller.add_scalar_input_argument(&finished_recipe, UA_TYPES_UINT32);
+    choose_next_robot_caller.add_scalar_input_argument(&processed_steps, UA_TYPES_UINT32);
+    object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
+    size_t output_size;
+    UA_Variant* output;
+    UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+    {
+        std::unique_lock<std::mutex> lock(client_mutex_);
+        if (controller_client_ != nullptr)
+            status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+    }
+    if (status != UA_STATUSCODE_GOOD)
+        return;
+    if(output_size != 2) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        stop();
+        return;
+    }
+    if(!UA_Variant_hasScalarType(&output[0], &UA_TYPES[UA_TYPES_STRING])
+        || !UA_Variant_hasScalarType(&output[1], &UA_TYPES[UA_TYPES_UINT32])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        stop();
+        return;
+    }
+    UA_String target_endpoint = *(UA_String*) output[0].data;
+    position_t target_position = *(position_t*) output[1].data;
+    std::string target_endpoint_std_str((char*) target_endpoint.data, target_endpoint.length);
+    if (target_endpoint_std_str.empty() || target_position == 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No suitable robot for next steps received", __FUNCTION__);
+        stop();
+        return;
+    }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", target_position, target_endpoint_std_str.c_str());
+    if (position_remote_robot_map_.find(target_position) == position_remote_robot_map_.end()) {
+        position_remote_robot_map_[target_position] = std::make_unique<remote_robot>(target_endpoint_std_str, target_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+    }
+    if (robots_to_be_removed_.find(target_position) != robots_to_be_removed_.end()) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, target_position);
+        remove_marked_robots();
+        return;
+    }
+    _plate.set_target_position(target_position);
+}
 
 void
 conveyor::perform_movement(UA_Server* _server, void* _data) {
@@ -255,6 +299,14 @@ conveyor::move_conveyor(steps_t _steps) {
 
 void
 conveyor::deliver_finished_order() {
+    for (auto occupied_plate_id = occupied_plates_.begin(); occupied_plate_id != occupied_plates_.end();) {
+        plate& p = plates_[*occupied_plate_id];
+        // TODO: if instruct suceeds
+        occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
+        // TODO: if instruct fails
+        occupied_plate_id++;
+    }
+
     for (size_t i = 0; i < plates_.size(); i++) {
         plate& p = plates_[i];
         if (!p.is_occupied()) {

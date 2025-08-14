@@ -21,7 +21,6 @@ controller::controller() : server_(UA_Server_new()), controller_type_inserter_(s
     // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add choose next robot method node */
     method_arguments choose_next_robot_arguments;
-    choose_next_robot_arguments.add_input_argument("the robot position", "robot_position", UA_TYPES_UINT32);
     choose_next_robot_arguments.add_input_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
     choose_next_robot_arguments.add_input_argument("the processed steps", "processed_steps", UA_TYPES_UINT32);
     choose_next_robot_arguments.add_output_argument("the next suitable robot endpoint", "next_suitable_robot_endpoint", UA_TYPES_STRING);
@@ -163,7 +162,7 @@ controller::choose_next_robot(UA_Server* _server,
         size_t _input_size, const UA_Variant* _input,
         size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_input_size != 3) {
+    if(_input_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
@@ -171,35 +170,28 @@ controller::choose_next_robot(UA_Server* _server,
     
     UA_StatusCode status = !UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32]);
     status |= !UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32]);
-    status |= !UA_Variant_hasScalarType(&_input[2], &UA_TYPES[UA_TYPES_UINT32]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
 
     /* Extract input arguments */
-    position_t position = *(position_t*)_input[0].data;
-    recipe_id_t recipe_id = *(recipe_id_t*)_input[1].data;
-    UA_UInt32 processed_steps = *(UA_UInt32*)_input[2].data;
+    recipe_id_t recipe_id = *(recipe_id_t*)_input[0].data;
+    UA_UInt32 processed_steps = *(UA_UInt32*)_input[1].data;
     /* Extract method context */
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
     controller* self = static_cast<controller*>(_method_context);
-    self->handle_next_robot_request(position, recipe_id, processed_steps, _output);
+    self->handle_next_robot_request(recipe_id, processed_steps, _output);
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_next_robot_request(position_t _position, recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output) {
+controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d must register first", __FUNCTION__, _position);
-        return;
-    }
-
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Robot at position %d requests next robot for recipe id %d processed with %d steps already", _position, _recipe_id, _processed_steps);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Conveyor requests next robot for recipe id %d processed with %d steps already", _recipe_id, _processed_steps);
     remote_robot* next_suitable_robot = find_suitable_robot(_recipe_id, _processed_steps);
     UA_String next_suitable_robot_endpoint = UA_STRING_ALLOC("");
     position_t next_suitable_robot_position = 0;

@@ -335,13 +335,12 @@ private:
     /**
      * @brief Chooses the next suitable robot
      * 
-     * @param _position the position of the remote robot
      * @param _recipe_id the recipe id of the partial finished order
      * @param _processed_steps the steps until the recipe is processed
      * @param _output the output pointer to store return parameters
      */
     void
-    handle_next_robot_request(position_t _position, recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
+    handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
 
     /**
      * @brief Returns a suitable robot for the given recipe ID starting from the next step to be processed
