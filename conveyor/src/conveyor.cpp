@@ -299,37 +299,47 @@ conveyor::move_conveyor(steps_t _steps) {
 
 void
 conveyor::deliver_finished_order() {
+    remove_marked_robots();
     for (auto occupied_plate_id = occupied_plates_.begin(); occupied_plate_id != occupied_plates_.end();) {
         plate& p = plates_[*occupied_plate_id];
-        // TODO: if instruct suceeds
-        occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
-        // TODO: if instruct fails
-        occupied_plate_id++;
-    }
-
-    for (size_t i = 0; i < plates_.size(); i++) {
-        plate& p = plates_[i];
-        if (!p.is_occupied()) {
+        if (!p.is_dish_finished() && p.get_target_position() == 0) {
+            request_next_robot(p);
+        }
+        if (!p.is_dish_finished() && p.get_target_position() == 0) {
+            occupied_plate_id++;
             continue;
         }
-        if (p.get_target_robot() != nullptr && (p.get_target_robot()->get_position() == p.get_position())) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Dish at position %d is deliverable", p.get_position());
-            size_t output_size;
-            UA_Variant* output;
-            UA_StatusCode status = p.get_target_robot()->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), &output_size, &output); // TODO: Check for marked robots and remove them
-            if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "DELIVERY: Failed to deliver dish at position %d", p.get_position());
-                continue;
-            }
-            receive_robot_task_called(output_size, output);
-        }
-        if (p.get_position() == OUTPUT_POSITION) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output", p.get_placed_recipe_id());
+        if (p.is_dish_finished() && p.get_position() == OUTPUT_POSITION) {
             p.place_recipe_id(0);
             p.set_occupied(false);
             p.set_processed_steps(0);
-            occupied_plates_.erase(p.get_plate_id());
+            p.set_dish_finished(false);
+            p.set_target_position(0);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output", p.get_placed_recipe_id());
+            occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
+            continue;
         }
+        if (!p.is_dish_finished() && p.get_position() == p.get_target_position()) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Dish at position %d is deliverable", p.get_position());
+            size_t output_size;
+            UA_Variant* output;
+            if (position_remote_robot_map_.find(p.get_position()) == position_remote_robot_map_.end()) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Robot at position %d is not known", p.get_position());
+                occupied_plate_id++;
+                continue;
+            }
+            remote_robot* target_robot = position_remote_robot_map_[p.get_position()].get();
+            UA_StatusCode status = target_robot->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), &output_size, &output);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "DELIVERY: Failed to deliver dish at position %d", p.get_position());
+                occupied_plate_id++;
+                continue;
+            }
+            receive_robot_task_called(output_size, output);
+            occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
+            continue;
+        }
+        occupied_plate_id++;
     }
     determine_next_movement();
 }
@@ -351,12 +361,14 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        stop();
         return;
     }
 
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT32])
       || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        stop();
         return;
     }
 
@@ -371,7 +383,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
 
     plate& p = plates_[position_plate_id_map_[remote_robot_position]];
     // Sanity check
-    if (!p.is_occupied() || p.get_target_robot() == nullptr || p.get_target_robot()->get_position() != remote_robot_position) {
+    if (!p.is_occupied() || p.get_target_position() == 0 || p.get_position() != remote_robot_position) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", p.get_position(), remote_robot_position);
         stop();
         return;    
@@ -379,8 +391,8 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     p.place_recipe_id(0);
     p.set_occupied(false);
     p.set_processed_steps(0);
-    p.set_target_robot(nullptr);
-    occupied_plates_.erase(p.get_plate_id());
+    p.set_target_position(0);
+    p.set_dish_finished(false);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: Delivered dish at position %d successfully", remote_robot_position);
 }
 
