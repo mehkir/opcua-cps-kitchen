@@ -187,60 +187,6 @@ robot::register_robot_called(size_t _output_size, UA_Variant* _output) {
     }
 }
 
-// void
-// robot::choose_next_robot_called(size_t _output_size, UA_Variant* _output) {
-//     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-//     if(_output_size != 2) {
-//         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-//         return;
-//     }
-//     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_STRING])
-//        || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])) {
-//         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-//         return;
-//     }
-//     UA_String target_endpoint = *(UA_String*) _output[0].data;
-//     position_t target_position = *(position_t*) _output[1].data;
-//     std::string target_endpoint_std_str((char*) target_endpoint.data, target_endpoint.length);
-//     handle_choose_next_robot_result(target_endpoint_std_str, target_position);
-// }
-
-// void
-// robot::handle_choose_next_robot_result(std::string _target_endpoint, position_t _target_position) {
-//     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-//     if (_target_endpoint.empty() || _target_position == 0) {
-//         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No suitable robot for next steps received", __FUNCTION__);
-//         stop();
-//         return;
-//     }
-//     next_suitable_robot_endpoint_for_recipe_id_in_process_ = _target_endpoint;
-//     next_suitable_robot_position_for_recipe_id_in_process_ = _target_position;
-//     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", next_suitable_robot_position_for_recipe_id_in_process_, next_suitable_robot_endpoint_for_recipe_id_in_process_.c_str());
-//     /* Notify conveyor about partially finished order */
-//     method_node_caller receive_finished_order_notification_caller;
-//     receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
-//     receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-//     object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-//     size_t output_size;
-//     UA_Variant* output;
-//     UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
-//     while (status != UA_STATUSCODE_GOOD) {
-//         {
-//             std::unique_lock<std::mutex> lock(client_mutex_);
-//             if (conveyor_client_ != nullptr)
-//                 status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-//             if (status != UA_STATUSCODE_GOOD)
-//                 conveyor_connected_condition.wait(lock);
-//         }
-//         if(!running_) {
-//             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-//             stop();
-//             return;
-//         }
-//     }
-//     receive_finished_order_notification_called(output_size, output);
-// }
-
 UA_StatusCode
 robot::receive_task(UA_Server *_server,
             const UA_NodeId *_session_id, void *_session_context,
@@ -275,6 +221,7 @@ robot::receive_task(UA_Server *_server,
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
         self->stop();
+        return UA_STATUSCODE_BAD;
     }
     self->io_context_.post([self, recipe_id, processed_steps] {
         self->handle_receive_task(recipe_id, processed_steps);
@@ -437,31 +384,6 @@ robot::determine_next_action() {
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
             reset_in_process_fields();
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Request next robot for recipe %d with processed steps %d", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
-            /* Request next robot */
-            // method_node_caller choose_next_robot_caller;
-            // choose_next_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-            // choose_next_robot_caller.add_scalar_input_argument(&recipe_id_in_process, UA_TYPES_UINT32);
-            // choose_next_robot_caller.add_scalar_input_argument(&processed_steps_of_recipe_id_in_process_, UA_TYPES_UINT32);
-            // object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
-            // size_t output_size;
-            // UA_Variant* output;
-            // UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
-            // while (status != UA_STATUSCODE_GOOD) {
-            //     {
-            //         std::unique_lock<std::mutex> lock(client_mutex_);
-            //         if (controller_client_ != nullptr)
-            //             status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-            //         if (status != UA_STATUSCODE_GOOD)
-            //             controller_connected_condition.wait(lock);
-            //     }
-            //     if(!running_) {
-            //         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to get next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            //         stop();
-            //         return;
-            //     }
-            // }
-            // choose_next_robot_called(output_size, output);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send partially finished order notification", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
             is_dish_finished_ = false;
             /* Notify conveyor about finished order */

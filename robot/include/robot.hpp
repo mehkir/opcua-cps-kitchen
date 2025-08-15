@@ -84,24 +84,6 @@ private:
     void
     register_robot_called(size_t _output_size, UA_Variant* _output);
 
-    // /**
-    //  * @brief Callback called after controller received choose next robot request. Extracts the controller response.
-    //  * 
-    //  * @param _output_size the count of returned output values
-    //  * @param _output the variant containing the output values
-    //  */
-    // void
-    // choose_next_robot_called(size_t _output_size, UA_Variant* _output);
-
-    // /**
-    //  * @brief Handles the controller response from choose_next_robot_called method to tell the conveyor where to deliver the plate next during the handover.
-    //  * 
-    //  * @param _target_endpoint next suitable robot's endpoint
-    //  * @param _target_position next suitable robot's position
-    //  */
-    // void
-    // handle_choose_next_robot_result(std::string _target_endpoint, position_t _target_position);
-
     /**
      * @brief Extracts the instruction parameters.
      * 
