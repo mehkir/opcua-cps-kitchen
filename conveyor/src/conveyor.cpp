@@ -310,12 +310,12 @@ conveyor::deliver_finished_order() {
             continue;
         }
         if (p.is_dish_finished() && p.get_position() == OUTPUT_POSITION) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output", p.get_placed_recipe_id());
             p.place_recipe_id(0);
             p.set_occupied(false);
             p.set_processed_steps(0);
             p.set_dish_finished(false);
             p.set_target_position(0);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output", p.get_placed_recipe_id());
             occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
             continue;
         }
