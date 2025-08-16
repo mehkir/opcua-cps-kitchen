@@ -541,6 +541,14 @@ private:
     remove_marked_robots();
 
     /**
+     * @brief Resets the plate attributes to their default values
+     * 
+     * @param _plate the plate
+     */
+    void
+    reset_plate(plate& _plate);
+
+    /**
      * @brief Joins all started threads.
      * 
      */

@@ -311,11 +311,7 @@ conveyor::deliver_finished_order() {
         }
         if (p.is_dish_finished() && p.get_position() == OUTPUT_POSITION) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output", p.get_placed_recipe_id());
-            p.place_recipe_id(0);
-            p.set_occupied(false);
-            p.set_processed_steps(0);
-            p.set_dish_finished(false);
-            p.set_target_position(0);
+            reset_plate(p);
             occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
             continue;
         }
@@ -388,11 +384,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         stop();
         return;    
     }
-    p.place_recipe_id(0);
-    p.set_occupied(false);
-    p.set_processed_steps(0);
-    p.set_target_position(0);
-    p.set_dish_finished(false);
+    reset_plate(p);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: Delivered dish at position %d successfully", remote_robot_position);
 }
 
@@ -415,6 +407,15 @@ conveyor::remove_marked_robots() {
         }
     }
     robots_to_be_removed_.clear();
+}
+
+void
+conveyor::reset_plate(plate& _plate) {
+    _plate.place_recipe_id(0);
+    _plate.set_processed_steps(0);
+    _plate.set_target_position(0);
+    _plate.set_occupied(false);
+    _plate.set_dish_finished(false);
 }
 
 void
