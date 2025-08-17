@@ -199,8 +199,10 @@ controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _process
         UA_String_clear(&next_suitable_robot_endpoint);
         next_suitable_robot_endpoint = UA_STRING_ALLOC(next_suitable_robot->get_endpoint().c_str());
         next_suitable_robot_position = next_suitable_robot->get_position();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d (%s)", next_suitable_robot_position, next_suitable_robot->get_endpoint().c_str());
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: No next suitable robot found");
     }
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d (%s)", next_suitable_robot_position, next_suitable_robot->get_endpoint().c_str());
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &next_suitable_robot_endpoint, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[1], &next_suitable_robot_position, &UA_TYPES[UA_TYPES_UINT32]);
     UA_String_clear(&next_suitable_robot_endpoint);
