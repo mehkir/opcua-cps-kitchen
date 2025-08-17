@@ -5,7 +5,7 @@
 #include "../include/client_connection_establisher.hpp"
 
 #define DISCOVERY_SERVER_ENDPOINT "opc.tcp://localhost:4840"
-#define REGISTER_INTERVAL 5
+#define REGISTER_INTERVAL 300
 
 discovery_util::discovery_util() : running_(true) {
 }

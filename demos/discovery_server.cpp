@@ -59,7 +59,7 @@ int main(void) {
      * bigger than 10 seconds, because cleanup is only triggered approximately
      * every 10 seconds. The server will still be removed depending on the
      * state of the semaphore file. */
-    // config->discoveryCleanupTimeout = 60*60;
+    config->discoveryCleanupTimeout = 450;
 
     UA_StatusCode retval = UA_Server_run(server, &running);
 
