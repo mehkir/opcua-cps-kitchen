@@ -260,7 +260,6 @@ conveyor::request_next_robot(plate& _plate) {
     std::string target_endpoint_std_str((char*) target_endpoint.data, target_endpoint.length);
     if (target_endpoint_std_str.empty() || target_position == 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No suitable robot for next steps received", __FUNCTION__);
-        stop();
         return;
     }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", target_position, target_endpoint_std_str.c_str());
