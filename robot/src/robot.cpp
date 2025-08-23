@@ -579,7 +579,11 @@ robot::start() {
     }
     std::vector<std::string> endpoints;
     while (endpoints.empty()) {
-        discovery_util_.lookup_endpoints(endpoints, robot_uri_);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Looking up own endpoint", __FUNCTION__);
+        if (discovery_util_.lookup_endpoints(endpoints, robot_uri_) != UA_STATUSCODE_GOOD || endpoints.empty()) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Couldn't look up own endpoint. Trying again in %d seconds", __FUNCTION__, LOOKUP_INTERVAL);
+            std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+        }
         if (!running_) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error looking up own endpoint url", __FUNCTION__);
             stop();
