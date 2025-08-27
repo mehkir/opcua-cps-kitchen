@@ -686,9 +686,9 @@ robot::start() {
 
 void
 robot::stop() {
-    running_ = false;
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
+        running_ = false;
         conveyor_connected_condition.notify_all();
     }
     work_guard_.reset();
