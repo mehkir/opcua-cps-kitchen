@@ -104,8 +104,11 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
                 } else {
                     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Server registered successfully. Registering will be renewed in %d seconds", REGISTER_INTERVAL);
                 }
-                std::unique_lock<std::mutex> lock(discovery_mutex_);
-                discovery_cv_.wait_for(lock, std::chrono::seconds(REGISTER_INTERVAL));
+                {
+                    std::unique_lock<std::mutex> lock(discovery_mutex_);
+                    if (running_)
+                        discovery_cv_.wait_for(lock, std::chrono::seconds(REGISTER_INTERVAL));
+                }
             }
         });
     } catch (...) {
