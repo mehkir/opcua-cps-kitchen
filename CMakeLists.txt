@@ -22,6 +22,7 @@ add_subdirectory(capabilities)
 add_subdirectory(robot)
 add_subdirectory(controller)
 add_subdirectory(conveyor)
+add_subdirectory(kitchen)
 
 add_executable(start_robot_instance start_robot_instance.cpp)
 target_link_libraries(start_robot_instance PUBLIC robot_lib)
@@ -34,6 +35,10 @@ target_include_directories(start_controller_instance PUBLIC ${PROJECT_BINARY_DIR
 add_executable(start_conveyor_instance start_conveyor_instance.cpp)
 target_link_libraries(start_conveyor_instance PUBLIC conveyor_lib open62541)
 target_include_directories(start_conveyor_instance PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/conveyor/include)
+
+add_executable(start_kitchen_instance start_kitchen_instance.cpp)
+target_link_libraries(start_kitchen_instance PUBLIC kitchen_lib open62541)
+target_include_directories(start_kitchen_instance PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/kitchen/include)
 
 add_executable(statistics-writer-main statistics-writer-main.cpp)
 target_link_libraries(statistics-writer-main PUBLIC statistics_lib)

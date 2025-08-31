@@ -68,7 +68,7 @@ private:
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_;
     boost::asio::steady_timer steady_timer_;
     std::mutex client_mutex_;
-    std::thread client_iterate_thread_; 
+    std::thread client_iterate_thread_;
     /* controller related member variables */
     UA_Client* controller_client_;
     /* conveyor related member variables */

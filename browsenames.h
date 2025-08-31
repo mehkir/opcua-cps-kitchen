@@ -39,4 +39,7 @@
 #define CHOOSE_NEXT_ROBOT "ChooseNextRobot"
 #define PLACE_RANDOM_ORDER "PlaceRandomOrder"
 
+/* KITCHEN */
+#define KITCHEN_TYPE "KitchenType"
+
 #endif // NODE_IDS_HPP

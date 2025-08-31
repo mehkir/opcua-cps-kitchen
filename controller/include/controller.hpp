@@ -38,7 +38,6 @@ struct remote_robot {
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_;
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_;
         std::unordered_map<std::string, object_method_info> method_id_map_;
-        robot_state state_;
         robot_tool last_equipped_tool_;
         duration_t overall_time_;
         std::atomic<bool> running_;
