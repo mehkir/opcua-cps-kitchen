@@ -4,10 +4,11 @@
 /* ROBOT */
 // object type node
 #define ROBOT_TYPE "RobotType"
+#define REMOTE_ROBOT_TYPE "RemoteRobotType"
 // method nodes
 #define RECEIVE_TASK "ReceiveTask"
 #define HANDOVER_FINISHED_ORDER "HandoverFinishedOrder"
-// information nodes
+// attribute nodes
 #define POSITION "Position"
 #define RECIPE_ID "RecipeId"
 #define DISH_NAME "DishName"
@@ -21,8 +22,9 @@
 /* CONVEYOR */
 // object type node
 #define CONVEYOR_TYPE "ConveyorType"
+#define REMOTE_CONVEYOR_TYPE "RemoteConveyorType"
 #define PLATE_TYPE "PlateType"
-// plate information nodes
+// plate attribute nodes
 #define PLATE_ID "Id"
 #define PLATE_POSITION "Position"
 #define PLATE_RECIPE_ID "RecipeId"
@@ -34,12 +36,17 @@
 /* CONTROLLER */
 // object type node
 #define CONTROLLER_TYPE "ControllerType"
+#define REMOTE_CONTROLLER_TYPE "RemoteControllerType"
 // method nodes
 #define REGISTER_ROBOT "RegisterRobot"
 #define CHOOSE_NEXT_ROBOT "ChooseNextRobot"
-#define PLACE_RANDOM_ORDER "PlaceRandomOrder"
 
 /* KITCHEN */
+// object type node
 #define KITCHEN_TYPE "KitchenType"
+// method nodes
+#define PLACE_RANDOM_ORDER "PlaceRandomOrder"
+// attribute nodes
+#define CONNECTIVITY "Connectivity"
 
 #endif // NODE_IDS_HPP
