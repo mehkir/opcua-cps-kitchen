@@ -7,7 +7,6 @@
 #include <string>
 #include <chrono>
 #include "client_connection_establisher.hpp"
-#include "response_checker.hpp"
 #include "time_unit.hpp"
 #include "filtered_logger.hpp"
 #include "browsenames.h"
