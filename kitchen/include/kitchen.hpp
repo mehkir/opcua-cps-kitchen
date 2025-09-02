@@ -10,14 +10,19 @@
 #include <unordered_map>
 #include <memory>
 #include <random>
+#include <functional>
 
 #include "object_type_node_inserter.hpp"
+#include "client_connection_establisher.hpp"
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
 #include "browsenames.h"
+#include "method_node_caller.hpp"
 #include "types.hpp"
 
 using namespace cps_kitchen;
+
+typedef std::function<void(position_t)> mark_robot_for_removal_callback_t;
 
 struct remote_robot {
     private:
@@ -25,9 +30,12 @@ struct remote_robot {
         std::string endpoint_;
         position_t position_;
         std::atomic<bool> running_;
-        std::thread client_iterate_thread_;
-        std::unordered_map<std::string, object_method_info> method_id_map_;
         object_type_node_inserter& remote_robot_type_inserter_;
+        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_;
+        UA_Server* kitchen_;
+        std::thread client_iterate_thread_;
+        std::mutex client_mutex_;
+        std::unordered_map<std::string, object_method_info> method_id_map_;
     public:
         /**
          * @brief Setup the remote robot object type
@@ -53,21 +61,96 @@ struct remote_robot {
          * @param _position the position of the remote robot at the conveyor
          * @param _kitchen_instance_id the kitchen instance id
          * @param _remote_robot_type_inserter the remote robot type inserter
+         * @param _mark_robot_for_removal_callback the mark robot for removal callback
+         * @param _kitchen the kitchen server
          */
-        remote_robot(std::string _endpoint, position_t _position, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter) {
+        remote_robot(std::string _endpoint, position_t _position, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback, UA_Server* _kitchen) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback), kitchen_(_kitchen) {
             /* Instantiate remote robot type */
-            UA_StatusCode status = remote_robot_type_inserter_.add_object_instance(REMOTE_ROBOT_INSTANCE_NAME(_position), PLATE_TYPE, _kitchen_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+            UA_StatusCode status = remote_robot_type_inserter_.add_object_instance(REMOTE_ROBOT_INSTANCE_NAME(position_), PLATE_TYPE, _kitchen_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding plate object instance");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding remote robot object instance (%s)");
                 return;
             }
             /* Set attribute values */
-            status = remote_robot_type_inserter_.set_scalar_attribute(REMOTE_ROBOT_INSTANCE_NAME(_position), POSITION, &position_, UA_TYPES_UINT32);
-            status |= remote_robot_type_inserter_.set_scalar_attribute(REMOTE_ROBOT_INSTANCE_NAME(_position), CONNECTIVITY, &position_, UA_TYPES_UINT32);
+            UA_Boolean remote_robot_connectivity = false;
+            status = remote_robot_type_inserter_.set_scalar_attribute(REMOTE_ROBOT_INSTANCE_NAME(position_), POSITION, &position_, UA_TYPES_UINT32);
+            status |= remote_robot_type_inserter_.set_scalar_attribute(REMOTE_ROBOT_INSTANCE_NAME(position_), CONNECTIVITY, &remote_robot_connectivity, UA_TYPES_BOOLEAN);
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting plate attributes");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot attributes (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                return;
             }
-            // TODO: Setup connection and add remove marked robots callback and make server delete node work
+            client_connection_establisher robot_client_connection_establisher;
+            bool connected = robot_client_connection_establisher.establish_connection(client_, endpoint_);
+            if (!connected) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error establishing robot client session");
+                mark_robot_for_removal_callback_(position_);
+                return;
+            }
+            if ((method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK)) == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
+                mark_robot_for_removal_callback_(position_);
+                return;
+            }
+            try {
+                client_iterate_thread_ = std::thread([this]() {
+                    while(running_) {
+                        {
+                            std::lock_guard<std::mutex> lock(client_mutex_);
+                            UA_StatusCode status = UA_Client_run_iterate(client_, 1);
+                            if (status != UA_STATUSCODE_GOOD) {
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
+                                running_ = false;
+                                mark_robot_for_removal_callback_(position_);
+                                return;
+                            }
+                        }
+                        if (usleep(1*1000)) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at robot client iterate sleep", __FUNCTION__);
+                            running_ = false;
+                            mark_robot_for_removal_callback_(position_);
+                            return;
+                        }
+                        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                    }
+                });
+            } catch (...) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the robot client iterate thread at position %d", __FUNCTION__, position_);
+                running_ = false;
+                mark_robot_for_removal_callback_(position_);
+                return;
+            }
+        }
+
+        /**
+         * @brief Instructs the remote robot to process a dish.
+         * 
+         * @param _recipe_id the recipe ID of the dish
+         * @param _processed_steps the processed steps of the recipe ID so far
+         * @param _output_size the count of returned output values
+         * @param _output the variant containing the output values
+         * 
+         * @return UA_StatusCode the status whether the method call was successful
+         */
+        UA_StatusCode
+        instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d from step %d", position_, _recipe_id, _processed_steps);
+            method_node_caller receive_robot_task_caller;
+            receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
+            receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
+            object_method_info omi = method_id_map_[RECEIVE_TASK];
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling instruct method (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                    running_ = false;
+                    mark_robot_for_removal_callback_(position_);
+                    return UA_STATUSCODE_BAD;
+                }
+            }
+            return status;
         }
 
         /**
@@ -78,7 +161,7 @@ struct remote_robot {
             running_ = false;
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
-            // UA_Server_deleteNode(kitchen_, instance_id, true);
+            UA_Server_deleteNode(kitchen_, remote_robot_type_inserter_.get_instance_id(REMOTE_ROBOT_INSTANCE_NAME(position_)), true);
             UA_Client_delete(client_);
         }
 };
