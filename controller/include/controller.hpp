@@ -36,7 +36,6 @@ struct remote_robot {
         std::unordered_set<std::string> capabilities_;
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_;
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_;
-        std::unordered_map<std::string, object_method_info> method_id_map_;
         robot_tool last_equipped_tool_;
         duration_t overall_time_;
         std::atomic<bool> running_;
@@ -55,14 +54,12 @@ struct remote_robot {
             bool connected = robot_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d (async)", position_);
-                running_ = false;
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
             attribute_id_map_[OVERALL_TIME] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, OVERALL_TIME);
             if (UA_NodeId_equal(&attribute_id_map_[OVERALL_TIME], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, OVERALL_TIME);
-                running_ = false;
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
@@ -70,27 +67,18 @@ struct remote_robot {
             UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[OVERALL_TIME], overall_time_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, OVERALL_TIME, position_);
-                running_ = false;
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
             attribute_id_map_[LAST_EQUIPPED_TOOL] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, LAST_EQUIPPED_TOOL);
             if (UA_NodeId_equal(&attribute_id_map_[LAST_EQUIPPED_TOOL], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, LAST_EQUIPPED_TOOL);
-                running_ = false;
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
             status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[LAST_EQUIPPED_TOOL], last_equipped_tool_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, LAST_EQUIPPED_TOOL, position_);
-                running_ = false;
-                mark_robot_for_removal_callback_(position_);
-                return;
-            }
-            if ((method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK)) == OBJECT_METHOD_INFO_NULL) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
-                running_ = false;
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
@@ -185,38 +173,6 @@ struct remote_robot {
         duration_t
         get_overall_time() const {
             return overall_time_;
-        }
-
-        /**
-         * @brief Instructs the remote robot to process a dish.
-         * 
-         * @param _recipe_id the recipe ID of the dish
-         * @param _processed_steps the processed steps of the recipe ID so far
-         * @param _output_size the count of returned output values
-         * @param _output the variant containing the output values
-         * 
-         * @return UA_StatusCode the status whether the method call was successful
-         */
-        UA_StatusCode
-        instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d from step %d", position_, _recipe_id, _processed_steps);
-            method_node_caller receive_robot_task_caller;
-            receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
-            receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
-            object_method_info omi = method_id_map_[RECEIVE_TASK];
-            UA_StatusCode status = UA_STATUSCODE_GOOD;
-            {
-                std::lock_guard<std::mutex> lock(client_mutex_);
-                status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling instruct method (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    running_ = false;
-                    mark_robot_for_removal_callback_(position_);
-                    return UA_STATUSCODE_BAD;
-                }
-            }
-            return status;
         }
 
         static void
