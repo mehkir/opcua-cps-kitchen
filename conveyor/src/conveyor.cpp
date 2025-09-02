@@ -421,6 +421,8 @@ void
 conveyor::join_threads() {
     if (server_iterate_thread_.joinable())
         server_iterate_thread_.join();
+    if (client_iterate_thread_.joinable())
+        client_iterate_thread_.join();
 }
 
 void
