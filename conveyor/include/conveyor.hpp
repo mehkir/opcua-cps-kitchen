@@ -233,7 +233,7 @@ struct plate {
             /* Instantiate plate type */
             UA_StatusCode status = plate_type_inserter_.add_object_instance(instance_name_id_.c_str(), PLATE_TYPE, _conveyor_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding plate object instance");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding plate object instance (%s)", __FUNCTION__, UA_StatusCode_name(status));
                 return;
             }
             /* Set attribute values */
@@ -242,7 +242,7 @@ struct plate {
             status |= plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_RECIPE_ID, &placed_recipe_id_, UA_TYPES_UINT32);
             status |= plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_OCCUPIED, &occupied_, UA_TYPES_BOOLEAN);
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting plate attributes");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting plate attributes (%s)", __FUNCTION__, UA_StatusCode_name(status));
             }
         }
 
