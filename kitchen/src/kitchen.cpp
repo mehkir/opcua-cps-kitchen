@@ -8,8 +8,10 @@
 #include "discovery_and_connection.hpp"
 
 #define INSTANCE_NAME "CpsKitchen"
+#define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
+#define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 
-kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3) {
+kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -30,10 +32,19 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, PLACE_RANDOM_ORDER);
         return;
     }
+
     /* Add kitchen type constructor */
     kitchen_type_inserter_.add_object_type_constructor(server_, kitchen_type_inserter_.get_object_type_id(KITCHEN_TYPE));
     /* Instantiate kitchen type */
     kitchen_type_inserter_.add_object_instance(INSTANCE_NAME, KITCHEN_TYPE);
+    /* Add the remote controller type */
+    remote_controller_type_inserter_.add_attribute(REMOTE_CONTROLLER_TYPE, CONNECTIVITY);
+    remote_controller_type_inserter_.add_object_type_constructor(server_, remote_controller_type_inserter_.get_object_type_id(REMOTE_CONTROLLER_TYPE));
+    remote_controller_type_inserter_.add_object_instance(REMOTE_CONTROLLER_INSTANCE_NAME, REMOTE_CONTROLLER_TYPE, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+    /* Add the remote conveyor type */
+    remote_conveyor_type_inserter_.add_attribute(REMOTE_CONVEYOR_TYPE, CONNECTIVITY);
+    remote_conveyor_type_inserter_.add_object_type_constructor(server_, remote_conveyor_type_inserter_.get_object_type_id(REMOTE_CONVEYOR_TYPE));
+    remote_conveyor_type_inserter_.add_object_instance(REMOTE_CONVEYOR_INSTANCE_NAME, REMOTE_CONVEYOR_TYPE, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
     /* Run the kitchen server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -61,6 +72,7 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     /* Setup controller client */
     std::string controller_endpoint;
     while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller, retrying in %d seconds (%s)", __FUNCTION__, LOOKUP_INTERVAL, UA_StatusCode_name(status));
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
         if (!running_) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
@@ -77,6 +89,7 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     /* Setup conveyor client */
     std::string conveyor_endpoint;
     while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
+        // TODO like above for controller
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
         if (!running_) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
@@ -131,11 +144,12 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
         UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
         if ((status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &next_suitable_robot_output_size, &next_suitable_robot_output)) != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            // TODO: Return and come back in conjunction with client iterate loop
+            // TODO: Add dropped dish
+            UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
+            return;
         }
     }
-
-    remote_robot* next_suitable_robot = find_suitable_robot(recipe_id, 0);
+    remote_robot* next_suitable_robot = choose_next_robot_called(next_suitable_robot_output_size, next_suitable_robot_output);
     if (next_suitable_robot != NULL) {
         UA_Variant* output;
         size_t output_size;
@@ -178,6 +192,23 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, robot->get_position());
 }
 
+remote_robot*
+kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_output_size != 2) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        stop();
+        return;
+    }
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_STRING])
+    || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        return;
+    }
+
+
+}
+
 void
 kitchen::join_threads() {
     if (server_iterate_thread_.joinable())
@@ -193,5 +224,7 @@ kitchen::start() {
 
 void
 kitchen::stop() {
-    
+    running_ = false;
+    discovery_util_.stop();
+    discovery_util_.deregister_server(server_);
 }

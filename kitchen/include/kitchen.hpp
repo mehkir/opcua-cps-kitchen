@@ -66,7 +66,7 @@ struct remote_robot {
          */
         remote_robot(std::string _endpoint, position_t _position, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback, UA_Server* _kitchen) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback), kitchen_(_kitchen) {
             /* Instantiate remote robot type */
-            UA_StatusCode status = remote_robot_type_inserter_.add_object_instance(REMOTE_ROBOT_INSTANCE_NAME(position_), PLATE_TYPE, _kitchen_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+            UA_StatusCode status = remote_robot_type_inserter_.add_object_instance(REMOTE_ROBOT_INSTANCE_NAME(position_), REMOTE_ROBOT_TYPE, _kitchen_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding remote robot object instance (%s)");
                 return;
@@ -86,6 +86,7 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
+            remote_robot_type_inserter_.set_scalar_attribute(REMOTE_ROBOT_INSTANCE_NAME(position_), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
             if ((method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 mark_robot_for_removal_callback_(position_);
@@ -243,6 +244,16 @@ private:
      */
     void
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Extracts the returned remote robot parameters
+     * 
+     * @param _output_size the count of returned output values
+     * @param _output the variant containing the output values
+     * @return remote_robot* the pointer of the remote robot extracted by the returned parameters
+     */
+    remote_robot*
+    choose_next_robot_called(size_t _output_size, UA_Variant *_output);
 
     /**
      * @brief Joins all started threads.
