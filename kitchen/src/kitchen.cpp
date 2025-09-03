@@ -16,7 +16,6 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error with setting up the server", __FUNCTION__);
-        running_ = false;
         return;
     }
     // Set a unique application URI for the robot
@@ -29,7 +28,6 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     status = kitchen_type_inserter_.add_method(KITCHEN_TYPE, PLACE_RANDOM_ORDER, place_random_order, place_random_order_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, PLACE_RANDOM_ORDER);
-        running_ = false;
         return;
     }
     /* Add kitchen type constructor */
@@ -40,7 +38,6 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error at kitchen startup");
-        running_ = false;
         return;
     }
     /* Register at discovery server repeatedly */
@@ -61,10 +58,40 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
         running_ = false;
         return;
     }
+    /* Setup controller client */
+    std::string controller_endpoint;
+    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+        if (!running_) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
+            stop();
+            return;
+        }
+    }
+    /* Gather method ids */
+    if ((method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
+        stop();
+        return;        
+    }
+    /* Setup conveyor client */
+    std::string conveyor_endpoint;
+    while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+        if (!running_) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
+            stop();
+            return;
+        }
+    }
 }
 
 kitchen::~kitchen() {
-    // TODO:
+    stop();
+    join_threads();
+    UA_Server_run_shutdown(server_);
+    UA_Server_delete(server_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
 }
 
 UA_StatusCode
@@ -92,6 +119,22 @@ void
 kitchen::handle_random_order_request(UA_Variant* _output) {
     bool instructed = false;
     recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
+    object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
+    UA_Variant* next_suitable_robot_output;
+    size_t next_suitable_robot_output_size;
+    {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        method_node_caller choose_next_robot_caller;
+        UA_UInt32 processed_steps = 0;
+        choose_next_robot_caller.add_scalar_input_argument(&recipe_id, UA_TYPES_UINT32);
+        choose_next_robot_caller.add_scalar_input_argument(&processed_steps, UA_TYPES_UINT32);
+        UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+        if ((status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &next_suitable_robot_output_size, &next_suitable_robot_output)) != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
+            // TODO: Return and come back in conjunction with client iterate loop
+        }
+    }
+
     remote_robot* next_suitable_robot = find_suitable_robot(recipe_id, 0);
     if (next_suitable_robot != NULL) {
         UA_Variant* output;
@@ -123,7 +166,6 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         return;
     }
 
-
     position_t remote_robot_position = *(position_t*) _output[0].data;
     UA_Boolean result = *(UA_Boolean*) _output[1].data;
 
@@ -136,10 +178,20 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, robot->get_position());
 }
 
-void kitchen::start() {
+void
+kitchen::join_threads() {
+    if (server_iterate_thread_.joinable())
+        server_iterate_thread_.join();
+    if (client_iterate_thread_.joinable())
+        client_iterate_thread_.join();
+}
+
+void
+kitchen::start() {
 
 }
 
-void kitchen::stop() {
+void
+kitchen::stop() {
     
 }

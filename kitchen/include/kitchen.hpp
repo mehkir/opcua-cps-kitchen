@@ -154,6 +154,16 @@ struct remote_robot {
         }
 
         /**
+         * @brief Returns the remote robot's position.
+         * 
+         * @return position_t the remote robot position
+         */
+        position_t
+        get_position() const {
+            return position_;
+        }
+
+        /**
          * @brief Destroy the remote robot object.
          * 
          */
@@ -234,6 +244,13 @@ private:
     void
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
 
+    /**
+     * @brief Joins all started threads.
+     * 
+     */
+    void
+    join_threads();
+
 public:
     kitchen();
     ~kitchen();
@@ -242,13 +259,15 @@ public:
      * @brief Starts the kitchen and joins all started threads.
      * 
      */
-    void start();
+    void
+    start();
 
     /**
      * @brief Stops the kitchen and shuts it down.
      * 
      */
-    void stop();
+    void
+    stop();
 };
 
 #endif // KITCHEN_HPP
