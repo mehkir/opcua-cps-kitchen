@@ -199,9 +199,8 @@ robot::receive_task(UA_Server *_server,
         return UA_STATUSCODE_BAD;
     }
 
-    UA_StatusCode status = !UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32]);
-    status |= !UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32]);
-    if (status != UA_STATUSCODE_GOOD) {
+    if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32])
+      ||!UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
@@ -215,7 +214,7 @@ robot::receive_task(UA_Server *_server,
     robot* self = static_cast<robot*>(_method_context);
     // Set output parameters
     UA_Boolean task_received = true;
-    status = UA_Variant_setScalarCopy(&_output[0], &self->position_, &UA_TYPES[UA_TYPES_UINT32]);
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &self->position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[1], &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
