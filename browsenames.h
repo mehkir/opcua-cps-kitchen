@@ -48,5 +48,9 @@
 #define PLACE_RANDOM_ORDER "PlaceRandomOrder"
 // attribute nodes
 #define CONNECTIVITY "Connectivity"
+#define RECEIVED_ORDERS "ReceivedOrders"
+#define ASSIGNED_ORDERS "AssignedOrders"
+#define DROPPED_ORDERS "DroppedOrders"
+#define COMPLETED_ORDERS "CompletedOrders"
 
 #endif // NODE_IDS_HPP
