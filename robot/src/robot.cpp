@@ -397,8 +397,10 @@ robot::determine_next_action() {
                     std::unique_lock<std::mutex> lock(client_mutex_);
                     if (conveyor_client_ != nullptr)
                         status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-                    if (running_ && status != UA_STATUSCODE_GOOD)
+                    if (running_ && status != UA_STATUSCODE_GOOD) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
                         conveyor_connected_condition.wait(lock);
+                    }
                     if(!running_) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
                         return;
@@ -460,8 +462,10 @@ robot::determine_next_action() {
                 std::unique_lock<std::mutex> lock(client_mutex_);
                 if (conveyor_client_ != nullptr)
                     status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-                if (running_ && status != UA_STATUSCODE_GOOD)
+                if (running_ && status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
                     conveyor_connected_condition.wait(lock);
+                }
                 if(!running_) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
                     return;
@@ -616,7 +620,7 @@ robot::start() {
 
         }
         if (!running_) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering at the contorller", __FUNCTION__);
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering at the controller", __FUNCTION__);
             stop();
             return;
         }
