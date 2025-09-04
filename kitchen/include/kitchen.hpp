@@ -241,8 +241,10 @@ private:
      * 
      * @param _output_size the count of returned output values
      * @param _output the variant containing the output values
+     * @return true if instruction suceeded
+     * @return false if instruction failed
      */
-    void
+    bool
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
 
     /**
@@ -254,6 +256,15 @@ private:
      */
     remote_robot*
     choose_next_robot_called(size_t _output_size, UA_Variant *_output);
+
+    /**
+     * @brief Helper method for incrementing X_ORDERS attribute nodes
+     * 
+     * @param _attribute_name the attribute name
+     * @return UA_StatusCode the status code indicating if incrementing succeeded
+     */
+    UA_StatusCode
+    increment_orders_counter(std::string _attribute_name);
 
     /**
      * @brief Joins all started threads.

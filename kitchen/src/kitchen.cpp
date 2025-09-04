@@ -24,6 +24,9 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(kitchen_uri_.c_str());
     // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    /* Add kitchen attributes */
+    kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, ASSIGNED_ORDERS);
+    kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, DROPPED_ORDERS);
     /* Add place random order method node */
     method_arguments place_random_order_arguments;
     place_random_order_arguments.add_output_argument("indicates whether the robot is instructed", "robot_instructed", UA_TYPES_BOOLEAN);
@@ -37,6 +40,11 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     kitchen_type_inserter_.add_object_type_constructor(server_, kitchen_type_inserter_.get_object_type_id(KITCHEN_TYPE));
     /* Instantiate kitchen type */
     kitchen_type_inserter_.add_object_instance(INSTANCE_NAME, KITCHEN_TYPE);
+    UA_UInt32 initial_orders_count = 0;
+    kitchen_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ASSIGNED_ORDERS, &initial_orders_count, UA_TYPES_UINT32);
+    kitchen_type_inserter_.set_scalar_attribute(INSTANCE_NAME, DROPPED_ORDERS, &initial_orders_count, UA_TYPES_UINT32);
+    kitchen_type_inserter_.set_scalar_attribute(INSTANCE_NAME, RECEIVED_ORDERS, &initial_orders_count, UA_TYPES_UINT32);
+    kitchen_type_inserter_.set_scalar_attribute(INSTANCE_NAME, COMPLETED_ORDERS, &initial_orders_count, UA_TYPES_UINT32);
     /* Add the remote controller type */
     remote_controller_type_inserter_.add_attribute(REMOTE_CONTROLLER_TYPE, CONNECTIVITY);
     remote_controller_type_inserter_.add_object_type_constructor(server_, remote_controller_type_inserter_.get_object_type_id(REMOTE_CONTROLLER_TYPE));
@@ -89,7 +97,7 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     /* Setup conveyor client */
     std::string conveyor_endpoint;
     while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
-        // TODO like above for controller
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor, retrying in %d seconds (%s)", __FUNCTION__, LOOKUP_INTERVAL, UA_StatusCode_name(status));
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
         if (!running_) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
@@ -144,7 +152,7 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
         UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
         if ((status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &next_suitable_robot_output_size, &next_suitable_robot_output)) != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            // TODO: Add dropped dish
+            increment_orders_counter(DROPPED_ORDERS);
             UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
             return;
         }
@@ -155,41 +163,50 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
         size_t output_size;
         UA_StatusCode status = next_suitable_robot->instruct(recipe_id, 0, &output_size, &output);
         if (status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling instruct on remote robot failed", __FUNCTION__);
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling instruct on remote robot failed (%s)", __FUNCTION__, UA_StatusCode_name(status));
             instructed = false;
+            increment_orders_counter(DROPPED_ORDERS);
             UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
             return;
         }
-        receive_robot_task_called(output_size, output);
-        instructed = true;
+        if (instructed = receive_robot_task_called(output_size, output)) {
+            increment_orders_counter(ASSIGNED_ORDERS);
+        } else {
+            increment_orders_counter(DROPPED_ORDERS);
+        }
     }
     UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
 
-void
+bool
 kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        return;
+        return false;
     }
 
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT32])
        || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        return;
+        return false;
     }
 
     position_t remote_robot_position = *(position_t*) _output[0].data;
     UA_Boolean result = *(UA_Boolean*) _output[1].data;
 
     remote_robot* robot = position_remote_robot_map_[remote_robot_position].get();
+    //TODO: discover robots and handle if not discovered yet but given by the controller, and handle remove marked robots
     // Sanity check
     if(robot->get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on position. Received position %d, actually %d", __FUNCTION__, remote_robot_position, robot->get_position());
+        return false;
     }
-    if (!result)
+    if (!result) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, robot->get_position());
+        return false;
+    }
+    return true;
 }
 
 remote_robot*
@@ -206,7 +223,25 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
         return;
     }
 
+    // TODO implement properly
 
+}
+
+UA_StatusCode
+kitchen::increment_orders_counter(std::string _attribute_name) {
+    UA_StatusCode status = UA_STATUSCODE_GOOD;
+    UA_Variant value;
+    if ((status = kitchen_type_inserter_.get_attribute(INSTANCE_NAME, _attribute_name.c_str(), value)) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error getting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        return status;
+    }
+    UA_UInt32 dishes_counter = *(UA_UInt32*) value.data;
+    dishes_counter++;
+    if ((status = kitchen_type_inserter_.set_scalar_attribute(INSTANCE_NAME, _attribute_name.c_str(), &dishes_counter, UA_TYPES_UINT32)) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        return status;
+    }
+    return status;
 }
 
 void
@@ -219,7 +254,53 @@ kitchen::join_threads() {
 
 void
 kitchen::start() {
+    /* Run the client iterate thread */
+    try {
+        client_iterate_thread_ = std::thread([this]() {
+            while(running_) {
+                {
+                    std::lock_guard<std::mutex> lock(client_mutex_);
+                    if (controller_client_ != nullptr) {
+                        UA_StatusCode status = UA_Client_run_iterate(controller_client_, 1);
+                        if (status != UA_STATUSCODE_GOOD) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running controller client iterate", __FUNCTION__);
+                            UA_Client_delete(controller_client_);
+                            controller_client_ = nullptr;
+                        }
+                    } else {
+                        std::string controller_endpoint;
+                        if (discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) != UA_STATUSCODE_GOOD)
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error reconnecting to controller. Retrying ...");
+                    }
 
+                    if (conveyor_client_ != nullptr) {
+                        UA_StatusCode status = UA_Client_run_iterate(conveyor_client_, 1);
+                        if (status != UA_STATUSCODE_GOOD) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running conveyor client iterate", __FUNCTION__);
+                            UA_Client_delete(conveyor_client_);
+                            conveyor_client_ = nullptr;
+                        }
+                    } else {
+                        std::string conveyor_endpoint;
+                        if (discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE) != UA_STATUSCODE_GOOD)
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error reconnecting to conveyor. Retrying ...");
+                    }
+                }
+                if (usleep(1*1000)) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at client iterate sleep", __FUNCTION__);
+                    stop();
+                    return;
+                }
+                // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+            }
+        });
+    } catch (...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the client iterate thread");
+        stop();
+        return;
+    }
+    join_threads();
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
 
 void
