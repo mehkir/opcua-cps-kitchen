@@ -8,6 +8,7 @@
 #include <thread>
 #include <atomic>
 #include <unordered_map>
+#include <unordered_set>
 #include <memory>
 #include <random>
 #include <functional>
@@ -32,7 +33,6 @@ struct remote_robot {
         std::atomic<bool> running_;
         object_type_node_inserter& remote_robot_type_inserter_;
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_;
-        UA_Server* kitchen_;
         std::thread client_iterate_thread_;
         std::mutex client_mutex_;
         std::unordered_map<std::string, object_method_info> method_id_map_;
@@ -62,9 +62,8 @@ struct remote_robot {
          * @param _kitchen_instance_id the kitchen instance id
          * @param _remote_robot_type_inserter the remote robot type inserter
          * @param _mark_robot_for_removal_callback the mark robot for removal callback
-         * @param _kitchen the kitchen server
          */
-        remote_robot(std::string _endpoint, position_t _position, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback, UA_Server* _kitchen) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback), kitchen_(_kitchen) {
+        remote_robot(std::string _endpoint, position_t _position, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
             /* Instantiate remote robot type */
             UA_StatusCode status = remote_robot_type_inserter_.add_object_instance(REMOTE_ROBOT_INSTANCE_NAME(position_), REMOTE_ROBOT_TYPE, _kitchen_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
             if (status != UA_STATUSCODE_GOOD) {
@@ -172,7 +171,6 @@ struct remote_robot {
             running_ = false;
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
-            UA_Server_deleteNode(kitchen_, remote_robot_type_inserter_.get_instance_id(REMOTE_ROBOT_INSTANCE_NAME(position_)), true);
             UA_Client_delete(client_);
         }
 };
@@ -192,6 +190,7 @@ private:
     std::thread client_iterate_thread_;
     /* remote robot related member variables */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
+    std::unordered_set<position_t> robots_to_be_removed_;
     object_type_node_inserter remote_robot_type_inserter_;
     /* controller related member variables */
     UA_Client* controller_client_;
@@ -265,6 +264,21 @@ private:
      */
     UA_StatusCode
     increment_orders_counter(std::string _attribute_name);
+
+    /**
+     * @brief Marks a remote robot for removal.
+     * 
+     * @param _position the position of the remote robot to mark for removal
+     */
+    void
+    mark_robot_for_removal(position_t _position); 
+
+    /**
+     * @brief Removes all marked robots from the kitchen.
+     * 
+     */
+    void
+    remove_marked_robots();
 
     /**
      * @brief Joins all started threads.
