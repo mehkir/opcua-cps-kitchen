@@ -222,6 +222,7 @@ private:
     /* robot related member variables */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
     std::unordered_set<position_t> robots_to_be_removed_;
+    std::mutex mark_for_removal_mutex_;
     /* recipe related member variables */
     recipe_parser recipe_parser_;
 

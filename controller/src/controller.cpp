@@ -224,6 +224,7 @@ controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_ste
 void
 controller::mark_robot_for_removal(position_t _position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
     robots_to_be_removed_.insert(_position);
 }
 

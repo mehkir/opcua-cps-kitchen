@@ -405,6 +405,8 @@ private:
     std::mutex client_mutex_;
     std::thread client_iterate_thread_; 
     UA_Client* controller_client_;
+    /* robot related member variables */
+    std::mutex mark_for_removal_mutex_;
 
     /**
      * @brief Extracts the remote robot port and position on which a finished order is ready to be retrieved.

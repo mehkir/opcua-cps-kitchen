@@ -390,6 +390,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
 void
 conveyor::mark_robot_for_removal(position_t _position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
     robots_to_be_removed_.insert(_position);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Marked robot at position %d for removal", __FUNCTION__, _position);
 }

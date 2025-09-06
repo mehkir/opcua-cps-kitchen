@@ -2,12 +2,39 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "(gdb) Launch kitchen",
+            "type": "cppdbg",
+            "request": "launch",
+            // Resolved by CMake Tools:
+            "program": "${workspaceFolder}/build/start_kitchen_instance",
+            "args": ["4"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}",
+            "environment": [
+                {
+                    // add the directory where our target was built to the PATHs
+                    // it gets resolved by CMake Tools:
+                    "name": "PATH",
+                    "value": "${env:PATH}:${command:cmake.getLaunchTargetDirectory}"
+                }
+            ],
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "CMake: build"
+        },
+        {
             "name": "(gdb) Launch conveyor",
             "type": "cppdbg",
             "request": "launch",
             // Resolved by CMake Tools:
             "program": "${workspaceFolder}/build/start_conveyor_instance",
-            "args": ["6000","4"],
+            "args": ["4"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [
