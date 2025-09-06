@@ -244,7 +244,7 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
     UA_UInt32 remote_robot_position = *(UA_UInt32*) _output[1].data;
     std::string remote_robot_endpoint_str((char*) remote_robot_endpoint.data, remote_robot_endpoint.length);
     if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end())
-        position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1), remote_robot_position);
+        position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, remote_robot_position, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
     if (robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()) {
         remove_marked_robots();
         remote_robot_discovery_cv.notify_all();
@@ -400,7 +400,7 @@ kitchen::start() {
                             }
                             position_t remote_robot_position = *(position_t*)inr.get_variant()->data;
                             if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end()) {
-                                position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(endpoint, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
+                                position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(endpoint, remote_robot_position, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
                             }
                             if (robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()){
                                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Instantiating remote robot at position %d failed", __FUNCTION__, remote_robot_position);

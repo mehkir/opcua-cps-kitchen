@@ -61,12 +61,12 @@ struct remote_robot {
          * @brief Construct a new remote robot object.
          * 
          * @param _endpoint the remote robot's endpoint url
+         * @param _position the remote robot's position
          * @param _kitchen_instance_id the kitchen instance id
          * @param _remote_robot_type_inserter the remote robot type inserter
          * @param _mark_robot_for_removal_callback the mark robot for removal callback
-         * @param _position the remote robot's position
          */
-        remote_robot(std::string _endpoint, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback, UA_UInt32 _position = 0) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
+        remote_robot(std::string _endpoint, UA_UInt32 _position, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
             client_connection_establisher robot_client_connection_establisher;
             bool connected = robot_client_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
@@ -81,17 +81,6 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
-            if (position_ == 0) {
-                /* Read the position information node */
-                information_node_reader inr;
-                if (inr.read_information_node(client_, attribute_id_map_[POSITION]) != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, POSITION);
-                    mark_robot_for_removal_callback_(position_);
-                    return;
-                }
-                position_ = *(position_t*)inr.get_variant()->data;
-            }
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot endpoint: %s, position: %d", __FUNCTION__, _endpoint.c_str(), position_);
             /* Subscribe to position changes */
             node_value_subscriber nv_subscriber;
             UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[POSITION], position_changed, this);
