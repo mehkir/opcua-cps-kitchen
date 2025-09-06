@@ -15,6 +15,10 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, stop_handler);
     
     // _position
+    if (argc < 2) {
+        std::cout << "Provide robot position" << std::endl;
+        return 0;
+    }
     robot robot_instance(atoi(argv[1]));
     robot_instance_ = &robot_instance;
     robot_instance.start();

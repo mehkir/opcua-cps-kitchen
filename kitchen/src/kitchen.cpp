@@ -12,7 +12,7 @@
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 
-kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE),
+kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE), robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE),
                         remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3), controller_client_(nullptr), conveyor_client_(nullptr) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -114,7 +114,11 @@ kitchen::kitchen() : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), 
     }
     remote_conveyor_type_inserter_.set_scalar_attribute(REMOTE_CONVEYOR_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
     /* Add remote robot type constructor */
-    remote_robot::setup_remote_robot_object_type(remote_robot_type_inserter_, server_);
+    if (remote_robot::setup_remote_robot_object_type(remote_robot_type_inserter_, server_) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the remote robot type constructor", __FUNCTION__);
+        stop();
+        return;
+    }
 }
 
 kitchen::~kitchen() {
@@ -167,7 +171,12 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
             return;
         }
     }
-    remote_robot* next_suitable_robot = choose_next_robot_called(next_suitable_robot_output_size, next_suitable_robot_output);
+    remote_robot* next_suitable_robot = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+        next_suitable_robot = choose_next_robot_called(next_suitable_robot_output_size, next_suitable_robot_output);
+        remote_robot_discovery_cv.notify_all();
+    }
     if (next_suitable_robot != nullptr) {
         UA_Variant* output;
         size_t output_size;
@@ -270,6 +279,7 @@ kitchen::mark_robot_for_removal(position_t _position) {
 void
 kitchen::remove_marked_robots() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
     for (position_t position : robots_to_be_removed_) {
         if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_.erase(position);
@@ -280,6 +290,7 @@ kitchen::remove_marked_robots() {
         }
     }
     robots_to_be_removed_.clear();
+    remote_robot_discovery_cv.notify_all();
 }
 
 void
@@ -336,16 +347,6 @@ kitchen::start() {
                             remote_conveyor_type_inserter_.set_scalar_attribute(REMOTE_CONVEYOR_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
                         }
                     }
-
-                    std::vector<std::string> endpoints;
-                    if (discovery_util_.lookup_endpoints(endpoints) != UA_STATUSCODE_GOOD) {
-                        for (std::string endpoint : endpoints) {
-                            if (node_browser_helper().has_instance(endpoint, ROBOT_TYPE)) {
-                                std::unique_ptr<remote_robot> remote_robot = std::make_unique<remote_robot>()
-                            }
-                        }
-                    }
-
                 }
                 if (usleep(1*1000)) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at client iterate sleep", __FUNCTION__);
@@ -360,13 +361,52 @@ kitchen::start() {
         stop();
         return;
     }
+    /* Run the cyclic remote robot discovery thread */
+    try {
+        cyclic_remote_robot_discovery_thread_ = std::thread([this]() {
+            while (running_) {
+                {
+                    std::unique_lock<std::mutex> lock(remote_robot_discovery_mutex_);
+                    std::vector<std::string> endpoints;
+                    if (discovery_util_.lookup_endpoints(endpoints) != UA_STATUSCODE_GOOD) {
+                        continue;
+                    }
+                    for (std::string endpoint : endpoints) {
+                        if (node_browser_helper().has_instance(endpoint, ROBOT_TYPE)) {
+                            std::unique_ptr<remote_robot> remote_robot_instance = std::make_unique<remote_robot>(endpoint, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
+                            position_t position = remote_robot_instance->get_position();
+                            if (robots_to_be_removed_.find(position) != robots_to_be_removed_.end()){
+                                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Instantiating remote robot at position %d failed", __FUNCTION__, position);
+                                remove_marked_robots();
+                                continue;
+                            }
+                            if (position_remote_robot_map_.find(position) == position_remote_robot_map_.end())
+                                position_remote_robot_map_[position];
+                        }
+                    }
+                    if (position_remote_robot_map_.size() == robot_count_)
+                        remote_robot_discovery_cv.wait(lock);
+                }
+                std::this_thread::sleep_for(std::chrono::seconds(1));
+            }
+        });
+    }
+    catch(...) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the remote robot discovery thread");
+        stop();
+        return;
+    }
     join_threads();
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
 
 void
 kitchen::stop() {
-    running_ = false;
+    {
+        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+        running_ = false;
+        remote_robot_discovery_cv.notify_all();
+    }
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
 }

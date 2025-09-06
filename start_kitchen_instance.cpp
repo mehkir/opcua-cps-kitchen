@@ -15,7 +15,11 @@ int main(int argc, char* argv[]) {
     signal(SIGTERM, stop_handler);
     
     // _robot_count
-    kitchen kitchen_instance;
+    if (argc < 2) {
+        std::cout << "Provide robot count" << std::endl;
+        return 0;
+    }
+    kitchen kitchen_instance(atoi(argv[1]));
     kitchen_instance_ = &kitchen_instance;
     kitchen_instance.start();
     return 0;

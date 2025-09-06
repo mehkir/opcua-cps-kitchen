@@ -58,14 +58,11 @@ discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::stri
         return retval;
     }
 
-    /*
-     * Now that we have the list of available servers, call get endpoints on all of them
-     */
     for(size_t i = 0; i < application_description_array_size; i++) {
         UA_ApplicationDescription* description = &application_description_array[i];
         if(description->discoveryUrlsSize == 0) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT,
-                        "[GetEndpoints] Server %.*s did not provide any discovery urls. Skipping.",
+                        "Server %.*s did not provide any discovery urls. Skipping.",
                         (int)description->applicationUri.length, description->applicationUri.data);
             continue;
         }

@@ -185,9 +185,10 @@ struct remote_robot {
                 remote_robot* self = static_cast<remote_robot*>(_mon_context);
                 if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                    self->mark_robot_for_removal_callback_(self->position_);
                     return;
                 }
-                self->overall_time_ = *(duration_t*) _value->value.data;
+                self->overall_time_ = *(UA_UInt32*) _value->value.data;
                 // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's overall time at position %d is %ld", __FUNCTION__, self->position_, self->overall_time_);
         }
 
@@ -201,6 +202,7 @@ struct remote_robot {
                 remote_robot* self = static_cast<remote_robot*>(_mon_context);
                 if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                    self->mark_robot_for_removal_callback_(self->position_);
                     return;
                 }
                 self->last_equipped_tool_ = *(robot_tool*) _value->value.data;
