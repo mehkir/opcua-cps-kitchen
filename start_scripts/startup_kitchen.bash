@@ -10,6 +10,8 @@ $PROJECT_DIRECTORY/start_scripts/start_conveyor.bash 4 &
 sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_robot.bash 4 &
 sleep 1
+$PROJECT_DIRECTORY/start_scripts/start_kitchen.bash 4 &
+sleep 1
 cd "$PROJECT_DIRECTORY/cps-kitchen-dashboard"
 export LD_LIBRARY_PATH="$(pwd)/my-addons/open62541/lib"
 node backend.js --robot-count 4 &

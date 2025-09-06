@@ -1,8 +1,9 @@
 #ifndef KITCHEN_HPP
 #define KITCHEN_HPP
 
-#define REMOTE_ROBOT_INSTANCE_NAME(POS) "RemoteKitchenRobot" #POS
+#define REMOTE_ROBOT_INSTANCE_NAME_PREFIX "RemoteKitchenRobot"
 
+#include <open62541/plugin/log_stdout.h>
 #include <open62541/server.h>
 #include <open62541/client.h>
 #include <thread>
@@ -18,7 +19,6 @@
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
 #include "browsenames.h"
-#include "information_node_reader.hpp"
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
 #include "types.hpp"
@@ -60,16 +60,17 @@ struct remote_robot {
         /**
          * @brief Construct a new remote robot object.
          * 
-         * @param _endpoint the robot's endpoint url
+         * @param _endpoint the remote robot's endpoint url
          * @param _kitchen_instance_id the kitchen instance id
          * @param _remote_robot_type_inserter the remote robot type inserter
          * @param _mark_robot_for_removal_callback the mark robot for removal callback
+         * @param _position the remote robot's position
          */
-        remote_robot(std::string _endpoint, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) : client_(nullptr), endpoint_(_endpoint), position_(0), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
+        remote_robot(std::string _endpoint, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback, UA_UInt32 _position = 0) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
             client_connection_establisher robot_client_connection_establisher;
             bool connected = robot_client_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error establishing robot client session");
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error establishing robot client session", __FUNCTION__);
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
@@ -80,14 +81,17 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
-            /* Read the position information node */
-            information_node_reader inr;
-            if (inr.read_information_node(client_, attribute_id_map_[POSITION]) != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, POSITION);
-                mark_robot_for_removal_callback_(position_);
-                return;
+            if (position_ == 0) {
+                /* Read the position information node */
+                information_node_reader inr;
+                if (inr.read_information_node(client_, attribute_id_map_[POSITION]) != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, POSITION);
+                    mark_robot_for_removal_callback_(position_);
+                    return;
+                }
+                position_ = *(position_t*)inr.get_variant()->data;
             }
-            position_ = *(position_t*)inr.get_variant()->data;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot endpoint: %s, position: %d", __FUNCTION__, _endpoint.c_str(), position_);
             /* Subscribe to position changes */
             node_value_subscriber nv_subscriber;
             UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[POSITION], position_changed, this);
@@ -97,16 +101,18 @@ struct remote_robot {
                 return;
             }
             /* Instantiate remote robot type */
-            UA_StatusCode status = remote_robot_type_inserter_.add_object_instance(REMOTE_ROBOT_INSTANCE_NAME(position_), REMOTE_ROBOT_TYPE, _kitchen_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+            status = remote_robot_type_inserter_.add_object_instance(remote_robot_instance_name(position_).c_str(), REMOTE_ROBOT_TYPE, _kitchen_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding remote robot object instance (%s)");
+                mark_robot_for_removal_callback_(position_);
                 return;
             }
             /* Set attribute values */
-            status = remote_robot_type_inserter_.set_scalar_attribute(REMOTE_ROBOT_INSTANCE_NAME(position_), POSITION, &position_, UA_TYPES_UINT32);
-            status |= remote_robot_type_inserter_.set_scalar_attribute(REMOTE_ROBOT_INSTANCE_NAME(position_), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
+            status = remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(position_), POSITION, &position_, UA_TYPES_UINT32);
+            status |= remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(position_), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot attributes (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                mark_robot_for_removal_callback_(position_);
                 return;
             }
             /* Get receive task method id */
@@ -202,11 +208,15 @@ struct remote_robot {
             }
             self->position_ = *(position_t*)_value->value.data;
             UA_StatusCode status;
-            if ((status = self->remote_robot_type_inserter_.set_scalar_attribute(REMOTE_ROBOT_INSTANCE_NAME(self->position_), POSITION, &self->position_, UA_TYPES_UINT32)) != UA_STATUSCODE_GOOD) {
+            if ((status = self->remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(self->position_).c_str(), POSITION, &self->position_, UA_TYPES_UINT32)) != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting %s information node", __FUNCTION__, POSITION, UA_StatusCode_name(status));
                 self->mark_robot_for_removal_callback_(self->position_);
             }
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->position_);
+        }
+
+        static std::string remote_robot_instance_name(position_t _position) {
+            return REMOTE_ROBOT_INSTANCE_NAME_PREFIX + std::to_string(_position);
         }
 
         /**
@@ -240,6 +250,7 @@ private:
     object_type_node_inserter remote_robot_type_inserter_;
     std::thread cyclic_remote_robot_discovery_thread_;
     std::mutex remote_robot_discovery_mutex_;
+    std::mutex mark_for_removal_mutex_;
     uint32_t robot_count_;
     std::condition_variable remote_robot_discovery_cv;
     /* controller related member variables */
