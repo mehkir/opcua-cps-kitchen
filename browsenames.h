@@ -29,7 +29,6 @@
 #define PLATE_POSITION "Position"
 #define PLATE_RECIPE_ID "RecipeId"
 #define PLATE_OCCUPIED "Occupied"
-
 // method nodes
 #define FINISHED_ORDER_NOTIFICATION "FinishedOrderNotification"
 
