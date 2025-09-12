@@ -62,11 +62,10 @@ struct remote_robot {
          * 
          * @param _endpoint the remote robot's endpoint url
          * @param _position the remote robot's position
-         * @param _kitchen_instance_id the kitchen instance id
          * @param _remote_robot_type_inserter the remote robot type inserter
          * @param _mark_robot_for_removal_callback the mark robot for removal callback
          */
-        remote_robot(std::string _endpoint, UA_UInt32 _position, UA_NodeId _kitchen_instance_id, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
+        remote_robot(std::string _endpoint, UA_UInt32 _position, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
             client_connection_establisher robot_client_connection_establisher;
             bool connected = robot_client_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
@@ -89,18 +88,10 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
-            /* Instantiate remote robot type */
-            status = remote_robot_type_inserter_.add_object_instance(remote_robot_instance_name(position_).c_str(), REMOTE_ROBOT_TYPE, _kitchen_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+            /* Set connectvitiy */
+            status = remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(position_), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding remote robot object instance (%s)");
-                mark_robot_for_removal_callback_(position_);
-                return;
-            }
-            /* Set attribute values */
-            status = remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(position_), POSITION, &position_, UA_TYPES_UINT32);
-            status |= remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(position_), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
-            if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot attributes (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot connectivity attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
                 mark_robot_for_removal_callback_(position_);
                 return;
             }

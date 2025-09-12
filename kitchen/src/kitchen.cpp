@@ -119,6 +119,18 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
         stop();
         return;
     }
+    /* Add instances to the address space */
+    connectivity_state = false;
+    for (position_t position = 1; position <= robot_count_; position++) {
+        status = remote_robot_type_inserter_.add_object_instance(remote_robot::remote_robot_instance_name(position).c_str(), REMOTE_ROBOT_TYPE, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+        status |= remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(position), POSITION, &position, UA_TYPES_UINT32);
+        status |= remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(position), CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding remote robot object and setting initial attributes (%s)", __FUNCTION__, UA_StatusCode_name(status));
+            stop();
+            return;
+        }
+    }
 }
 
 kitchen::~kitchen() {
@@ -244,7 +256,7 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
     UA_UInt32 remote_robot_position = *(UA_UInt32*) _output[1].data;
     std::string remote_robot_endpoint_str((char*) remote_robot_endpoint.data, remote_robot_endpoint.length);
     if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end())
-        position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, remote_robot_position, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
+        position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, remote_robot_position, remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
     if (robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()) {
         remove_marked_robots();
         remote_robot_discovery_cv.notify_all();
@@ -283,7 +295,6 @@ kitchen::remove_marked_robots() {
     for (position_t position : robots_to_be_removed_) {
         if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_.erase(position);
-            UA_Server_deleteNode(server_, remote_robot_type_inserter_.get_instance_id(remote_robot::remote_robot_instance_name(position)), true);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
         } else {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
@@ -400,7 +411,7 @@ kitchen::start() {
                             }
                             position_t remote_robot_position = *(position_t*)inr.get_variant()->data;
                             if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end()) {
-                                position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(endpoint, remote_robot_position, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
+                                position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(endpoint, remote_robot_position, remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
                             }
                             if (robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()){
                                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Instantiating remote robot at position %d failed", __FUNCTION__, remote_robot_position);
