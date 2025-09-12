@@ -208,6 +208,8 @@ struct remote_robot {
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
             UA_Client_delete(client_);
+            UA_Boolean connectivity = false;
+            remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(position_), CONNECTIVITY, &connectivity, UA_TYPES_BOOLEAN);
         }
 };
 
