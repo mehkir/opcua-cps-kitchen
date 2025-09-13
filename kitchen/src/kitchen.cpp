@@ -3,7 +3,6 @@
 #include <open62541/server_config_default.h>
 #include <open62541/client_config_default.h>
 #include <open62541/client_highlevel.h>
-#include <unistd.h>
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
 #include "information_node_reader.hpp"

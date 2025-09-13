@@ -13,6 +13,7 @@
 #include <memory>
 #include <random>
 #include <functional>
+#include <unistd.h>
 
 #include "object_type_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
