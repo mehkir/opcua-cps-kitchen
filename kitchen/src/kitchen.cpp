@@ -57,6 +57,23 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     remote_conveyor_type_inserter_.add_object_type_constructor(server_, remote_conveyor_type_inserter_.get_object_type_id(REMOTE_CONVEYOR_TYPE));
     remote_conveyor_type_inserter_.add_object_instance(REMOTE_CONVEYOR_INSTANCE_NAME, REMOTE_CONVEYOR_TYPE, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
     remote_conveyor_type_inserter_.set_scalar_attribute(REMOTE_CONVEYOR_INSTANCE_NAME, CONNECTIVITY, &initial_connectivity_state, UA_TYPES_BOOLEAN);
+    /* Add remote robot type constructor */
+    if (remote_robot::setup_remote_robot_object_type(remote_robot_type_inserter_, server_) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the remote robot type constructor", __FUNCTION__);
+        stop();
+        return;
+    }
+    /* Add remote robot instances to the address space */
+    for (position_t position = 1; position <= robot_count_; position++) {
+        status = remote_robot_type_inserter_.add_object_instance(remote_robot::remote_robot_instance_name(position).c_str(), REMOTE_ROBOT_TYPE, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
+        status |= remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(position), POSITION, &position, UA_TYPES_UINT32);
+        status |= remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(position), CONNECTIVITY, &initial_connectivity_state, UA_TYPES_BOOLEAN);
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding remote robot object and setting initial attributes (%s)", __FUNCTION__, UA_StatusCode_name(status));
+            stop();
+            return;
+        }
+    }
     /* Run the kitchen server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -112,24 +129,6 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
         }
     }
     remote_conveyor_type_inserter_.set_scalar_attribute(REMOTE_CONVEYOR_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
-    /* Add remote robot type constructor */
-    if (remote_robot::setup_remote_robot_object_type(remote_robot_type_inserter_, server_) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the remote robot type constructor", __FUNCTION__);
-        stop();
-        return;
-    }
-    /* Add instances to the address space */
-    connectivity_state = false;
-    for (position_t position = 1; position <= robot_count_; position++) {
-        status = remote_robot_type_inserter_.add_object_instance(remote_robot::remote_robot_instance_name(position).c_str(), REMOTE_ROBOT_TYPE, kitchen_type_inserter_.get_instance_id(INSTANCE_NAME), UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
-        status |= remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(position), POSITION, &position, UA_TYPES_UINT32);
-        status |= remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(position), CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
-        if (status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding remote robot object and setting initial attributes (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            stop();
-            return;
-        }
-    }
 }
 
 kitchen::~kitchen() {
