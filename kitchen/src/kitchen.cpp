@@ -162,6 +162,7 @@ kitchen::place_random_order(UA_Server* _server,
 
 void
 kitchen::handle_random_order_request(UA_Variant* _output) {
+    increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
     recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
     object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
@@ -336,7 +337,6 @@ kitchen::start() {
                             UA_Boolean connectivity_state = true;
                             remote_controller_type_inserter_.set_scalar_attribute(REMOTE_CONTROLLER_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
                         }
-
                     }
 
                     if (conveyor_client_ != nullptr) {
