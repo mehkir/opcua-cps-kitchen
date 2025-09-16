@@ -28,6 +28,8 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     /* Add kitchen attributes */
     kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, ASSIGNED_ORDERS);
     kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, DROPPED_ORDERS);
+    kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, RECEIVED_ORDERS);
+    kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, COMPLETED_ORDERS);
     /* Add place random order method node */
     method_arguments place_random_order_arguments;
     place_random_order_arguments.add_output_argument("indicates whether the robot is instructed", "robot_instructed", UA_TYPES_BOOLEAN);
