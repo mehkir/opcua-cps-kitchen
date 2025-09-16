@@ -304,7 +304,7 @@ private:
      * @brief Helper method for incrementing X_ORDERS attribute nodes
      * 
      * @param _attribute_name the attribute name
-     * @return UA_StatusCode the status code indicating if incrementing succeeded
+     * @return UA_StatusCode the status code indicating whether incrementing succeeded
      */
     UA_StatusCode
     increment_orders_counter(std::string _attribute_name);
