@@ -39,6 +39,8 @@
 // method nodes
 #define REGISTER_ROBOT "RegisterRobot"
 #define CHOOSE_NEXT_ROBOT "ChooseNextRobot"
+// attribute nodes
+#define REGISTERED_ROBOTS "RegisteredRobots"
 
 /* KITCHEN */
 // object type node
