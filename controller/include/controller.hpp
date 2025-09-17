@@ -12,6 +12,7 @@
 #include <condition_variable>
 #include <atomic>
 #include <functional>
+#include <unistd.h>
 #include "node_value_subscriber.hpp"
 #include "browsenames.h"
 #include "method_node_caller.hpp"
