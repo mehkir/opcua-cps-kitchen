@@ -206,6 +206,8 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
         } else {
             increment_orders_counter(DROPPED_ORDERS);
         }
+    } else {
+        increment_orders_counter(DROPPED_ORDERS);
     }
     UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
@@ -256,6 +258,8 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
     UA_String remote_robot_endpoint = *(UA_String*) _output[0].data;
     UA_UInt32 remote_robot_position = *(UA_UInt32*) _output[1].data;
     std::string remote_robot_endpoint_str((char*) remote_robot_endpoint.data, remote_robot_endpoint.length);
+    if (remote_robot_endpoint_str.empty() || remote_robot_position == 0)
+        return nullptr;
     if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end())
         position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, remote_robot_position, remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
     if (robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()) {
