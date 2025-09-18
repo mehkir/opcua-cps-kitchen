@@ -361,6 +361,7 @@ kitchen::start() {
                     }
                 }
                 if (remote_robot_discovery_mutex_.try_lock()) {
+                    remove_marked_robots();
                     if (position_remote_robot_map_.size() < robot_count_)
                         remote_robot_discovery_cv.notify_all();
                     remote_robot_discovery_mutex_.unlock();
@@ -396,7 +397,8 @@ kitchen::start() {
                             bool connected = cce.establish_connection(remote_robot_client, endpoint);
                             if (!connected) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error establishing robot client session", __FUNCTION__);
-                                UA_Client_delete(remote_robot_client);
+                                if (remote_robot_client != nullptr)
+                                    UA_Client_delete(remote_robot_client);
                                 continue;
                             }
                             UA_NodeId position_node_id = node_browser_helper().get_attribute_id(remote_robot_client, ROBOT_TYPE, POSITION);
