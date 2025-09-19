@@ -17,7 +17,7 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
-    if(status != UA_STATUSCODE_GOOD) {
+    if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error with setting up the server", __FUNCTION__);
         return;
     }
@@ -34,11 +34,15 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     method_arguments place_random_order_arguments;
     place_random_order_arguments.add_output_argument("indicates whether the robot is instructed", "robot_instructed", UA_TYPES_BOOLEAN);
     status = kitchen_type_inserter_.add_method(KITCHEN_TYPE, PLACE_RANDOM_ORDER, place_random_order, place_random_order_arguments, this);
-    if(status != UA_STATUSCODE_GOOD) {
+    if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, PLACE_RANDOM_ORDER);
         return;
     }
-
+    /* Add receive completed order method node */
+    method_arguments receive_completed_order_arguments;
+    receive_completed_order_arguments.add_input_argument("receives a completed order", "receive_completed_order", UA_TYPES_UINT32);
+    receive_completed_order_arguments.add_output_argument("indicated whether the order is received", "order_received", UA_TYPES_BOOLEAN);
+    status = kitchen_type_inserter_.add_method(KITCHEN_TYPE, RECEIVE_COMPLETED_ORDER, receive_completed_order, receive_completed_order_arguments, this);
     /* Add kitchen type constructor */
     kitchen_type_inserter_.add_object_type_constructor(server_, kitchen_type_inserter_.get_object_type_id(KITCHEN_TYPE));
     /* Instantiate kitchen type */
@@ -139,6 +143,29 @@ kitchen::~kitchen() {
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
+}
+
+UA_StatusCode
+kitchen::receive_completed_order(UA_Server* _server,
+        const UA_NodeId* _session_id, void* _session_context,
+        const UA_NodeId* _method_id, void* _method_context,
+        const UA_NodeId* _object_id, void* _object_context,
+        size_t _input_size, const UA_Variant* _input,
+        size_t _output_size, UA_Variant* _output) {
+    if(_input_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+    /* Extract method context */
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+    kitchen* self = static_cast<kitchen*>(_method_context);
+    self->increment_orders_counter(COMPLETED_ORDERS);
+    UA_Boolean result = true;
+    UA_Variant_setScalarCopy(_output, &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    return UA_STATUSCODE_GOOD;
 }
 
 UA_StatusCode

@@ -248,6 +248,30 @@ private:
     std::uniform_int_distribution<std::uint32_t> uniform_int_distribution_;
 
     /**
+     * @brief Receives a completed order.
+     * 
+     * @param _server the server instance from which this method is called
+     * @param _session_id 
+     * @param _session_context 
+     * @param _method_id 
+     * @param _method_context the node context data passed to the method node
+     * @param _object_id 
+     * @param _object_context 
+     * @param _input_size the count of the input parameters
+     * @param _input the input pointer of the input parameters
+     * @param _output_size the allocated output size
+     * @param _output the output pointer to store return parameters
+     * @return UA_StatusCode the status code in the response
+     */
+    static UA_StatusCode
+    receive_completed_order(UA_Server* _server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
+
+    /**
      * @brief Places a random order.
      * 
      * @param _server the server instance from which this method is called

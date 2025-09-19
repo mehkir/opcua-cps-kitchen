@@ -50,6 +50,7 @@
 #define KITCHEN_TYPE "KitchenType"
 // method nodes
 #define PLACE_RANDOM_ORDER "PlaceRandomOrder"
+#define RECEIVE_COMPLETED_ORDER "ReceiveCompletedOrder"
 // attribute nodes
 #define CONNECTIVITY "Connectivity"
 #define RECEIVED_ORDERS "ReceivedOrders"
