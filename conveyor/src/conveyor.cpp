@@ -397,13 +397,13 @@ conveyor::receive_completed_order_called(size_t _output_size, UA_Variant* _outpu
     if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         stop();
-        return;
+        return UA_STATUSCODE_BAD;
     }
 
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
         stop();
-        return;
+        return UA_STATUSCODE_BAD;
     }
 
     UA_Boolean result = *(UA_Boolean*) _output[0].data;
