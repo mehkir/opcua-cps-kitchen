@@ -156,7 +156,7 @@ kitchen::receive_completed_order(UA_Server* _server,
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
-    if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
+    if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
