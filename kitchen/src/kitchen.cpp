@@ -156,6 +156,12 @@ kitchen::receive_completed_order(UA_Server* _server,
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
+    if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+    recipe_id_t completed_recipe = *(recipe_id_t*)_input[0].data;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Conveyor delivered completed dish with the recipe ID %d", __FUNCTION__, completed_recipe);
     /* Extract method context */
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);

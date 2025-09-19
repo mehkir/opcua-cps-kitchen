@@ -12,7 +12,7 @@
 #define DEBOUNCE_TIME 1LL
 #define MOVE_TIME 1LL
 
-conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE), running_(true), state_status_(conveyor::state::IDLING), controller_client_(nullptr) {
+conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE), running_(true), state_status_(conveyor::state::IDLING), controller_client_(nullptr), kitchen_client_(nullptr) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
     if(status != UA_STATUSCODE_GOOD) {
@@ -86,9 +86,24 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
             return;
         }
     }
-    /* Gather method ids */
+    /* Gather controller method ids */
     if ((method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
+        stop();
+        return;        
+    }
+    /* Setup kitchen client */
+    std::string kitchen_endpoint;
+    while((status = discover_and_connect(kitchen_client_, discovery_util_, kitchen_endpoint, KITCHEN_TYPE)) != UA_STATUSCODE_GOOD) {
+        if (!running_) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to kitchen", __FUNCTION__);
+            stop();
+            return;
+        }
+    }
+    /* Gather kitchen method ids */
+    if ((method_id_map_[RECEIVE_COMPLETED_ORDER] = node_browser_helper().get_method_id(kitchen_endpoint, KITCHEN_TYPE, RECEIVE_COMPLETED_ORDER)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_COMPLETED_ORDER);
         stop();
         return;        
     }
@@ -247,7 +262,7 @@ conveyor::request_next_robot(plate& _plate) {
     UA_Variant* output;
     UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
     {
-        std::unique_lock<std::mutex> lock(client_mutex_);
+        std::lock_guard<std::mutex> lock(client_mutex_);
         if (controller_client_ != nullptr)
             status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
     }
@@ -317,14 +332,38 @@ conveyor::deliver_finished_order() {
             occupied_plate_id++;
             continue;
         }
+        /* Deliver finished orders */
         if (p.is_dish_finished() && p.get_position() == OUTPUT_POSITION) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output", p.get_placed_recipe_id());
+            method_node_caller receive_completed_order_caller;
+            recipe_id_t completed_recipe = p.get_placed_recipe_id();
+            receive_completed_order_caller.add_scalar_input_argument(&completed_recipe, UA_TYPES_UINT32);
+            object_method_info omi = method_id_map_[RECEIVE_COMPLETED_ORDER];
+            size_t output_size;
+            UA_Variant* output;
+            UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                if (kitchen_client_ != nullptr)
+                    status = receive_completed_order_caller.call_method_node(kitchen_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+            }
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Failed to call %s method (%s)", RECEIVE_COMPLETED_ORDER, UA_StatusCode_name(status));
+                occupied_plate_id++;
+                continue;
+            }
+            if ((status = receive_completed_order_called(output_size, output)) != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Delivery failed because Kitchen returned bad result");
+                occupied_plate_id++;
+                continue;
+            }
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output (%s)", p.get_placed_recipe_id(), UA_StatusCode_name(status));
             reset_plate(p);
             occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
             UA_UInt32 occupied_plates_count = occupied_plates_.size();
             conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
             continue;
         }
+        /* Deliver partially prepared orders to next suitable robot */
         if (!p.is_dish_finished() && p.get_position() == p.get_target_position()) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Dish at position %d is deliverable", p.get_position());
             size_t output_size;
@@ -352,9 +391,28 @@ conveyor::deliver_finished_order() {
     determine_next_movement();
 }
 
+UA_StatusCode
+conveyor::receive_completed_order_called(size_t _output_size, UA_Variant* _output) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_output_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        stop();
+        return;
+    }
+
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        stop();
+        return;
+    }
+
+    UA_Boolean result = *(UA_Boolean*) _output[0].data;
+    return result ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BAD;
+}
+
 void
 conveyor::determine_next_movement() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (occupied_plates_.empty() && notifications_map_.empty()) {
         state_status_ = conveyor::state::IDLING;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: No occupied plates or notifications, idling now");
@@ -449,6 +507,7 @@ conveyor::start() {
             while(running_) {
                 {
                     std::lock_guard<std::mutex> lock(client_mutex_);
+                    /* Handle controller client iterate */
                     if (controller_client_ != nullptr) {
                         UA_StatusCode status = UA_Client_run_iterate(controller_client_, 1);
                         if (status != UA_STATUSCODE_GOOD) {
@@ -460,6 +519,20 @@ conveyor::start() {
                         std::string controller_endpoint;
                         if (discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) == UA_STATUSCODE_GOOD) {
                             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Re-established connection to controller", __FUNCTION__);
+                        }
+                    }
+                    /* Handle kitchen client iterate */
+                    if (kitchen_client_ != nullptr) {
+                        UA_StatusCode status = UA_Client_run_iterate(kitchen_client_, 1);
+                        if (status != UA_STATUSCODE_GOOD) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running kitchen client iterate", __FUNCTION__);
+                            UA_Client_delete(kitchen_client_);
+                            kitchen_client_ = nullptr;
+                        }
+                    } else {
+                        std::string kitchen_endpoint;
+                        if (discover_and_connect(kitchen_client_, discovery_util_, kitchen_endpoint, KITCHEN_TYPE) == UA_STATUSCODE_GOOD) {
+                            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Re-established connection to kitchen", __FUNCTION__);
                         }
                     }
                 }

@@ -407,6 +407,8 @@ private:
     UA_Client* controller_client_;
     /* robot related member variables */
     std::mutex mark_for_removal_mutex_;
+    /* kitchen related member variables */
+    UA_Client* kitchen_client_;
 
     /**
      * @brief Extracts the remote robot port and position on which a finished order is ready to be retrieved.
@@ -473,6 +475,16 @@ private:
      */
     void
     deliver_finished_order();
+
+    /**
+     * @brief Extracts the returned result to indicate whether the completed dish is delivered successfully
+     * 
+     * @param _output_size the count of returned output values
+     * @param _output the variant containing the output values
+     * @return UA_StatusCode the status code indicating the successful or failed delivery
+     */
+    UA_StatusCode
+    receive_completed_order_called(size_t _output_size, UA_Variant* _output);
 
     /**
      * @brief Idles if there are no notifications and occupied plates. Otherwise it processes the notifications and occupied plates.
