@@ -31,6 +31,9 @@
 #define PLATE_OCCUPIED "Occupied"
 // method nodes
 #define FINISHED_ORDER_NOTIFICATION "FinishedOrderNotification"
+// attribute nodes
+#define TOTAL_PLATES "TotalPlates"
+#define OCCUPIED_PLATES "OccupiedPlates"
 
 /* CONTROLLER */
 // object type node

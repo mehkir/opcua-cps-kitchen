@@ -23,6 +23,9 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC("urn:kitchen:conveyor");
     // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    /* Add conveyor attribute nodes */
+    conveyor_type_inserter_.add_attribute(CONVEYOR_TYPE, TOTAL_PLATES);
+    conveyor_type_inserter_.add_attribute(CONVEYOR_TYPE, OCCUPIED_PLATES);
     /* Add receive finished order notification method node*/
     method_arguments receive_finished_order_notification_arguments;
     receive_finished_order_notification_arguments.add_input_argument("the robot endpoint", "robot_endpoint", UA_TYPES_STRING);
@@ -38,9 +41,13 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     conveyor_type_inserter_.add_object_type_constructor(server_, conveyor_type_inserter_.get_object_type_id(CONVEYOR_TYPE));
     /* Instantiate conveyor type */
     conveyor_type_inserter_.add_object_instance(CONVEYOR_INSTANCE_NAME, CONVEYOR_TYPE);
+    UA_UInt32 total_plates_count = _robot_count + 1;
+    conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, TOTAL_PLATES, &total_plates_count, UA_TYPES_UINT32);
+    UA_UInt32 initially_occupied_plates = 0;
+    conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &initially_occupied_plates, UA_TYPES_UINT32);
     /* Setup plates */
     plate::setup_plate_object_type(plate_type_inserter_, server_);
-    for (size_t i = 0; i < _robot_count+1; i++) {
+    for (size_t i = 0; i < total_plates_count; i++) {
         plates_.push_back(plate(i,i, conveyor_type_inserter_.get_instance_id(CONVEYOR_INSTANCE_NAME), plate_type_inserter_));
         position_plate_id_map_[i] = i;
     }
@@ -219,6 +226,8 @@ conveyor::handle_handover_finished_order(std::string _remote_robot_endpoint, pos
     p.set_dish_finished(_is_dish_finished);
     p.set_processed_steps(_processed_steps);
     occupied_plates_.insert(p.get_plate_id());
+    UA_UInt32 occupied_plates_count = occupied_plates_.size();
+    conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
     if (_is_dish_finished)
         return;
     request_next_robot(p);
@@ -312,6 +321,8 @@ conveyor::deliver_finished_order() {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Finished dish with recipe id %d delivered at output", p.get_placed_recipe_id());
             reset_plate(p);
             occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
+            UA_UInt32 occupied_plates_count = occupied_plates_.size();
+            conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
             continue;
         }
         if (!p.is_dish_finished() && p.get_position() == p.get_target_position()) {
@@ -332,6 +343,8 @@ conveyor::deliver_finished_order() {
             }
             receive_robot_task_called(output_size, output);
             occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
+            UA_UInt32 occupied_plates_count = occupied_plates_.size();
+            conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
             continue;
         }
         occupied_plate_id++;
