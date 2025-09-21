@@ -1,7 +1,18 @@
 #!/usr/bin/bash
+
+# Validate argument
+if (( $# < 1 )); then
+  echo "Usage: $0 <robots_count>"
+  exit 1
+fi
+
+if (( $1 < 1)); then
+    echo "robots count must be >= 1"
+fi
+
 PROJECT_DIRECTORY=/home/mehmet/vscode-workspaces/opcua-cps-kitchen
 $PROJECT_DIRECTORY/build.bash
-ROBOTS_COUNT=4
+ROBOTS_COUNT=$1
 
 $PROJECT_DIRECTORY/build/demos/discovery_server &
 sleep 1
