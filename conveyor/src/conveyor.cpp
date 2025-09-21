@@ -439,7 +439,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     }
 
     position_t remote_robot_position = *(position_t*) _output[0].data;
-    UA_Boolean result = *(position_t*) _output[1].data;
+    UA_Boolean result = *(UA_Boolean*) _output[1].data;
 
     if (!result) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, remote_robot_position);
