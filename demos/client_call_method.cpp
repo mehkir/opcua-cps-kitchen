@@ -32,12 +32,13 @@ int main(int argc, char* argv[]) {
     UA_StatusCode status = mnc.call_method_node(client, UA_NODEID_NUMERIC(0, UA_NS0ID_OBJECTSFOLDER), UA_NODEID_STRING(0,const_cast<char*>("server_method")), &output_size, &output);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling server method failed (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         UA_Client_delete(client);
         return EXIT_FAILURE;
     }
     UA_Boolean result = *(UA_Boolean*)output->data;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method returned %s", __FUNCTION__, (result ? "true" : "false"));
-    UA_Variant_clear(output);
+    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
 
     UA_Client_delete(client);
     return EXIT_SUCCESS;

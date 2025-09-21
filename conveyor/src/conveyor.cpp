@@ -188,6 +188,7 @@ conveyor::handle_retrieve_finished_orders() {
             UA_StatusCode status = position_remote_robot_map_[notification->first]->handover_finished_order(&output_size, &output);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: RETRIEVAL: Retrieving for dish at position %d failed (%s)", __FUNCTION__, notification->first, UA_StatusCode_name(status));
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                 remove_marked_robots();
                 notification = notifications_map_.erase(notification);
                 continue;
@@ -208,6 +209,7 @@ conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _outpu
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 5) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;
     }
@@ -218,6 +220,7 @@ conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _outpu
       || !UA_Variant_hasScalarType(&_output[3], &UA_TYPES[UA_TYPES_UINT32])
       || !UA_Variant_hasScalarType(&_output[4], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;
     }
@@ -227,7 +230,9 @@ conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _outpu
     recipe_id_t finished_recipe = *(recipe_id_t*) _output[2].data;
     UA_UInt32 processed_steps = *(UA_UInt32*) _output[3].data;
     UA_Boolean is_dish_finished = *(UA_Boolean*) _output[4].data;
-    handle_handover_finished_order(std::string((char*) remote_robot_endpoint.data, remote_robot_endpoint.length), remote_robot_position, finished_recipe, processed_steps, is_dish_finished);
+    std::string remote_robot_endpoint_str = std::string((char*) remote_robot_endpoint.data, remote_robot_endpoint.length);
+    UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+    handle_handover_finished_order(remote_robot_endpoint_str, remote_robot_position, finished_recipe, processed_steps, is_dish_finished);
 }
 
 void
@@ -266,16 +271,20 @@ conveyor::request_next_robot(plate& _plate) {
         if (controller_client_ != nullptr)
             status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
     }
-    if (status != UA_STATUSCODE_GOOD)
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return;
+    }
     if(output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;
     }
     if(!UA_Variant_hasScalarType(&output[0], &UA_TYPES[UA_TYPES_STRING])
         || !UA_Variant_hasScalarType(&output[1], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;
     }
@@ -284,6 +293,7 @@ conveyor::request_next_robot(plate& _plate) {
     std::string target_endpoint_std_str((char*) target_endpoint.data, target_endpoint.length);
     if (target_endpoint_std_str.empty() || target_position == 0) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No suitable robot for next steps received", __FUNCTION__);
+        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return;
     }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", target_position, target_endpoint_std_str.c_str());
@@ -292,10 +302,12 @@ conveyor::request_next_robot(plate& _plate) {
     }
     if (robots_to_be_removed_.find(target_position) != robots_to_be_removed_.end()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, target_position);
+        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         remove_marked_robots();
         return;
     }
     _plate.set_target_position(target_position);
+    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
 }
 
 void
@@ -348,6 +360,7 @@ conveyor::deliver_finished_order() {
             }
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "OUTPUT DELIVERY: Failed to call %s method (%s)", RECEIVE_COMPLETED_ORDER, UA_StatusCode_name(status));
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                 occupied_plate_id++;
                 continue;
             }
@@ -377,6 +390,7 @@ conveyor::deliver_finished_order() {
             UA_StatusCode status = target_robot->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), &output_size, &output);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "DELIVERY: Failed to deliver dish at position %d", p.get_position());
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                 occupied_plate_id++;
                 continue;
             }
@@ -396,17 +410,20 @@ conveyor::receive_completed_order_called(size_t _output_size, UA_Variant* _outpu
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return UA_STATUSCODE_BAD;
     }
 
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return UA_STATUSCODE_BAD;
     }
 
     UA_Boolean result = *(UA_Boolean*) _output[0].data;
+    UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
     return result ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BAD;
 }
 
@@ -427,6 +444,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;
     }
@@ -434,6 +452,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT32])
       || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;
     }
@@ -443,6 +462,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
 
     if (!result) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, remote_robot_position);
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;
     }
@@ -451,10 +471,12 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     // Sanity check
     if (!p.is_occupied() || p.get_target_position() == 0 || p.get_position() != remote_robot_position) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", p.get_position(), remote_robot_position);
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;    
     }
     reset_plate(p);
+    UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: Delivered dish at position %d successfully", remote_robot_position);
 }
 
