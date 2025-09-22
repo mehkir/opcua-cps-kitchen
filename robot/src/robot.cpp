@@ -286,11 +286,13 @@ robot::compute_overall_time_and_determine_last_tool(std::queue<robot_action> _ac
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Get overall time */
     UA_Variant overall_time_var;
+    UA_Variant_init(&overall_time_var);
     robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
     UA_Variant_clear(&overall_time_var);
     /* Get last equipped tool */
     UA_Variant last_equipped_tool_var;
+    UA_Variant_init(&last_equipped_tool_var);
     robot_type_inserter_.get_attribute(INSTANCE_NAME, LAST_EQUIPPED_TOOL, last_equipped_tool_var);
     robot_tool last_equipped_tool = *(robot_tool*) last_equipped_tool_var.data;
     UA_Variant_clear(&last_equipped_tool_var);
@@ -333,6 +335,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Get recipe id in process */
     UA_Variant recipe_id_in_process_var;
+    UA_Variant_init(&recipe_id_in_process_var);
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     UA_Variant_clear(&recipe_id_in_process_var);
@@ -379,6 +382,7 @@ void
 robot::determine_next_action() {
     /* Get recipe id in process */
     UA_Variant recipe_id_in_process_var;
+    UA_Variant_init(&recipe_id_in_process_var);
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     UA_Variant_clear(&recipe_id_in_process_var);
@@ -523,6 +527,7 @@ void
 robot::pass_time() {
     /* Get overall time */
     UA_Variant overall_time_var;
+    UA_Variant_init(&overall_time_var);
     robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
     UA_Variant_clear(&overall_time_var);
@@ -552,6 +557,7 @@ robot::action_performed() {
     processed_steps_of_recipe_id_in_process_++;
     /* Get recipe id in process */
     UA_Variant recipe_id_in_process_var;
+    UA_Variant_init(&recipe_id_in_process_var);
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     UA_Variant_clear(&recipe_id_in_process_var);
@@ -568,6 +574,7 @@ robot::retool() {
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
     /* Get overall time */
     UA_Variant overall_time_var;
+    UA_Variant_init(&overall_time_var);
     robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
     UA_Variant_clear(&overall_time_var);
@@ -613,6 +620,7 @@ robot::start() {
     register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
     register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
     UA_Variant capabilities;
+    UA_Variant_init(&capabilities);
     robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
     register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
     UA_Variant_clear(&capabilities);
@@ -666,6 +674,7 @@ robot::start() {
                             register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
                             register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
                             UA_Variant capabilities;
+                            UA_Variant_init(&capabilities);
                             robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
                             register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
                             UA_Variant_clear(&capabilities);
