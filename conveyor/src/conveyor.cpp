@@ -112,6 +112,13 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
 conveyor::~conveyor() {
     stop();
     join_threads();
+    {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        if (controller_client_ != nullptr)
+            UA_Client_delete(controller_client_);
+        if (kitchen_client_ != nullptr)
+            UA_Client_delete(kitchen_client_);
+    }
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
