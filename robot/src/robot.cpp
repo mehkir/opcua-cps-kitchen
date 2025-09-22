@@ -174,19 +174,22 @@ robot::register_robot_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return;
     }
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return;
     }
     UA_Boolean register_robot_received = *(UA_Boolean*) _output[0].data;
     if (!register_robot_received) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Controller returned false", __FUNCTION__);
     }
-    UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+    if (_output != nullptr)
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
 }
 
 UA_StatusCode
@@ -400,8 +403,8 @@ robot::determine_next_action() {
             receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
             receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
             object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-            size_t output_size;
-            UA_Variant* output;
+            size_t output_size = 0;
+            UA_Variant* output = nullptr;
             UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
             while (status != UA_STATUSCODE_GOOD) {
                 {
@@ -410,12 +413,14 @@ robot::determine_next_action() {
                         status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
                     if (running_ && status != UA_STATUSCODE_GOOD) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                        if (output != nullptr)
+                            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                         conveyor_connected_condition.wait(lock);
                     }
                     if(!running_) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                        if (output != nullptr)
+                            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                         return;
                     }
                 }
@@ -467,8 +472,8 @@ robot::determine_next_action() {
         receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
         receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
         object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-        size_t output_size;
-        UA_Variant* output;
+        size_t output_size = 0;
+        UA_Variant* output = nullptr;
         UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
         while (status != UA_STATUSCODE_GOOD) {
             {
@@ -477,12 +482,14 @@ robot::determine_next_action() {
                     status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
                 if (running_ && status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                    if (output != nullptr)
+                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                     conveyor_connected_condition.wait(lock);
                 }
                 if(!running_) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                    if (output != nullptr)
+                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                     return;
                 }
             }
@@ -506,13 +513,15 @@ robot::receive_finished_order_notification_called(size_t _output_size, UA_Varian
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return;
     }
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return;
     }
     UA_Boolean finished_order_notification_received = *(UA_Boolean*) _output[0].data;
@@ -520,7 +529,8 @@ robot::receive_finished_order_notification_called(size_t _output_size, UA_Varian
     if (!finished_order_notification_received) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Conveyor returned false", __FUNCTION__);
     }
-    UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+    if (_output != nullptr)
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
 }
 
 void
@@ -631,14 +641,15 @@ robot::start() {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
 
-    size_t output_size;
-    UA_Variant* output;
+    size_t output_size = 0;
+    UA_Variant* output = nullptr;
     UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
     while (status != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registering at the controller", __FUNCTION__);
         if ((controller_client_ != nullptr) && (status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output)) != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
-            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+            if (output != nullptr)
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
             std::string controller_endpoint;
             UA_Client_delete(controller_client_);
             controller_client_ = nullptr;
@@ -648,7 +659,8 @@ robot::start() {
         }
         if (!running_) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering at the controller", __FUNCTION__);
-            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+            if (output != nullptr)
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
             stop();
             return;
         }
@@ -679,12 +691,13 @@ robot::start() {
                             register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
                             UA_Variant_clear(&capabilities);
                             object_method_info omi = method_id_map_[REGISTER_ROBOT];
-                            size_t output_size;
-                            UA_Variant* output;
+                            size_t output_size = 0;
+                            UA_Variant* output = nullptr;
                             UA_StatusCode status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
                             if (status != UA_STATUSCODE_GOOD) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling robot register during client iterate", __FUNCTION__);
-                                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                                if (output != nullptr)
+                                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                             } else {
                                 register_robot_called(output_size, output);
                             }
