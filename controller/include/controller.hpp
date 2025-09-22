@@ -322,22 +322,14 @@ private:
     remove_marked_robots();
 
     /**
-     * @brief Helper method for incrementing a numerical UA_UINT32 attribute node
+     * @brief Helper method for incrementing or decrementing a numerical UA_UINT32 attribute node (increments by default).
      * 
      * @param _attribute_name the attribute name
-     * @return UA_StatusCode the status code indicating whether incrementing succeeded
+     * @param _increment indicator for incrementing or decrementing
+     * @return UA_StatusCode the status code indicating whether incrementing/decrementing succeeded
      */
     UA_StatusCode
-    increment_counter_node(std::string _attribute_name);
-
-    /**
-     * @brief Helper method for decrementing a numerical UA_UINT32 attribute node
-     * 
-     * @param _attribute_name the attribute name
-     * @return UA_StatusCode the status code indicating whether decrementing succeeded
-     */
-    UA_StatusCode
-    decrement_counter_node(std::string _attribute_name);
+    increment_or_decrement_counter_node(std::string _attribute_name, bool increment = true);
 
     /**
      * @brief Joins all started threads.

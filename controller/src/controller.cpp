@@ -138,7 +138,7 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
     remove_marked_robots();
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities, std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1));
-        increment_counter_node(REGISTERED_ROBOTS);
+        increment_or_decrement_counter_node(REGISTERED_ROBOTS);
     }
     bool robot_registration_success = true;
     if (robots_to_be_removed_.find(_position) != robots_to_be_removed_.end()) {
@@ -239,7 +239,7 @@ controller::remove_marked_robots() {
     for (position_t position : robots_to_be_removed_) {
         if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_.erase(position);
-            decrement_counter_node(REGISTERED_ROBOTS);
+            increment_or_decrement_counter_node(REGISTERED_ROBOTS, false);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
         } else {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
@@ -249,36 +249,33 @@ controller::remove_marked_robots() {
 }
 
 UA_StatusCode
-controller::increment_counter_node(std::string _attribute_name) {
+controller::increment_or_decrement_counter_node(std::string _attribute_name, bool increment) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_Variant value;
+    UA_Variant_init(&value);
     if ((status = controller_type_inserter_.get_attribute(INSTANCE_NAME, _attribute_name.c_str(), value)) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error getting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        UA_Variant_clear(&value);
         return status;
     }
-    UA_UInt32 counter_value = *(UA_UInt32*) value.data;
-    counter_value++;
+    UA_UInt32 counter_value = 0;
+    if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_UINT32]) && value.data) {
+        counter_value = *(UA_UInt32*) value.data;
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unexpected attribute type for %s", __FUNCTION__, _attribute_name.c_str());
+        UA_Variant_clear(&value);
+        return UA_STATUSCODE_BADTYPEMISMATCH;
+    }
+    if (increment)
+        counter_value++;
+    else
+        counter_value--;
     if ((status = controller_type_inserter_.set_scalar_attribute(INSTANCE_NAME, _attribute_name.c_str(), &counter_value, UA_TYPES_UINT32)) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        UA_Variant_clear(&value);
         return status;
     }
-    return status;
-}
-
-UA_StatusCode
-controller::decrement_counter_node(std::string _attribute_name) {
-    UA_StatusCode status = UA_STATUSCODE_GOOD;
-    UA_Variant value;
-    if ((status = controller_type_inserter_.get_attribute(INSTANCE_NAME, _attribute_name.c_str(), value)) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error getting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
-        return status;
-    }
-    UA_UInt32 counter_value = *(UA_UInt32*) value.data;
-    counter_value--;
-    if ((status = controller_type_inserter_.set_scalar_attribute(INSTANCE_NAME, _attribute_name.c_str(), &counter_value, UA_TYPES_UINT32)) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
-        return status;
-    }
+    UA_Variant_clear(&value);
     return status;
 }
 
