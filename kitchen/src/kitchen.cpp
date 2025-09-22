@@ -201,8 +201,8 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
     bool instructed = false;
     recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
     object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
-    UA_Variant* next_suitable_robot_output;
-    size_t next_suitable_robot_output_size;
+    UA_Variant* next_suitable_robot_output = nullptr;
+    size_t next_suitable_robot_output_size = 0;
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         method_node_caller choose_next_robot_caller;
@@ -212,7 +212,8 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
         UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
         if ((status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &next_suitable_robot_output_size, &next_suitable_robot_output)) != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            UA_Array_delete(next_suitable_robot_output, next_suitable_robot_output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+            if (next_suitable_robot_output != nullptr )
+                UA_Array_delete(next_suitable_robot_output, next_suitable_robot_output_size, &UA_TYPES[UA_TYPES_VARIANT]);
             increment_orders_counter(DROPPED_ORDERS);
             UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
             return;
@@ -225,8 +226,8 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
         next_suitable_robot = choose_next_robot_called(next_suitable_robot_output_size, next_suitable_robot_output);
     }
     if (next_suitable_robot != nullptr) {
-        UA_Variant* output;
-        size_t output_size;
+        UA_Variant* output = nullptr;
+        size_t output_size = 0;
         UA_StatusCode status = next_suitable_robot->instruct(recipe_id, 0, &output_size, &output);
         if (status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling instruct on remote robot failed (%s)", __FUNCTION__, UA_StatusCode_name(status));
@@ -251,14 +252,16 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return false;
     }
 
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT32])
        || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_BOOLEAN])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return false;
     }
 
@@ -269,15 +272,18 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     // Sanity check
     if(robot->get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on position. Received position %d, actually %d", __FUNCTION__, remote_robot_position, robot->get_position());
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return false;
     }
     if (!result) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, robot->get_position());
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return false;
     }
-    UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+    if (_output != nullptr)
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
     return true;
 }
 
@@ -286,21 +292,24 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return nullptr;
     }
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_STRING])
     || !UA_Variant_hasScalarType(&_output[1], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return nullptr;
     }
     UA_String remote_robot_endpoint = *(UA_String*) _output[0].data;
     UA_UInt32 remote_robot_position = *(UA_UInt32*) _output[1].data;
     std::string remote_robot_endpoint_str((char*) remote_robot_endpoint.data, remote_robot_endpoint.length);
     if (remote_robot_endpoint_str.empty() || remote_robot_position == 0) {
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return nullptr;
     }
     if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end())
@@ -308,10 +317,12 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
     if (robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()) {
         remove_marked_robots();
         remote_robot_discovery_cv.notify_all();
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return nullptr;
     }
-    UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+    if (_output != nullptr)
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
     return position_remote_robot_map_[remote_robot_position].get();
 }
 
