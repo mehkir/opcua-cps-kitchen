@@ -288,10 +288,12 @@ robot::compute_overall_time_and_determine_last_tool(std::queue<robot_action> _ac
     UA_Variant overall_time_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
+    UA_Variant_clear(&overall_time_var);
     /* Get last equipped tool */
     UA_Variant last_equipped_tool_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, LAST_EQUIPPED_TOOL, last_equipped_tool_var);
     robot_tool last_equipped_tool = *(robot_tool*) last_equipped_tool_var.data;
+    UA_Variant_clear(&last_equipped_tool_var);
     while (!_action_queue.empty() && capability_parser_.is_capable_to(_action_queue.front().get_name())) {
         overall_time += last_equipped_tool != _action_queue.front().get_required_tool() ? RETOOLING_TIME : 0;
         overall_time += _action_queue.front().get_action_duration();
@@ -333,6 +335,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     UA_Variant recipe_id_in_process_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
+    UA_Variant_clear(&recipe_id_in_process_var);
     /* Set output values */
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &server_endpoint_, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
@@ -378,6 +381,7 @@ robot::determine_next_action() {
     UA_Variant recipe_id_in_process_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
+    UA_Variant_clear(&recipe_id_in_process_var);
     /* Process remaining actions */
     if (action_queue_in_process_.size()) {
         robot_action robot_act = action_queue_in_process_.front();
@@ -521,6 +525,7 @@ robot::pass_time() {
     UA_Variant overall_time_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
+    UA_Variant_clear(&overall_time_var);
     overall_time -= TIME_UNIT_UPDATE_RATE;
     /* Update overall time */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
@@ -549,6 +554,7 @@ robot::action_performed() {
     UA_Variant recipe_id_in_process_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
+    UA_Variant_clear(&recipe_id_in_process_var);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
     action_queue_in_process_.pop();
     determine_next_action();
@@ -564,6 +570,7 @@ robot::retool() {
     UA_Variant overall_time_var;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
+    UA_Variant_clear(&overall_time_var);
     overall_time -= RETOOLING_TIME;
     /* Update overall time */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
@@ -608,6 +615,7 @@ robot::start() {
     UA_Variant capabilities;
     robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
     register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
+    UA_Variant_clear(&capabilities);
     object_method_info omi = method_id_map_[REGISTER_ROBOT];
 
     worker_thread_ = std::thread([this]() {
@@ -660,6 +668,7 @@ robot::start() {
                             UA_Variant capabilities;
                             robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
                             register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
+                            UA_Variant_clear(&capabilities);
                             object_method_info omi = method_id_map_[REGISTER_ROBOT];
                             size_t output_size;
                             UA_Variant* output;
