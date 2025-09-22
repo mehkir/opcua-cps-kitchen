@@ -140,6 +140,13 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
 kitchen::~kitchen() {
     stop();
     join_threads();
+    {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        if (controller_client_ != nullptr)
+            UA_Client_delete(controller_client_);
+        if (conveyor_client_ != nullptr)
+            UA_Client_delete(conveyor_client_);
+    }
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
@@ -330,16 +337,27 @@ UA_StatusCode
 kitchen::increment_orders_counter(std::string _attribute_name) {
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_Variant value;
+    UA_Variant_init(&value);
     if ((status = kitchen_type_inserter_.get_attribute(INSTANCE_NAME, _attribute_name.c_str(), value)) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error getting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        UA_Variant_clear(&value);
         return status;
     }
-    UA_UInt32 dishes_counter = *(UA_UInt32*) value.data;
+    UA_UInt32 dishes_counter = 0;
+    if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_UINT32]) && value.data) {
+        dishes_counter = *(UA_UInt32*) value.data;
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unexpected attribute type for %s", __FUNCTION__, _attribute_name.c_str());
+        UA_Variant_clear(&value);
+        return UA_STATUSCODE_BADTYPEMISMATCH;
+    }
     dishes_counter++;
     if ((status = kitchen_type_inserter_.set_scalar_attribute(INSTANCE_NAME, _attribute_name.c_str(), &dishes_counter, UA_TYPES_UINT32)) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        UA_Variant_clear(&value);
         return status;
     }
+    UA_Variant_clear(&value);
     return status;
 }
 
@@ -464,11 +482,13 @@ kitchen::start() {
                             UA_NodeId position_node_id = node_browser_helper().get_attribute_id(remote_robot_client, ROBOT_TYPE, POSITION);
                             if (UA_NodeId_equal(&position_node_id, &UA_NODEID_NULL)) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, POSITION);
+                                UA_Client_delete(remote_robot_client);
                                 continue;
                             }
                             information_node_reader inr;
                             if (inr.read_information_node(remote_robot_client, position_node_id) != UA_STATUSCODE_GOOD) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, POSITION);
+                                UA_Client_delete(remote_robot_client);
                                 continue;
                             }
                             position_t remote_robot_position = *(position_t*)inr.get_variant()->data;
@@ -479,6 +499,7 @@ kitchen::start() {
                                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Instantiating remote robot at position %d failed", __FUNCTION__, remote_robot_position);
                                 remove_marked_robots();
                             }
+                            UA_Client_delete(remote_robot_client);
                         }
                     }
                     if (position_remote_robot_map_.size() == robot_count_)
