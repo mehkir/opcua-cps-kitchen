@@ -239,6 +239,7 @@ private:
     /* controller related member variables */
     UA_Client* controller_client_;
     object_type_node_inserter remote_controller_type_inserter_;
+    std::condition_variable remote_controller_connected_cv_;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
     object_type_node_inserter remote_conveyor_type_inserter_;

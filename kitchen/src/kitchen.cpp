@@ -208,29 +208,42 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
     bool instructed = false;
     recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
     object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
-    UA_Variant* next_suitable_robot_output = nullptr;
-    size_t next_suitable_robot_output_size = 0;
+    UA_Variant* output = nullptr;
+    size_t output_size = 0;
     {
-        std::lock_guard<std::mutex> lock(client_mutex_);
+        std::unique_lock<std::mutex> lock(client_mutex_);
         method_node_caller choose_next_robot_caller;
         UA_UInt32 processed_steps = 0;
         choose_next_robot_caller.add_scalar_input_argument(&recipe_id, UA_TYPES_UINT32);
         choose_next_robot_caller.add_scalar_input_argument(&processed_steps, UA_TYPES_UINT32);
         UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
-        if ((status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &next_suitable_robot_output_size, &next_suitable_robot_output)) != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            if (next_suitable_robot_output != nullptr )
-                UA_Array_delete(next_suitable_robot_output, next_suitable_robot_output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-            increment_orders_counter(DROPPED_ORDERS);
-            UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
-            return;
+        while (status != UA_STATUSCODE_GOOD) {
+            if (controller_client_ != nullptr)
+                status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+            if (running_ && status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                if (output != nullptr ) {
+                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                    output = nullptr;
+                    output_size = 0;
+                }
+                UA_Client_delete(controller_client_);
+                controller_client_ = nullptr;
+                remote_controller_connected_cv_.wait(lock);
+            }
+            if (!running_) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to call choose next robot", __FUNCTION__);
+                if (output != nullptr )
+                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                return;
+            }
         }
     }
     remote_robot* next_suitable_robot = nullptr;
     {
         std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
         remove_marked_robots();
-        next_suitable_robot = choose_next_robot_called(next_suitable_robot_output_size, next_suitable_robot_output);
+        next_suitable_robot = choose_next_robot_called(output_size, output);
     }
     if (next_suitable_robot != nullptr) {
         UA_Variant* output = nullptr;
@@ -240,6 +253,8 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling instruct on remote robot failed (%s)", __FUNCTION__, UA_StatusCode_name(status));
             instructed = false;
             increment_orders_counter(DROPPED_ORDERS);
+            if (output != nullptr)
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
             UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
             return;
         }
@@ -416,6 +431,7 @@ kitchen::start() {
                         else {
                             UA_Boolean connectivity_state = true;
                             remote_controller_type_inserter_.set_scalar_attribute(REMOTE_CONTROLLER_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
+                            remote_controller_connected_cv_.notify_all();
                         }
                     }
 
@@ -524,6 +540,7 @@ kitchen::stop() {
         std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
         running_ = false;
         remote_robot_discovery_cv.notify_all();
+        remote_controller_connected_cv_.notify_all();
     }
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
