@@ -418,6 +418,8 @@ robot::determine_next_action() {
                             output_size = 0;
                             output = nullptr;
                         }
+                        UA_Client_delete(conveyor_client_);
+                        conveyor_client_ = nullptr;
                         conveyor_connected_condition_.wait(lock);
                     }
                     if(!running_) {
@@ -490,6 +492,8 @@ robot::determine_next_action() {
                         output_size = 0;
                         output = nullptr;
                     }
+                    UA_Client_delete(conveyor_client_);
+                    conveyor_client_ = nullptr;
                     conveyor_connected_condition_.wait(lock);
                 }
                 if(!running_) {
