@@ -73,7 +73,7 @@ private:
     UA_Client* controller_client_;
     /* conveyor related member variables */
     UA_Client* conveyor_client_;
-    std::condition_variable conveyor_connected_condition;
+    std::condition_variable conveyor_connected_condition_;
 
     /**
      * @brief Callback called after controller received robot registration. Extracts the controller output values and idicates whether the regeistration was successful.

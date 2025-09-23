@@ -413,9 +413,12 @@ robot::determine_next_action() {
                         status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
                     if (running_ && status != UA_STATUSCODE_GOOD) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                        if (output != nullptr)
+                        if (output != nullptr) {
                             UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                        conveyor_connected_condition.wait(lock);
+                            output_size = 0;
+                            output = nullptr;
+                        }
+                        conveyor_connected_condition_.wait(lock);
                     }
                     if(!running_) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
@@ -482,9 +485,12 @@ robot::determine_next_action() {
                     status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
                 if (running_ && status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    if (output != nullptr)
+                    if (output != nullptr) {
                         UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                    conveyor_connected_condition.wait(lock);
+                        output_size = 0;
+                        output = nullptr;
+                    }
+                    conveyor_connected_condition_.wait(lock);
                 }
                 if(!running_) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
@@ -648,8 +654,11 @@ robot::start() {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Registering at the controller", __FUNCTION__);
         if ((controller_client_ != nullptr) && (status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output)) != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
-            if (output != nullptr)
+            if (output != nullptr) {
                 UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                output_size = 0;
+                output = nullptr;
+            }
             std::string controller_endpoint;
             UA_Client_delete(controller_client_);
             controller_client_ = nullptr;
@@ -714,7 +723,7 @@ robot::start() {
                     } else {
                         std::string conveyor_endpoint;
                         if (discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE) == UA_STATUSCODE_GOOD)
-                            conveyor_connected_condition.notify_all();
+                            conveyor_connected_condition_.notify_all();
                     }
                 }
                 if (usleep(1*1000)) {
@@ -739,7 +748,7 @@ robot::stop() {
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         running_ = false;
-        conveyor_connected_condition.notify_all();
+        conveyor_connected_condition_.notify_all();
     }
     work_guard_.reset();
     io_context_.stop();
