@@ -9,7 +9,11 @@ if [[ -z $ROBOTS ]]; then
     echo "Error: Number of robots not specified."
     exit 1
 fi
-PROJECT_DIRECTORY=/home/mehmet/vscode-workspaces/opcua-cps-kitchen
+SCRIPT_PATH="$(realpath "$0")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+cd -- "$SCRIPT_DIR"
+cd ..
+PROJECT_DIRECTORY="$(pwd)"
 for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
     robot_position=$(( $robot_count + 1 ))
     echo "Starting robot at position $robot_position"

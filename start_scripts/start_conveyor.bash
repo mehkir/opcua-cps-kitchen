@@ -9,7 +9,11 @@ if [[ -z $ROBOTS ]]; then
     exit 1
 fi
 
-PROJECT_DIRECTORY=/home/mehmet/vscode-workspaces/opcua-cps-kitchen
+SCRIPT_PATH="$(realpath "$0")"
+SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
+cd -- "$SCRIPT_DIR"
+cd ..
+PROJECT_DIRECTORY="$(pwd)"
 $PROJECT_DIRECTORY/build/start_conveyor_instance $ROBOTS &
 exit_code=$?
 if [ $exit_code -ne 0 ]; then
