@@ -201,6 +201,8 @@ kitchen::place_random_order(UA_Server* _server,
     self->io_context_.post([self] {
         self->handle_random_order_request();
     });
+    UA_Boolean result = true;
+    UA_Variant_setScalarCopy(_output, &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
     return UA_STATUSCODE_GOOD;
 }
 
@@ -253,13 +255,12 @@ kitchen::handle_random_order_request() {
         UA_StatusCode status = next_suitable_robot->instruct(recipe_id, 0, &output_size, &output);
         if (status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling instruct on remote robot failed (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            instructed = false;
             increment_orders_counter(DROPPED_ORDERS);
             if (output != nullptr)
                 UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
             return;
         }
-        if (instructed = receive_robot_task_called(output_size, output)) {
+        if (receive_robot_task_called(output_size, output)) {
             increment_orders_counter(ASSIGNED_ORDERS);
         } else {
             increment_orders_counter(DROPPED_ORDERS);
@@ -289,10 +290,14 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
 
     position_t remote_robot_position = *(position_t*) _output[0].data;
     UA_Boolean result = *(UA_Boolean*) _output[1].data;
-
-    remote_robot* robot = position_remote_robot_map_[remote_robot_position].get();
+    remote_robot* robot = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+        robot = position_remote_robot_map_[remote_robot_position].get();
+    }
     // Sanity check
-    if(robot->get_position() != remote_robot_position) {
+    if (robot != nullptr) return false;
+    if (robot->get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on position. Received position %d, actually %d", __FUNCTION__, remote_robot_position, robot->get_position());
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
@@ -386,6 +391,7 @@ kitchen::mark_robot_for_removal(position_t _position) {
 void
 kitchen::remove_marked_robots() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
     for (position_t position : robots_to_be_removed_) {
         if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_.erase(position);
@@ -548,7 +554,8 @@ kitchen::start() {
 void
 kitchen::stop() {
     {
-        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+        std::lock_guard<std::mutex> remote_robot_lock(remote_robot_discovery_mutex_);
+        std::lock_guard<std::mutex> client_loop_lock(client_mutex_);
         running_ = false;
         remote_robot_discovery_cv.notify_all();
         remote_controller_connected_cv_.notify_all();
