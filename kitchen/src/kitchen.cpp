@@ -296,7 +296,7 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         robot = position_remote_robot_map_[remote_robot_position].get();
     }
     // Sanity check
-    if (robot != nullptr) return false;
+    if (robot == nullptr) return false;
     if (robot->get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on position. Received position %d, actually %d", __FUNCTION__, remote_robot_position, robot->get_position());
         if (_output != nullptr)
