@@ -12,7 +12,7 @@
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 
 kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE), robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE),
-                        remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3), controller_client_(nullptr), conveyor_client_(nullptr) {
+                        remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3), controller_client_(nullptr), conveyor_client_(nullptr), work_guard_(boost::asio::make_work_guard(io_context_)) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -32,7 +32,7 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, COMPLETED_ORDERS);
     /* Add place random order method node */
     method_arguments place_random_order_arguments;
-    place_random_order_arguments.add_output_argument("indicates whether the robot is instructed", "robot_instructed", UA_TYPES_BOOLEAN);
+    place_random_order_arguments.add_output_argument("indicates whether the kitchen received the order", "order_received", UA_TYPES_BOOLEAN);
     status = kitchen_type_inserter_.add_method(KITCHEN_TYPE, PLACE_RANDOM_ORDER, place_random_order, place_random_order_arguments, this);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, PLACE_RANDOM_ORDER);
@@ -41,7 +41,7 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     /* Add receive completed order method node */
     method_arguments receive_completed_order_arguments;
     receive_completed_order_arguments.add_input_argument("receives a completed order", "receive_completed_order", UA_TYPES_UINT32);
-    receive_completed_order_arguments.add_output_argument("indicated whether the order is received", "order_received", UA_TYPES_BOOLEAN);
+    receive_completed_order_arguments.add_output_argument("indicated whether the completed order is received", "completed_order_received", UA_TYPES_BOOLEAN);
     status = kitchen_type_inserter_.add_method(KITCHEN_TYPE, RECEIVE_COMPLETED_ORDER, receive_completed_order, receive_completed_order_arguments, this);
     /* Add kitchen type constructor */
     kitchen_type_inserter_.add_object_type_constructor(server_, kitchen_type_inserter_.get_object_type_id(KITCHEN_TYPE));
@@ -198,12 +198,14 @@ kitchen::place_random_order(UA_Server* _server,
         return UA_STATUSCODE_BAD;
     }
     kitchen* self = static_cast<kitchen*>(_method_context);
-    self->handle_random_order_request(_output);
+    self->io_context_.post([self] {
+        self->handle_random_order_request();
+    });
     return UA_STATUSCODE_GOOD;
 }
 
 void
-kitchen::handle_random_order_request(UA_Variant* _output) {
+kitchen::handle_random_order_request() {
     increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
     recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
@@ -255,7 +257,6 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
             increment_orders_counter(DROPPED_ORDERS);
             if (output != nullptr)
                 UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-            UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
             return;
         }
         if (instructed = receive_robot_task_called(output_size, output)) {
@@ -266,7 +267,6 @@ kitchen::handle_random_order_request(UA_Variant* _output) {
     } else {
         increment_orders_counter(DROPPED_ORDERS);
     }
-    UA_Variant_setScalarCopy(_output, &instructed, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
 
 bool
@@ -405,10 +405,21 @@ kitchen::join_threads() {
         client_iterate_thread_.join();
     if (cyclic_remote_robot_discovery_thread_.joinable())
         cyclic_remote_robot_discovery_thread_.join();
+    if(worker_thread_.joinable())
+        worker_thread_.join();
 }
 
 void
 kitchen::start() {
+    if (!running_) {
+        stop();
+        return;
+    }
+    /* Setup worker thread */
+    worker_thread_ = std::thread([this]() {
+        io_context_.run();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
+    });
     /* Run the client iterate thread */
     try {
         client_iterate_thread_ = std::thread([this]() {
@@ -542,6 +553,8 @@ kitchen::stop() {
         remote_robot_discovery_cv.notify_all();
         remote_controller_connected_cv_.notify_all();
     }
+    work_guard_.reset();
+    io_context_.stop();
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);

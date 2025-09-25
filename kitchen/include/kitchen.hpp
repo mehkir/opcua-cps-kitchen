@@ -14,6 +14,7 @@
 #include <random>
 #include <functional>
 #include <unistd.h>
+#include <boost/asio.hpp>
 
 #include "object_type_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
@@ -227,6 +228,9 @@ private:
     std::thread server_iterate_thread_;
     std::mutex client_mutex_;
     std::thread client_iterate_thread_;
+    std::thread worker_thread_;
+    boost::asio::io_context io_context_;
+    boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_;
     /* remote robot related member variables */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
     std::unordered_set<position_t> robots_to_be_removed_;
@@ -299,10 +303,9 @@ private:
     /**
      * @brief Handles the random order request.
      * 
-     * @param _output the output pointer to store return parameters
      */
     void
-    handle_random_order_request(UA_Variant* _output);
+    handle_random_order_request();
 
     /**
      * @brief Extracts the returned robot state parameters.
