@@ -3,14 +3,29 @@
 
 #include <jsoncpp/json/json.h>
 #include <fstream>
+#include <unistd.h>
+#include <limits.h>
+#include <filesystem>
+#include <iostream>
 
-capability_parser::capability_parser(std::string _capabilities_path, position_t _robot_position) {
+capability_parser::capability_parser(std::string _capabilities_file_name, position_t _robot_position) {
     robot_actions* actions = robot_actions::get_instance();
-    std::string capabilities_file_path = _capabilities_path + "r" + std::to_string(_robot_position) + ".json";
-    std::ifstream ifs_capabilities(capabilities_file_path);
+    char buffer[PATH_MAX + 1];  // +1 for the null terminator
+    ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return;
+    }
+    buffer[len] = '\0';  // null terminate
+    std::filesystem::path exe_path(buffer);
+    std::filesystem::path exe_dir = exe_path.parent_path();
+    std::filesystem::path capabilities_file_path = exe_dir.parent_path() / "capabilities" / _capabilities_file_name;
+    std::ifstream ifs_capabilities(capabilities_file_path.string());
     Json::Value capabilities;
     Json::Reader reader;
-    reader.parse(ifs_capabilities, capabilities);
+    if (!reader.parse(ifs_capabilities, capabilities)) {
+        std::cerr << reader.getFormattedErrorMessages() << std::endl;
+    }
     for (auto capability : capabilities["capabilities"]) {
         if (!actions->has_action(capability.asString())) {
             std::string error_string = capability.asString() + " is not a valid action";

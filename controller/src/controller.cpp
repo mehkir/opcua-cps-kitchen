@@ -5,9 +5,8 @@
 #include "filtered_logger.hpp"
 
 #define INSTANCE_NAME "KitchenController"
-#define RECIPE_PATH "recipes.json"
 
-controller::controller() : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), recipe_parser_(RECIPE_PATH) {
+controller::controller() : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), recipe_parser_() {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);

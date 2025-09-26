@@ -4,6 +4,10 @@
 #include <fstream>
 #include <stdexcept>
 #include <memory>
+#include <unistd.h>
+#include <limits.h>
+#include <filesystem>
+#include <iostream>
 
 #include "types.hpp"
 
@@ -14,12 +18,24 @@
 #define DURATION_KEY "duration"
 
 
-recipe_parser::recipe_parser(std::string _recipe_path) {
+recipe_parser::recipe_parser() {
     robot_actions* actions = robot_actions::get_instance();
-    std::ifstream ifs_recipe(_recipe_path);
+    char buffer[PATH_MAX + 1];  // +1 for the null terminator
+    ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return;
+    }
+    buffer[len] = '\0';  // null terminate
+    std::filesystem::path exe_path(buffer);
+    std::filesystem::path exe_dir = exe_path.parent_path();
+    std::filesystem::path recipe_path = exe_dir.parent_path() / "recipes.json";
+    std::ifstream ifs_recipe(recipe_path.string());
     Json::Value recipes;
     Json::Reader reader;
-    reader.parse(ifs_recipe, recipes);
+    if (!reader.parse(ifs_recipe, recipes)) {
+        std::cerr << reader.getFormattedErrorMessages() << std::endl;
+    }
     for (size_t recipe_id = 1; recipe_id <= recipes.size(); recipe_id++) {
         std::string dish_name = recipes[std::to_string(recipe_id)][DISH_NAME_KEY].asString();
         std::queue<robot_action> action_queue;

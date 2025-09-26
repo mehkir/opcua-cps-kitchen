@@ -223,7 +223,7 @@ public:
      * 
      * @param _position the position of the robot at the conveyor
      */
-    robot(position_t _position);
+    robot(position_t _position, std::string _capabilities_file_name);
 
     /**
      * @brief Destroy the robot object.

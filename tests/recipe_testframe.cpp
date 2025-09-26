@@ -2,7 +2,7 @@
 #include <iostream>
 
 int main (int argc, char* argv[]) {
-    recipe_parser rp("recipes.json");
+    recipe_parser rp;
     if(rp.has_recipe(1)) {
         recipe rcp = rp.get_recipe(3);
         std::cout << "Recipe ID: " << rcp.get_recipe_id() << std::endl;

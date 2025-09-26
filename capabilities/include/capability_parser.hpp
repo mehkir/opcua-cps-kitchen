@@ -11,7 +11,7 @@ class capability_parser {
 private:
     std::unordered_set<std::string> capabilities_;
 public:
-    capability_parser(std::string _capabilities_path, position_t _robot_position);
+    capability_parser(std::string _capabilities_file_name, position_t _robot_position);
     ~capability_parser();
     bool is_capable_to(std::string _action_name);
     std::unordered_set<std::string> get_capabilities();

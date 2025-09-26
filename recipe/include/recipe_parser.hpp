@@ -47,7 +47,7 @@ class recipe_parser {
     private:
         std::unordered_map<cps_kitchen::recipe_id_t, std::unique_ptr<recipe>> recipe_map_;
     public:
-        recipe_parser(std::string _recipe_path);
+        recipe_parser();
         ~recipe_parser();
         bool has_recipe(const cps_kitchen::recipe_id_t _recipe_id) const;
         recipe get_recipe(cps_kitchen::recipe_id_t _recipe);

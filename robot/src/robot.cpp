@@ -13,13 +13,13 @@
 #include "discovery_and_connection.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
-#define RECIPE_PATH "recipes.json"
-#define CAPABILITIES_PATH "./capabilities/"
 
-robot::robot(position_t _position) :
+robot::robot(position_t _position, std::string _capabilities_file_name) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
         processed_steps_of_recipe_id_in_process_(0), current_action_duration_(0),
-        recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr), conveyor_client_(nullptr), pending_pickup_(false) {
+        recipe_parser_(), capability_parser_(_capabilities_file_name, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr), conveyor_client_(nullptr), pending_pickup_(false) {
+    running_ = false;
+    return;
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
