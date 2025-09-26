@@ -3,14 +3,20 @@ project(opcua_cps_kitchen)
 
 set(CMAKE_CXX_STANDARD 26)
 
-# Choose your version with a variable
-set(OPEN62541_VERSION "1.4.7")
-set(OPEN62541_DIR "${CMAKE_SOURCE_DIR}/deps/open62541-${OPEN62541_VERSION}")
+option(USE_CUSTOM_VERSION "Use custom version" OFF)
+option(USE_ASAN "Enable Address Sanitizer" OFF)
+option(USE_TSAN "Enable Thread Sanitizer" OFF)
 
-include_directories("${OPEN62541_DIR}/include")
-include_directories("${OPEN62541_DIR}/src_generated")
-include_directories("${OPEN62541_DIR}/plugins/include")
-link_directories("${OPEN62541_DIR}/lib")
+if (USE_CUSTOM_VERSION)
+    # Choose your version with a variable
+    set(OPEN62541_VERSION "1.4.7") # for possible versions see OPEN62541_DIR
+    set(OPEN62541_DIR "${CMAKE_SOURCE_DIR}/deps/open62541-${OPEN62541_VERSION}")
+
+    include_directories("${OPEN62541_DIR}/include")
+    include_directories("${OPEN62541_DIR}/src_generated")
+    include_directories("${OPEN62541_DIR}/plugins/include")
+    link_directories("${OPEN62541_DIR}/lib")
+endif()
 
 add_subdirectory(statistics)
 add_subdirectory(wrappers)
@@ -43,3 +49,25 @@ target_include_directories(start_kitchen_instance PUBLIC ${PROJECT_BINARY_DIR} $
 add_executable(statistics-writer-main statistics-writer-main.cpp)
 target_link_libraries(statistics-writer-main PUBLIC statistics_lib)
 target_include_directories(statistics-writer-main PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/statistics/include)
+
+if (USE_ASAN)
+    target_compile_options(start_robot_instance PRIVATE -fsanitize=address)
+    target_link_options(start_robot_instance PRIVATE -fsanitize=address)
+    target_compile_options(start_controller_instance PRIVATE -fsanitize=address)
+    target_link_options(start_controller_instance PRIVATE -fsanitize=address)
+    target_compile_options(start_conveyor_instance PRIVATE -fsanitize=address)
+    target_link_options(start_conveyor_instance PRIVATE -fsanitize=address)
+    target_compile_options(start_kitchen_instance PRIVATE -fsanitize=address)
+    target_link_options(start_kitchen_instance PRIVATE -fsanitize=address)
+endif()
+
+if (USE_TSAN)
+    target_compile_options(start_robot_instance PRIVATE -fsanitize=thread)
+    target_link_options(start_robot_instance PRIVATE -fsanitize=thread)
+    target_compile_options(start_controller_instance PRIVATE -fsanitize=thread)
+    target_link_options(start_controller_instance PRIVATE -fsanitize=thread)
+    target_compile_options(start_conveyor_instance PRIVATE -fsanitize=thread)
+    target_link_options(start_conveyor_instance PRIVATE -fsanitize=thread)
+    target_compile_options(start_kitchen_instance PRIVATE -fsanitize=thread)
+    target_link_options(start_kitchen_instance PRIVATE -fsanitize=thread)
+endif()
