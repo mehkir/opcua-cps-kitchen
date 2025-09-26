@@ -19,7 +19,7 @@
 robot::robot(position_t _position) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
         processed_steps_of_recipe_id_in_process_(0), current_action_duration_(0),
-        recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr), conveyor_client_(nullptr) {
+        recipe_parser_(RECIPE_PATH), capability_parser_(CAPABILITIES_PATH, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr), conveyor_client_(nullptr), pending_pickup_(false) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -336,6 +336,24 @@ robot::handover_finished_order(UA_Server *_server,
 void
 robot::handle_handover_finished_order(UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (!pending_pickup_) {
+        UA_UInt32 recipe_id = 0;
+        UA_UInt32 processed_steps = 0;
+        UA_Boolean is_dish_finished = false;
+        UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &server_endpoint_, &UA_TYPES[UA_TYPES_STRING]);
+        status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
+        status |= UA_Variant_setScalarCopy(&_output[2], &recipe_id, &UA_TYPES[UA_TYPES_UINT32]);
+        status |= UA_Variant_setScalarCopy(&_output[3], &processed_steps, &UA_TYPES[UA_TYPES_UINT32]);
+        status |= UA_Variant_setScalarCopy(&_output[4], &is_dish_finished, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+            stop();
+            return;
+        }
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: UNCOORDINATED HANDOVER: Passed zero response", __FUNCTION__);
+        return;
+    }
+    pending_pickup_ = false;
     /* Get recipe id in process */
     UA_Variant recipe_id_in_process_var;
     UA_Variant_init(&recipe_id_in_process_var);
@@ -421,6 +439,7 @@ robot::determine_next_action() {
                         UA_Client_delete(conveyor_client_);
                         conveyor_client_ = nullptr;
                         conveyor_connected_condition_.wait(lock);
+                        continue;
                     }
                     if(!running_) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
@@ -428,6 +447,7 @@ robot::determine_next_action() {
                             UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                         return;
                     }
+                    pending_pickup_ = true;
                 }
             }
             receive_finished_order_notification_called(output_size, output);
@@ -495,6 +515,7 @@ robot::determine_next_action() {
                     UA_Client_delete(conveyor_client_);
                     conveyor_client_ = nullptr;
                     conveyor_connected_condition_.wait(lock);
+                    continue;
                 }
                 if(!running_) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
@@ -502,6 +523,7 @@ robot::determine_next_action() {
                         UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                     return;
                 }
+                pending_pickup_ = true;
             }
         }
         receive_finished_order_notification_called(output_size, output);
@@ -708,12 +730,16 @@ robot::start() {
                             UA_Variant* output = nullptr;
                             UA_StatusCode status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
                             if (status != UA_STATUSCODE_GOOD) {
-                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling robot register during client iterate", __FUNCTION__);
-                                if (output != nullptr)
-                                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method during client iterate", __FUNCTION__, REGISTER_ROBOT);
+                                if (controller_client_ != nullptr) {
+                                    UA_Client_delete(controller_client_);
+                                    controller_client_ = nullptr;
+                                }
                             } else {
                                 register_robot_called(output_size, output);
                             }
+                            if (output != nullptr)
+                                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                         }
                     }
 
@@ -726,8 +752,30 @@ robot::start() {
                         }
                     } else {
                         std::string conveyor_endpoint;
-                        if (discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE) == UA_STATUSCODE_GOOD)
-                            conveyor_connected_condition_.notify_all();
+                        if (discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE) == UA_STATUSCODE_GOOD) {
+                            if (pending_pickup_) {
+                                method_node_caller receive_finished_order_notification_caller;
+                                receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+                                receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
+                                object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
+                                size_t output_size = 0;
+                                UA_Variant* output = nullptr;
+                                UA_StatusCode status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+                                if (status != UA_STATUSCODE_GOOD) {
+                                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method during client iterate", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
+                                    if (conveyor_client_ != nullptr) {
+                                        UA_Client_delete(conveyor_client_);
+                                        conveyor_client_ = nullptr;
+                                    }
+                                    if (output != nullptr)
+                                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                                } else {
+                                    receive_finished_order_notification_called(output_size, output);
+                                }
+                            }
+                            if (conveyor_client_ != nullptr)
+                                conveyor_connected_condition_.notify_all();
+                        }
                     }
                 }
                 if (usleep(1*1000)) {

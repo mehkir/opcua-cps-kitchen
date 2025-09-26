@@ -58,6 +58,7 @@ private:
     bool preparing_dish_;
     bool is_dish_finished_;
     std::atomic<bool> running_;
+    std::atomic<bool> pending_pickup_;
     discovery_util discovery_util_;
     std::thread server_iterate_thread_;
     recipe_parser recipe_parser_;
