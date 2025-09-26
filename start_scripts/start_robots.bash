@@ -1,6 +1,6 @@
 #!/usr/bin/bash
-if [ "$#" -lt 2 ]; then
-    echo "Usage: $0 <number_of_robots> <capabilities_file_name"
+if [ "$#" -lt 1 ]; then
+    echo "Usage: $0 <number_of_robots>"
     exit 1
 fi
 ROBOTS=$1
