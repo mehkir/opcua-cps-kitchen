@@ -14,7 +14,6 @@ SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 cd -- "$SCRIPT_DIR"
 cd ..
 PROJECT_DIRECTORY="$(pwd)"
-$PROJECT_DIRECTORY/build.bash
 ROBOTS_COUNT=$1
 
 # Define a cleanup function
