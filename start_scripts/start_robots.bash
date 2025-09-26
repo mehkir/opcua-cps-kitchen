@@ -22,7 +22,11 @@ PROJECT_DIRECTORY="$(pwd)"
 for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
     robot_position=$(( $robot_count + 1 ))
     echo "Starting robot at position $robot_position"
-    $PROJECT_DIRECTORY/build/start_robot_instance $robot_position $position_capabilities[$robot_position] &
+    if [[ ! -v position_capabilities[$robot_position] ]]; then
+        echo "No capabilities file mapped for position $robot_position" >&2
+        continue
+    fi
+    "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" &
     # $PROJECT_DIRECTORY/build/start_robot_instance $robot_position 1>/dev/null &
     # $PROJECT_DIRECTORY/build/start_robot_instance $robot_position >./logs/robot_${robot_position}_${ROBOTS}_$(date +%Y%m%d%H%M%S) &
     exit_code=$?
