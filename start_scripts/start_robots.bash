@@ -1,14 +1,19 @@
 #!/usr/bin/bash
-
+if [ "$#" -lt 2 ]; then
+    echo "Usage: $0 <number_of_robots> <capabilities_file_name"
+    exit 1
+fi
 ROBOTS=$1
 if [[ $ROBOTS -lt 1 ]]; then
-    echo "Usage: $0 <number_of_robots>"
+    echo "Number of robots must be >= 1"
     exit 1
 fi
-if [[ -z $ROBOTS ]]; then
-    echo "Error: Number of robots not specified."
-    exit 1
-fi
+declare -A position_capabilities=(
+    [1]="r1.json"
+    [2]="r2.json"
+    [3]="r3.json"
+    [4]="r4.json"
+)
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 cd -- "$SCRIPT_DIR"
@@ -17,7 +22,7 @@ PROJECT_DIRECTORY="$(pwd)"
 for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
     robot_position=$(( $robot_count + 1 ))
     echo "Starting robot at position $robot_position"
-    $PROJECT_DIRECTORY/build/start_robot_instance $robot_position &
+    $PROJECT_DIRECTORY/build/start_robot_instance $robot_position $position_capabilities[$robot_position] &
     # $PROJECT_DIRECTORY/build/start_robot_instance $robot_position 1>/dev/null &
     # $PROJECT_DIRECTORY/build/start_robot_instance $robot_position >./logs/robot_${robot_position}_${ROBOTS}_$(date +%Y%m%d%H%M%S) &
     exit_code=$?

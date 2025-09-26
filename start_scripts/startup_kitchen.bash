@@ -24,7 +24,7 @@ $PROJECT_DIRECTORY/start_scripts/start_controller.bash &
 sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_conveyor.bash $ROBOTS_COUNT &
 sleep 1
-$PROJECT_DIRECTORY/start_scripts/start_robot.bash $ROBOTS_COUNT &
+$PROJECT_DIRECTORY/start_scripts/start_robots.bash $ROBOTS_COUNT &
 sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_kitchen.bash $ROBOTS_COUNT &
 # Wait for all background processes to finish
