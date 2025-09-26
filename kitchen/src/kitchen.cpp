@@ -140,6 +140,14 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
 kitchen::~kitchen() {
     stop();
     join_threads();
+
+    /* Destroy remote robot instances BEFORE deleting the UA server
+    to avoid remote_robot::~remote_robot() touching a freed UA_Server */
+    {
+        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+        position_remote_robot_map_.clear(); // remote_robot dtors run here
+    }
+
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         if (controller_client_ != nullptr)
@@ -296,7 +304,11 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         robot = position_remote_robot_map_[remote_robot_position].get();
     }
     // Sanity check
-    if (robot == nullptr) return false;
+    if (robot == nullptr) {
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        return false;
+    }
     if (robot->get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on position. Received position %d, actually %d", __FUNCTION__, remote_robot_position, robot->get_position());
         if (_output != nullptr)
