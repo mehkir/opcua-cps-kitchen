@@ -403,8 +403,13 @@ kitchen::mark_robot_for_removal(position_t _position) {
 void
 kitchen::remove_marked_robots() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
-    for (position_t position : robots_to_be_removed_) {
+    std::unordered_set<cps_kitchen::position_t> robots_to_be_removed_tmp;
+    {
+        std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
+        robots_to_be_removed_tmp.swap(robots_to_be_removed_);
+    }
+    std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+    for (position_t position : robots_to_be_removed_tmp) {
         if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_.erase(position);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
@@ -412,7 +417,6 @@ kitchen::remove_marked_robots() {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
         }
     }
-    robots_to_be_removed_.clear();
 }
 
 void
