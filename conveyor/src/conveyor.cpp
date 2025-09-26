@@ -113,6 +113,7 @@ conveyor::~conveyor() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     stop();
     join_threads();
+    position_remote_robot_map_.clear();
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         if (controller_client_ != nullptr)
