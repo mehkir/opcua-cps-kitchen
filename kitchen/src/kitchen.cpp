@@ -251,12 +251,8 @@ kitchen::handle_random_order_request() {
             }
         }
     }
-    remote_robot* next_suitable_robot = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
-        remove_marked_robots();
-        next_suitable_robot = choose_next_robot_called(output_size, output);
-    }
+    remove_marked_robots();
+    remote_robot* next_suitable_robot = choose_next_robot_called(output_size, output);
     if (next_suitable_robot != nullptr) {
         UA_Variant* output = nullptr;
         size_t output_size = 0;
@@ -351,18 +347,36 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return nullptr;
     }
-    if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end())
-        position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, remote_robot_position, remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
-    if (robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()) {
+    {
+        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+        if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end())
+            position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, remote_robot_position, remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
+    }
+    bool remote_robot_init_failed = false;
+    {
+        std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
+        remote_robot_init_failed = robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()
+    }
+    if (remote_robot_init_failed) {
         remove_marked_robots();
-        remote_robot_discovery_cv.notify_all();
+        {
+            std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+            remote_robot_discovery_cv.notify_all();
+        }
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return nullptr;
     }
     if (_output != nullptr)
         UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-    return position_remote_robot_map_[remote_robot_position].get();
+    remote_robot* next_remote_robot = nullptr;
+    {
+        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+        if (position_remote_robot_map_.find(remote_robot_position) != position_remote_robot_map_.end())
+            next_remote_robot = position_remote_robot_map_[remote_robot_position].get();
+
+    }
+    return next_remote_robot;
 }
 
 UA_StatusCode
@@ -544,15 +558,23 @@ kitchen::start() {
                             if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end()) {
                                 position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(endpoint, remote_robot_position, remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
                             }
-                            if (robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()){
-                                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Instantiating remote robot at position %d failed", __FUNCTION__, remote_robot_position);
+                            bool instantiating_failed = false;
+                            {
+                                std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
+                                instantiating_failed = robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end();
+                            }
+                            if (instantiating_failed){
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Instantiating remote robot at position %d failed", __FUNCTION__, remote_robot_position);
                                 remove_marked_robots();
                             }
                             UA_Client_delete(remote_robot_client);
                         }
                     }
-                    if (position_remote_robot_map_.size() == robot_count_)
+                    if (position_remote_robot_map_.size() == robot_count_) {
+                        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Discovered all remote robots, wait for notification ...", __FUNCTION__);
                         remote_robot_discovery_cv.wait(lock);
+                        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Received notification, rediscovering remote robots.", __FUNCTION__);
+                    }
                 }
                 std::this_thread::sleep_for(std::chrono::seconds(1));
             }

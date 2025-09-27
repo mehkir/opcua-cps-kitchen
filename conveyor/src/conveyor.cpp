@@ -160,7 +160,12 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
         position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
     }
     UA_Boolean finished_order_notification_received = true;
-    if (robots_to_be_removed_.find(_robot_position) != robots_to_be_removed_.end()) {
+    bool remote_robot_initialization_failed = false;
+    {
+        std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
+        remote_robot_initialization_failed = robots_to_be_removed_.find(_robot_position) != robots_to_be_removed_.end();
+    }
+    if (remote_robot_initialization_failed) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, _robot_position);
         remove_marked_robots();
         finished_order_notification_received = false;
@@ -323,7 +328,12 @@ conveyor::request_next_robot(plate& _plate) {
     if (position_remote_robot_map_.find(target_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[target_position] = std::make_unique<remote_robot>(target_endpoint_std_str, target_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
     }
-    if (robots_to_be_removed_.find(target_position) != robots_to_be_removed_.end()) {
+    bool remote_robot_initialization_failed = false;
+    {
+        std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
+        remote_robot_initialization_failed = robots_to_be_removed_.find(_robot_position) != robots_to_be_removed_.end();
+    }
+    if (remote_robot_initialization_failed) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, target_position);
         if (output != nullptr)
             UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
@@ -528,7 +538,12 @@ conveyor::mark_robot_for_removal(position_t _position) {
 void
 conveyor::remove_marked_robots() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    for (position_t position : robots_to_be_removed_) {
+    std::unordered_set<cps_kitchen::plate_id_t> robots_to_be_removed_tmp;
+    {
+        std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
+        robots_to_be_removed_tmp.swap(robots_to_be_removed_);
+    }
+    for (position_t position : robots_to_be_removed_tmp) {
         if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_.erase(position);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Removed remote robot at position %d", __FUNCTION__, position);
@@ -536,7 +551,6 @@ conveyor::remove_marked_robots() {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No remote robot found at position %d", __FUNCTION__, position);
         }
     }
-    robots_to_be_removed_.clear();
 }
 
 void

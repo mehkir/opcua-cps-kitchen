@@ -80,6 +80,7 @@ controller::controller() : server_(UA_Server_new()), controller_type_inserter_(s
 controller::~controller() {
     stop();
     join_threads();
+    position_remote_robot_map_.clear();
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
@@ -140,10 +141,13 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
         increment_or_decrement_counter_node(REGISTERED_ROBOTS);
     }
     bool robot_registration_success = true;
-    if (robots_to_be_removed_.find(_position) != robots_to_be_removed_.end()) {
+    {
+        std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
+        robot_registration_success = robots_to_be_removed_.find(_position) == robots_to_be_removed_.end();
+    }
+    if (!robot_registration_success) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot registration at position %d failed", __FUNCTION__, _position);
         remove_marked_robots();
-        robot_registration_success = false;
     }
     UA_Variant_setScalarCopy(_output, &robot_registration_success, &UA_TYPES[UA_TYPES_BOOLEAN]);
 }
@@ -235,7 +239,12 @@ controller::mark_robot_for_removal(position_t _position) {
 void
 controller::remove_marked_robots() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    for (position_t position : robots_to_be_removed_) {
+    std::unordered_set<cps_kitchen::position_t> robots_to_be_removed_tmp;
+    {
+        std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
+        robots_to_be_removed_tmp.swap(robots_to_be_removed_);
+    }
+    for (position_t position : robots_to_be_removed_tmp) {
         if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_.erase(position);
             increment_or_decrement_counter_node(REGISTERED_ROBOTS, false);
@@ -244,7 +253,6 @@ controller::remove_marked_robots() {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
         }
     }
-    robots_to_be_removed_.clear();
 }
 
 UA_StatusCode
