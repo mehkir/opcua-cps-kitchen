@@ -501,8 +501,8 @@ kitchen::start() {
                         }
                     }
                 }
+                remove_marked_robots();
                 if (remote_robot_discovery_mutex_.try_lock()) {
-                    remove_marked_robots();
                     if (position_remote_robot_map_.size() < robot_count_)
                         remote_robot_discovery_cv.notify_all();
                     remote_robot_discovery_mutex_.unlock();
