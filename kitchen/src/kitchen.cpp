@@ -355,7 +355,7 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
     bool remote_robot_init_failed = false;
     {
         std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
-        remote_robot_init_failed = robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end()
+        remote_robot_init_failed = robots_to_be_removed_.find(remote_robot_position) != robots_to_be_removed_.end();
     }
     if (remote_robot_init_failed) {
         remove_marked_robots();

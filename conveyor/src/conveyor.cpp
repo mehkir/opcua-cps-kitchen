@@ -331,7 +331,7 @@ conveyor::request_next_robot(plate& _plate) {
     bool remote_robot_initialization_failed = false;
     {
         std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
-        remote_robot_initialization_failed = robots_to_be_removed_.find(_robot_position) != robots_to_be_removed_.end();
+        remote_robot_initialization_failed = robots_to_be_removed_.find(target_position) != robots_to_be_removed_.end();
     }
     if (remote_robot_initialization_failed) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot initialization at position %d failed", __FUNCTION__, target_position);
