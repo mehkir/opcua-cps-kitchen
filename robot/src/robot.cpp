@@ -733,11 +733,12 @@ robot::start() {
                                     UA_Client_delete(controller_client_);
                                     controller_client_ = nullptr;
                                 }
+                                if (output != nullptr) {
+                                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                                }
                             } else {
                                 register_robot_called(output_size, output);
                             }
-                            if (output != nullptr)
-                                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                         }
                     }
 
