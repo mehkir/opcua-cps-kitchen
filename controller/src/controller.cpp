@@ -136,11 +136,12 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
     capabilites_str += "]";
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
     remove_marked_robots();
+    bool robot_registration_success = false;
     if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities, std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1));
         increment_or_decrement_counter_node(REGISTERED_ROBOTS);
+        robot_registration_success = true;
     }
-    bool robot_registration_success = true;
     {
         std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
         robot_registration_success = robots_to_be_removed_.find(_position) == robots_to_be_removed_.end();
