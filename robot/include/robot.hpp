@@ -22,18 +22,29 @@ using namespace cps_kitchen;
 struct order {
     private:
         recipe_id_t recipe_id_;
-        UA_UInt32 processed_steps_;
+        UA_UInt32 overall_processed_steps_;
+        UA_UInt32 overall_processing_steps_;
+        UA_UInt32 processable_steps_;
         std::queue<robot_action> action_queue_;
     public:
-        order(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, std::queue<robot_action> _action_queue) : recipe_id_(_recipe_id), processed_steps_(_processed_steps), action_queue_(_action_queue) {
+        order(recipe_id_t _recipe_id, UA_UInt32 _overall_processed_steps, UA_UInt32 _overall_processing_steps, UA_UInt32 _processable_steps, std::queue<robot_action> _action_queue) :
+            recipe_id_(_recipe_id), overall_processed_steps_(_overall_processed_steps), overall_processing_steps_(_overall_processing_steps), processable_steps_(_processable_steps), action_queue_(_action_queue) {
         }
 
         recipe_id_t get_recipe_id() const {
             return recipe_id_;
         }
 
-        UA_UInt32 get_processed_steps() const {
-            return processed_steps_;
+        UA_UInt32 get_overall_processed_steps() const {
+            return overall_processed_steps_;
+        }
+
+        UA_UInt32 get_overall_processing_steps() const {
+            return overall_processing_steps_;
+        }
+
+        UA_UInt32 get_processable_steps() const {
+            return processable_steps_;
         }
 
         std::queue<robot_action> get_action_queue() const {
@@ -51,7 +62,6 @@ private:
     UA_String server_endpoint_;
     object_type_node_inserter robot_type_inserter_;
     robot_tool current_tool_;
-    UA_UInt32 processed_steps_of_recipe_id_in_process_;
     std::queue<order> order_queue_;
     duration_t current_action_duration_;
     std::queue<robot_action> action_queue_in_process_;
@@ -99,7 +109,7 @@ private:
      * @param _input the input pointer of the input parameters
      * @param _output_size the allocated output size
      * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode 
+     * @return UA_StatusCode the status code
      */
     static UA_StatusCode
     receive_task(UA_Server *_server,
@@ -113,10 +123,10 @@ private:
      * @brief Handles the extracted instruction parameters from the receive_task method and processes the ordered dish.
      * 
      * @param _recipe_id the recipe ID of the dish to prepare
-     * @param _processed_steps the processed steps of the recipe ID so far
+     * @param _overall_processed_steps the overall processed steps of the recipe ID so far
      */
     void
-    handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps);
+    handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _overall_processed_steps);
 
     /**
      * @brief Cooks the next order in the order queue
@@ -127,10 +137,12 @@ private:
 
     /**
      * @brief Computes the overall time and determines the last equipped tool according to the actions the robot is capable to
+     * and the processable steps count
      * 
      * @param _action_queue the action queue
+     * @return UA_UInt32 the processable steps count
      */
-    void
+    UA_UInt32
     compute_overall_time_and_determine_last_tool(std::queue<robot_action> _action_queue);
 
     /**

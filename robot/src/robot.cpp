@@ -16,8 +16,7 @@
 
 robot::robot(position_t _position, std::string _capabilities_file_name) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
-        processed_steps_of_recipe_id_in_process_(0), current_action_duration_(0),
-        recipe_parser_(), capability_parser_(_capabilities_file_name, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr), conveyor_client_(nullptr), pending_pickup_(false) {
+        current_action_duration_(0), recipe_parser_(), capability_parser_(_capabilities_file_name, _position), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr), conveyor_client_(nullptr), pending_pickup_(false) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -41,6 +40,10 @@ robot::robot(position_t _position, std::string _capabilities_file_name) :
     robot_type_inserter_.add_attribute(ROBOT_TYPE, CURRENT_TOOL);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, LAST_EQUIPPED_TOOL);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, CAPABILITIES);
+    robot_type_inserter_.add_attribute(ROBOT_TYPE, PROCESSED_STEPS);
+    robot_type_inserter_.add_attribute(ROBOT_TYPE, PROCESSABLE_STEPS);
+    robot_type_inserter_.add_attribute(ROBOT_TYPE, OVERALL_PROCESSED_STEPS);
+    robot_type_inserter_.add_attribute(ROBOT_TYPE, OVERALL_PROCESSING_STEPS);
     /* Add receive task method node */
     method_arguments receive_task_method_arguments;
     receive_task_method_arguments.add_input_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
@@ -107,7 +110,15 @@ robot::robot(position_t _position, std::string _capabilities_file_name) :
     for (size_t i = 0; i < capabilities.size(); i++) {
         UA_String_clear(&(ua_capabilities[i]));
     }
-    
+    /* Set processed steps */
+    UA_UInt32 initial_progress = 0;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, PROCESSED_STEPS, &initial_progress, UA_TYPES_UINT32);
+    /* Set processable steps */
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, PROCESSABLE_STEPS, &initial_progress, UA_TYPES_UINT32);
+    /* Set overall processed steps */
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, &initial_progress, UA_TYPES_UINT32);
+    /* Set overall processing steps */
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSING_STEPS, &initial_progress, UA_TYPES_UINT32);
     /* Run the robot server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -209,7 +220,7 @@ robot::receive_task(UA_Server *_server,
         return UA_STATUSCODE_BAD;
     }
     recipe_id_t recipe_id = *(recipe_id_t*)_input[0].data;
-    UA_UInt32 processed_steps = *(UA_UInt32*)_input[1].data;
+    UA_UInt32 overall_processed_steps = *(UA_UInt32*)_input[1].data;
 
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
@@ -225,29 +236,30 @@ robot::receive_task(UA_Server *_server,
         self->stop();
         return UA_STATUSCODE_BAD;
     }
-    self->io_context_.post([self, recipe_id, processed_steps] {
-        self->handle_receive_task(recipe_id, processed_steps);
+    self->io_context_.post([self, recipe_id, overall_processed_steps] {
+        self->handle_receive_task(recipe_id, overall_processed_steps);
     });
     return UA_STATUSCODE_GOOD;
 }
 
 void
-robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _processed_steps) {
+robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _overall_processed_steps) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Received instruction to cook recipe_id=%d with already %d processed steps", _recipe_id, _processed_steps);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Received instruction to cook recipe_id=%d with already %d processed steps", _recipe_id, _overall_processed_steps);
     if (!recipe_parser_.has_recipe(_recipe_id)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unknown recipe ID", __FUNCTION__);
         return;
     }
     recipe incoming_recipe = recipe_parser_.get_recipe(_recipe_id);
     std::queue<robot_action> action_queue = incoming_recipe.get_action_queue();
+    UA_UInt32 overall_processing_steps = action_queue.size();
     // Remove already processed steps
-    for (size_t i = 0; i < _processed_steps; i++) {
+    for (size_t i = 0; i < _overall_processed_steps; i++) {
         action_queue.pop();
     }
-    compute_overall_time_and_determine_last_tool(action_queue);
+    UA_UInt32 processable_steps = compute_overall_time_and_determine_last_tool(action_queue);
     // Setup incoming order
-    order_queue_.push(order(_recipe_id, _processed_steps, action_queue));
+    order_queue_.push(order(_recipe_id, _overall_processed_steps, overall_processing_steps, processable_steps, action_queue));
     if (!preparing_dish_) {
         cook_next_order();
     }
@@ -269,7 +281,22 @@ robot::cook_next_order() {
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Setting %s failed", __FUNCTION__, RECIPE_ID);
     }
-    processed_steps_of_recipe_id_in_process_ = next_order.get_processed_steps();
+    // Update recipe progress attributes
+    UA_UInt32 overall_processed_steps = next_order.get_overall_processed_steps();
+    UA_UInt32 overall_processing_steps = next_order.get_overall_processing_steps();
+    UA_UInt32 processable_steps = next_order.get_processable_steps();
+    status = robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, &overall_processed_steps, UA_TYPES_UINT32);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Setting %s failed", __FUNCTION__, OVERALL_PROCESSED_STEPS);
+    }
+    status = robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSING_STEPS, &overall_processing_steps, UA_TYPES_UINT32);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Setting %s failed", __FUNCTION__, OVERALL_PROCESSING_STEPS);
+    }
+    status = robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, PROCESSABLE_STEPS, &processable_steps, UA_TYPES_UINT32);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Setting %s failed", __FUNCTION__, PROCESSABLE_STEPS);
+    }
     // Update dish name
     recipe current_recipe = recipe_parser_.get_recipe(recipe_id_in_process);
     UA_String dish_in_process = UA_STRING_ALLOC(current_recipe.get_dish_name().c_str());
@@ -282,7 +309,7 @@ robot::cook_next_order() {
     determine_next_action();
 }
 
-void
+UA_UInt32
 robot::compute_overall_time_and_determine_last_tool(std::queue<robot_action> _action_queue) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Get overall time */
@@ -297,16 +324,19 @@ robot::compute_overall_time_and_determine_last_tool(std::queue<robot_action> _ac
     robot_type_inserter_.get_attribute(INSTANCE_NAME, LAST_EQUIPPED_TOOL, last_equipped_tool_var);
     robot_tool last_equipped_tool = *(robot_tool*) last_equipped_tool_var.data;
     UA_Variant_clear(&last_equipped_tool_var);
+    UA_UInt32 processable_steps = 0;
     while (!_action_queue.empty() && capability_parser_.is_capable_to(_action_queue.front().get_name())) {
         overall_time += last_equipped_tool != _action_queue.front().get_required_tool() ? RETOOLING_TIME : 0;
         overall_time += _action_queue.front().get_action_duration();
         last_equipped_tool = _action_queue.front().get_required_tool();
         _action_queue.pop();
+        processable_steps++;
     }
     /* Update overall time */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
     /* Update last equipped tool time */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, LAST_EQUIPPED_TOOL, &last_equipped_tool, UA_TYPES_UINT32);
+    return processable_steps;
 }
 
 UA_StatusCode
@@ -358,11 +388,17 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     UA_Variant_clear(&recipe_id_in_process_var);
+    /* Get overall processed steps */
+    UA_Variant overall_processed_steps_var;
+    UA_Variant_init(&overall_processed_steps_var);
+    robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, overall_processed_steps_var);
+    UA_UInt32 overall_processed_steps =  *(UA_UInt32*) overall_processed_steps_var.data;
+    UA_Variant_clear(&overall_processed_steps_var);
     /* Set output values */
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &server_endpoint_, &UA_TYPES[UA_TYPES_STRING]);
     status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[2], &recipe_id_in_process, &UA_TYPES[UA_TYPES_UINT32]);
-    status |= UA_Variant_setScalarCopy(&_output[3], &processed_steps_of_recipe_id_in_process_, &UA_TYPES[UA_TYPES_UINT32]);
+    status |= UA_Variant_setScalarCopy(&_output[3], &overall_processed_steps, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[4], &is_dish_finished_, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
@@ -372,8 +408,13 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Pass finished recipe_id=%d from position %d", recipe_id_in_process, position_);
     /* Set recipe id in process*/
     recipe_id_in_process = 0;
-    processed_steps_of_recipe_id_in_process_ = 0;
     is_dish_finished_ = false;
+    /* Reset recipe progress */
+    UA_UInt32 initial_progress = 0;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, PROCESSED_STEPS, &initial_progress, UA_TYPES_UINT32);
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, PROCESSABLE_STEPS, &initial_progress, UA_TYPES_UINT32);
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, &initial_progress, UA_TYPES_UINT32);
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSING_STEPS, &initial_progress, UA_TYPES_UINT32);
     /* Update recipe id in process */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, RECIPE_ID, &recipe_id_in_process, UA_TYPES_UINT32);
     /* Update dish in process */
@@ -405,6 +446,12 @@ robot::determine_next_action() {
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     UA_Variant_clear(&recipe_id_in_process_var);
+    /* Get overall processed steps */
+    UA_Variant overall_processed_steps_var;
+    UA_Variant_init(&overall_processed_steps_var);
+    robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, overall_processed_steps_var);
+    UA_UInt32 overall_processed_steps =  *(UA_UInt32*) overall_processed_steps_var.data;
+    UA_Variant_clear(&overall_processed_steps_var);
     /* Process remaining actions */
     if (action_queue_in_process_.size()) {
         robot_action robot_act = action_queue_in_process_.front();
@@ -412,7 +459,7 @@ robot::determine_next_action() {
         if (!capability_parser_.is_capable_to(robot_act.get_name())) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot is not capable to %s", __FUNCTION__, robot_act.get_name().c_str());
             reset_in_process_fields();
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send partially finished order notification", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send partially finished order notification", recipe_id_in_process, overall_processed_steps);
             is_dish_finished_ = false;
             /* Notify conveyor about finished order */
             method_node_caller receive_finished_order_notification_caller;
@@ -488,7 +535,13 @@ robot::determine_next_action() {
         }
     } else {
         reset_in_process_fields();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process, processed_steps_of_recipe_id_in_process_);
+        /* Get overall processed steps */
+        UA_Variant overall_processed_steps_var;
+        UA_Variant_init(&overall_processed_steps_var);
+        robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, overall_processed_steps_var);
+        UA_UInt32 overall_processed_steps =  *(UA_UInt32*) overall_processed_steps_var.data;
+        UA_Variant_clear(&overall_processed_steps_var);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process, overall_processed_steps);
         is_dish_finished_ = true;
         /* Notify conveyor about finished order */
         method_node_caller receive_finished_order_notification_caller;
@@ -594,7 +647,22 @@ void
 robot::action_performed() {
     robot_action robot_act = action_queue_in_process_.front();
     duration_t action_duration = robot_act.get_action_duration();
-    processed_steps_of_recipe_id_in_process_++;
+    /* Update overall processed steps */
+    UA_Variant overall_processed_steps_var;
+    UA_Variant_init(&overall_processed_steps_var);
+    robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, overall_processed_steps_var);
+    UA_UInt32 overall_processed_steps = *(UA_UInt32*) overall_processed_steps_var.data;
+    UA_Variant_clear(&overall_processed_steps_var);
+    overall_processed_steps++;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, &overall_processed_steps, UA_TYPES_UINT32);
+    /* Update local processed steps */
+    UA_Variant locally_processed_steps_var;
+    UA_Variant_init(&locally_processed_steps_var);
+    robot_type_inserter_.get_attribute(INSTANCE_NAME, PROCESSED_STEPS, locally_processed_steps_var);
+    UA_UInt32 locally_processed_steps = *(UA_UInt32*) locally_processed_steps_var.data;
+    UA_Variant_clear(&locally_processed_steps_var);
+    locally_processed_steps++;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, PROCESSED_STEPS, &locally_processed_steps, UA_TYPES_UINT32);
     /* Get recipe id in process */
     UA_Variant recipe_id_in_process_var;
     UA_Variant_init(&recipe_id_in_process_var);
