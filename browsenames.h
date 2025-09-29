@@ -18,6 +18,10 @@
 #define CURRENT_TOOL "CurrentTool"
 #define LAST_EQUIPPED_TOOL "LastEquippedTool"
 #define CAPABILITIES "Capabilities"
+#define PROCESSED_STEPS "ProcessedSteps"
+#define PROCESSABLE_STEPS "ProcessableSteps"
+#define OVERALL_PROCESSED_STEPS "OverallProcessedSteps"
+#define OVERALL_PROCESSING_STEPS "OverallProcessingSteps"
 
 /* CONVEYOR */
 // object type node
