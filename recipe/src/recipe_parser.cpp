@@ -92,6 +92,6 @@ bool recipe_parser::has_recipe(const cps_kitchen::recipe_id_t _recipe_id) const 
     return recipe_map_.find(_recipe_id) != recipe_map_.end();
 }
 
-recipe recipe_parser::get_recipe(cps_kitchen::recipe_id_t _recipe) {
-    return recipe_map_.at(_recipe).operator*();
+recipe recipe_parser::get_recipe(cps_kitchen::recipe_id_t _recipe_id) {
+    return recipe_map_.at(_recipe_id).operator*();
 }
