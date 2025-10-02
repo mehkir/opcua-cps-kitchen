@@ -2,8 +2,8 @@
  * @file robot.hpp
  * @brief OPC UA kitchen robot server and client logic (public interface and documentation).
  *
- * This header declares the kitchen robot component which exposes an OPC UA server, registers
- * itself to a discovery server, communicates with a controller and a conveyor via OPC UA
+ * This header declares the kitchen robot agent which exposes an OPC UA server, registers
+ * itself to a discovery server, communicates with the controller and the conveyor via OPC UA
  * method calls, and processes cooking "recipes" as sequences of robot actions.
  *
  * The implementation is multithreaded: the robot hosts its own server iterate loop, runs
