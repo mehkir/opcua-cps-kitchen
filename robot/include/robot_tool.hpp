@@ -1,8 +1,14 @@
+/**
+ * @file robot_tool.hpp
+ * @brief Defines the available robot tools
+ *
+ * This header defines the available cooking tools of the kitchen robot agent
+ */
 #ifndef ROBOT_TOOL_HPP
 #define ROBOT_TOOL_HPP
 
 /**
- * @brief The robot tool
+ * @brief The available robot tools
  * 
  */
 enum class robot_tool {
