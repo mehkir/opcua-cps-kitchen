@@ -1,3 +1,15 @@
+/**
+ * @file robot.hpp
+ * @brief OPC UA kitchen robot server and client logic (public interface and documentation).
+ *
+ * This header declares the kitchen robot component which exposes an OPC UA server, registers
+ * itself to a discovery server, communicates with a controller and a conveyor via OPC UA
+ * method calls, and processes cooking "recipes" as sequences of robot actions.
+ *
+ * The implementation is multithreaded: the robot hosts its own server iterate loop, runs
+ * a worker to progress actions over time using Boost.Asio timers, and maintains client
+ * connections to external services.
+ */
 #ifndef ROBOT_HPP
 #define ROBOT_HPP
 
@@ -231,14 +243,14 @@ private:
 
 public:
     /**
-     * @brief Construct a new robot object.
+     * @brief Constructs a new robot object.
      * 
      * @param _position the position of the robot at the conveyor
      */
     robot(position_t _position, std::string _capabilities_file_name);
 
     /**
-     * @brief Destroy the robot object.
+     * @brief Destroys the robot object.
      * 
      */
     ~robot();
