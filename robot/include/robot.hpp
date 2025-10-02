@@ -101,7 +101,7 @@ private:
     position_t position_; /**< the robot's position on the conveyor belt */
     std::string robot_uri_; /**< the robot's uniform resource identifier */
     UA_String server_endpoint_; /**< the robot's endpoint address */
-    object_type_node_inserter robot_type_inserter_; /**< the robot type inserter for adding the robot's attributes and methods in the address space */
+    object_type_node_inserter robot_type_inserter_; /**< the robot type inserter for adding the robot's attributes and methods to the address space */
     robot_tool current_tool_; /**< the current tool the robot is equipped with */
     std::queue<order> order_queue_; /**< the queue holding all the assigned orders */
     duration_t current_action_duration_; /**< the current action duration */
@@ -140,12 +140,12 @@ private:
      * @brief Extracts the instruction parameters.
      * 
      * @param _server the server instance from which this method is called
-     * @param _session_id 
-     * @param _session_context 
-     * @param _method_id 
-     * @param _method_context the node context data passed to the method node
-     * @param _object_id 
-     * @param _object_context 
+     * @param _session_id the client session id
+     * @param _session_context user-defined context data passed via the access control/plugin
+     * @param _method_id the node id of this method
+     * @param _method_context user-defined context data passed to the method node
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
      * @param _input_size the count of the input parameters
      * @param _input the input pointer of the input parameters
      * @param _output_size the allocated output size
