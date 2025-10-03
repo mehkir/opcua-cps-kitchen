@@ -1,10 +1,16 @@
+/**
+ * @file robot_state.hpp
+ * @brief Defines the robot states
+ *
+ * This header defines the robot states of the kitchen robot agent
+ */
 #ifndef ROBOT_STATE_HPP
 #define ROBOT_STATE_HPP
 
 #include <string>
 
 /**
- * @brief The robot state
+ * @brief The robot states
  * 
  */
 enum class robot_state {
