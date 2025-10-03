@@ -1,14 +1,14 @@
 /**
  * @file robot_tool.hpp
- * @brief Defines the available robot tools
+ * @brief Defines the available robot tools.
  *
- * This header defines the available cooking tools of the kitchen robot agent
+ * This header defines the available cooking tools of the kitchen robot agent.
  */
 #ifndef ROBOT_TOOL_HPP
 #define ROBOT_TOOL_HPP
 
 /**
- * @brief The available robot tools
+ * @brief The available robot tools.
  * 
  */
 enum class robot_tool {
@@ -28,10 +28,10 @@ enum class robot_tool {
     ROBOT_TOOLS_COUNT = WHISK+1
 };
 /**
- * @brief Returns the corresponding string for the given robot tool
+ * @brief Returns the corresponding string for the given robot tool.
  * 
- * @param _robot_tool the robot tool
- * @return const char* the corresponding string
+ * @param _robot_tool the robot tool.
+ * @return const char* the corresponding string.
  */
 static const char* robot_tool_to_string(robot_tool _robot_tool) {
     switch (_robot_tool) {

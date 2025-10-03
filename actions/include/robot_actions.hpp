@@ -30,9 +30,9 @@ struct action {
     private:
     public:
         /**
-         * @brief Returns the action name
+         * @brief Returns the action name.
          * 
-         * @return std::string the action name string
+         * @return std::string the action name string.
          */
         virtual std::string get_name() const = 0;
 
@@ -44,40 +44,40 @@ struct action {
 };
 
 /**
- * @brief Timed robot action with explicit ingredients and duration
+ * @brief Timed robot action with explicit ingredients and duration.
  *
  * Represents an action the robot executes with a specific tool, an
  * ingredient descriptor, and a fixed duration.
  */
 struct robot_action : public action {
     private:
-        std::string name_; /**< the robot action name */
-        robot_tool required_tool_; /**< the required tool */
-        std::string ingredients_; /**< the required ingredients */
-        duration_t duration_; /**< the action duration */
+        std::string name_; /**< the robot action name. */
+        robot_tool required_tool_; /**< the required tool. */
+        std::string ingredients_; /**< the required ingredients. */
+        duration_t duration_; /**< the action duration. */
     public:
         /**
-         * @brief Constructs a new robot action object
+         * @brief Constructs a new robot action object.
          * 
-         * @param _name the robot action name
-         * @param _required_tool the required tool
-         * @param _ingredients the required ingredients
-         * @param _duration the action duration
+         * @param _name the robot action name.
+         * @param _required_tool the required tool.
+         * @param _ingredients the required ingredients.
+         * @param _duration the action duration.
          */
         robot_action(std::string _name, robot_tool _required_tool, std::string _ingredients, duration_t _duration) : name_(_name), required_tool_(_required_tool), ingredients_(_ingredients), duration_(_duration) {
         }
         
         /**
-         * @brief Destroys the robot action object
+         * @brief Destroys the robot action object.
          * 
          */
         ~robot_action() {
         }
 
         /**
-         * @brief Returns the name object
+         * @brief Returns the name object.
          * 
-         * @return std::string the robot action name string
+         * @return std::string the robot action name string.
          */
         std::string
         get_name() const {
@@ -85,9 +85,9 @@ struct robot_action : public action {
         }
 
         /**
-         * @brief Returns the required robot tool
+         * @brief Returns the required robot tool.
          * 
-         * @return robot_tool the required robot tool
+         * @return robot_tool the required robot tool.
          */
         robot_tool
         get_required_tool() const {
@@ -95,18 +95,18 @@ struct robot_action : public action {
         }
 
         /**
-         * @brief Returns the required ingredients
+         * @brief Returns the required ingredients.
          * 
-         * @return std::string the required ingredients string
+         * @return std::string the required ingredients string.
          */
         std::string get_ingredients() const {
             return ingredients_;
         }
 
         /**
-         * @brief Returns the action duration
+         * @brief Returns the action duration.
          * 
-         * @return duration_t the action duration
+         * @return duration_t the action duration.
          */
         duration_t
         get_action_duration() const {
@@ -115,35 +115,35 @@ struct robot_action : public action {
 };
 
 /**
- * @brief Timed autonomous action with fixed duration
+ * @brief Timed autonomous action with fixed duration.
  */
 struct autonomous_action : public action {
     private:
-        std::string name_; /**< the robot action name */
-        robot_tool required_tool_; /**< the required tool */
-        duration_t duration_; /**< the action duration */
+        std::string name_; /**< the robot action name. */
+        robot_tool required_tool_; /**< the required tool. */
+        duration_t duration_; /**< the action duration. */
     public:
         /**
-         * @brief Constructs a new autonomous action
+         * @brief Constructs a new autonomous action.
          * 
-         * @param _name the robot action name
-         * @param _required_tool the required tool
-         * @param _duration the action duration
+         * @param _name the robot action name.
+         * @param _required_tool the required tool.
+         * @param _duration the action duration.
          */
         autonomous_action(std::string _name, robot_tool _required_tool, duration_t _duration) : name_(_name), required_tool_(_required_tool), duration_(_duration) {
         }
 
         /**
-         * @brief Destroys the autonomous action
+         * @brief Destroys the autonomous action.
          * 
          */
         ~autonomous_action() {
         }
 
         /**
-         * @brief Returns the action name
+         * @brief Returns the action name.
          * 
-         * @return std::string the action name string
+         * @return std::string the action name string.
          */
         virtual std::string
         get_name() const {
@@ -151,9 +151,9 @@ struct autonomous_action : public action {
         }
 
         /**
-         * @brief Returns the required tool
+         * @brief Returns the required tool.
          * 
-         * @return robot_tool the required tool
+         * @return robot_tool the required tool.
          */
         robot_tool
         get_required_tool() const {
@@ -161,9 +161,9 @@ struct autonomous_action : public action {
         }
 
         /**
-         * @brief Returns the action duration
-         * 
-         * @return duration_t the action duration
+         * @brief Returns the action duration.
+         *
+         * @return duration_t the action duration.
          */
         duration_t
         get_action_duration() const {
@@ -176,23 +176,23 @@ struct autonomous_action : public action {
  */
 struct recipe_timed_action : public action {
     private:
-        std::string name_; /**< the action name */
-        robot_tool required_tool_; /**< the required tool */
+        std::string name_; /**< the action name. */
+        robot_tool required_tool_; /**< the required tool. */
     public:
         recipe_timed_action(std::string _name, robot_tool _required_tool) : name_(_name), required_tool_(_required_tool) {
         }
 
         /**
-         * @brief Destroys the recipe timed action
+         * @brief Destroys the recipe timed action.
          * 
          */
         ~recipe_timed_action() {
         }
 
         /**
-         * @brief Returns the action name
+         * @brief Returns the action name.
          * 
-         * @return std::string the action name string
+         * @return std::string the action name string.
          */
         virtual std::string
         get_name() const {
@@ -200,9 +200,9 @@ struct recipe_timed_action : public action {
         }
 
         /**
-         * @brief Returns the required robot tool
+         * @brief Returns the required robot tool.
          * 
-         * @return robot_tool the required robot tool
+         * @return robot_tool the required robot tool.
          */
         robot_tool
         get_required_tool() const {
@@ -211,60 +211,60 @@ struct recipe_timed_action : public action {
 };
 
 /**
- * @brief Singleton registry for known robot actions providing lookups by action name for autonomous and recipe-timed actions
+ * @brief Singleton registry for known robot actions providing lookups by action name for autonomous and recipe-timed actions.
  */
 class robot_actions {
     public:
         /**
-         * @brief Returns the singleton robot_actions instance
+         * @brief Returns the singleton robot_actions instance.
          * 
-         * @return robot_actions* the robot actions address
+         * @return robot_actions* the robot actions address.
          */
         static robot_actions* get_instance();
 
         /**
-         * @brief Checks whether the given action exists in the registry
+         * @brief Checks whether the given action exists in the registry.
          * 
-         * @param _action_name the action name
-         * @return true if action exists
-         * @return false if action doesn't exist
+         * @param _action_name the action name.
+         * @return true if action exists.
+         * @return false if action doesn't exist.
          */
         bool has_action(const std::string _action_name) const;
 
         /**
-         * @brief Returns the action by name
+         * @brief Returns the action by name.
          * 
-         * @param _action_name the action name
-         * @return std::shared_ptr<action> the action
+         * @param _action_name the action name.
+         * @return std::shared_ptr<action> the action.
          */
         std::shared_ptr<action> get_robot_action(const std::string _action_name);
     private:
         /**
-         * @brief Constructs a new robot actions object
+         * @brief Constructs a new robot actions object.
          * 
          */
         robot_actions();
 
         /**
-         * @brief Destroys the robot actions object
+         * @brief Destroys the robot actions object.
          * 
          */
         ~robot_actions();
 
         /**
-         * @brief The singleton robot_actions instance pointer
+         * @brief The singleton robot_actions instance pointer.
          * 
          */
         static robot_actions* instance_;
 
         /**
-         * @brief The mutex ensuring the singleton instance
+         * @brief The mutex ensuring the singleton instance.
          * 
          */
         static std::mutex mutex_;
 
         /**
-         * @brief The action registry
+         * @brief The action registry.
          * 
          */
         std::unordered_map<std::string, std::shared_ptr<action>> action_map_;

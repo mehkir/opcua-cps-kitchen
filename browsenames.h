@@ -1,8 +1,8 @@
 /**
  * @file browsenames.h
- * @brief OPC UA browse names for attributes and methods in the address space
- *
- * This header defines the browse names for methods and attributes of the CPS Kitchen agents
+ * @brief OPC UA browse names for attributes and methods in the address space.
+ * 
+ * This header defines the browse names for methods and attributes of the CPS Kitchen agents.
  */
 #ifndef NODE_IDS_HPP
 #define NODE_IDS_HPP

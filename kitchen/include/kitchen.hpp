@@ -42,27 +42,27 @@
 
 using namespace cps_kitchen;
 
-typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback typedef to mark robots for removal */
+typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback typedef to mark robots for removal. */
 
 struct remote_robot {
     private:
-        UA_Client* client_; /**< the OPC UA remote robot client pointer */
-        std::string endpoint_; /**< the remote robot's endpoint address */
-        position_t position_; /**< the remote robot's position on the conveyor belt */
-        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run */
-        object_type_node_inserter& remote_robot_type_inserter_; /**< the remote robot type inserter for adding the remote robot's attributes to the address space*/
-        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal */
-        std::thread client_iterate_thread_; /**< the client iteration thread */
-        std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
-        std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the ids of remote robot methods */
-        std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the ids of remote robot attributes */
+        UA_Client* client_; /**< the OPC UA remote robot client pointer. */
+        std::string endpoint_; /**< the remote robot's endpoint address. */
+        position_t position_; /**< the remote robot's position on the conveyor belt. */
+        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
+        object_type_node_inserter& remote_robot_type_inserter_; /**< the remote robot type inserter for adding the remote robot's attributes to the address space. */
+        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
+        std::thread client_iterate_thread_; /**< the client iteration thread. */
+        std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
+        std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the ids of remote robot methods. */
+        std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the ids of remote robot attributes. */
     public:
         /**
-         * @brief Setup the remote robot object type
+         * @brief Setup the remote robot object type.
          * 
-         * @param _remote_robot_type_inserter the remote robot type inserter
-         * @param _conveyor the conveyor server
-         * @return UA_StatusCode the status code
+         * @param _remote_robot_type_inserter the remote robot type inserter.
+         * @param _conveyor the conveyor server.
+         * @return UA_StatusCode the status code.
          */
         static UA_StatusCode setup_remote_robot_object_type(object_type_node_inserter& _remote_robot_type_inserter, UA_Server* _kitchen) {
             UA_StatusCode status;
@@ -77,10 +77,10 @@ struct remote_robot {
         /**
          * @brief Construct a new remote robot object.
          * 
-         * @param _endpoint the remote robot's endpoint url
-         * @param _position the remote robot's position
-         * @param _remote_robot_type_inserter the remote robot type inserter
-         * @param _mark_robot_for_removal_callback the mark robot for removal callback
+         * @param _endpoint the remote robot's endpoint url.
+         * @param _position the remote robot's position.
+         * @param _remote_robot_type_inserter the remote robot type inserter.
+         * @param _mark_robot_for_removal_callback the mark robot for removal callback.
          */
         remote_robot(std::string _endpoint, UA_UInt32 _position, object_type_node_inserter& _remote_robot_type_inserter, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) : client_(nullptr), endpoint_(_endpoint), position_(_position), running_(true), remote_robot_type_inserter_(_remote_robot_type_inserter), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
             client_connection_establisher robot_client_connection_establisher;
@@ -90,14 +90,14 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
-            /* Get the position attribute id*/
+            /* Get the position attribute id. */
             attribute_id_map_[POSITION] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, POSITION);
             if (UA_NodeId_equal(&attribute_id_map_[POSITION], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, POSITION);
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
-            /* Subscribe to position changes */
+            /* Subscribe to position changes. */
             node_value_subscriber nv_subscriber;
             UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[POSITION], position_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
@@ -105,14 +105,14 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
-            /* Set connectvitiy */
+            /* Set connectvitiy. */
             status = remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(position_), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot connectivity attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
-            /* Get receive task method id */
+            /* Get receive task method id. */
             if ((method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 mark_robot_for_removal_callback_(position_);
@@ -151,12 +151,12 @@ struct remote_robot {
         /**
          * @brief Instructs the remote robot to process a dish.
          * 
-         * @param _recipe_id the recipe ID of the dish
-         * @param _processed_steps the processed steps of the recipe ID so far
-         * @param _output_size the count of returned output values
-         * @param _output the variant containing the output values
+         * @param _recipe_id the recipe ID of the dish.
+         * @param _processed_steps the processed steps of the recipe ID so far.
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
          * 
-         * @return UA_StatusCode the status whether the method call was successful
+         * @return UA_StatusCode the status whether the method call was successful.
          */
         UA_StatusCode
         instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
@@ -183,7 +183,7 @@ struct remote_robot {
         /**
          * @brief Returns the remote robot's position.
          * 
-         * @return position_t the remote robot position
+         * @return position_t the remote robot position.
          */
         position_t
         get_position() const {
@@ -191,14 +191,14 @@ struct remote_robot {
         }
 
         /**
-         * @brief The position changed callback for the subscription
-         * 
-         * @param _client the client issuing the subscription
-         * @param _sub_id server-assigned subscription id that delivered this notification
-         * @param _sub_context user-defined context data passed when creating the subscription
-         * @param _mon_id server-assigned MonitoredItemId that produced the data change
-         * @param _mon_context user-defined context data passed when creating the monitored item
-         * @param _value the reported UA_DataValue
+         * @brief The position changed callback for the subscription.
+         *
+         * @param _client the client issuing the subscription.
+         * @param _sub_id server-assigned subscription id that delivered this notification.
+         * @param _sub_context user-defined context data passed when creating the subscription.
+         * @param _mon_id server-assigned MonitoredItemId that produced the data change.
+         * @param _mon_context user-defined context data passed when creating the monitored item.
+         * @param _value the reported UA_DataValue.
          */
         static void
         position_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
@@ -223,10 +223,10 @@ struct remote_robot {
         }
 
         /**
-         * @brief Helper method for self defined remote robot instance names according to their position
+         * @brief Helper method for self defined remote robot instance names according to their position.
          * 
-         * @param _position the remote robot's position
-         * @return std::string the remote robot's instance name string
+         * @param _position the remote robot's position.
+         * @return std::string the remote robot's instance name string.
          */
         static std::string remote_robot_instance_name(position_t _position) {
             return REMOTE_ROBOT_INSTANCE_NAME_PREFIX + std::to_string(_position);
@@ -249,55 +249,55 @@ struct remote_robot {
 class kitchen {
 
 private:
-    /* kitchen related member variables */
-    UA_Server* server_; /**< the OPC UA kitchen server */
-    std::string kitchen_uri_; /**< the kitchen's uniform resource identifier */
-    object_type_node_inserter kitchen_type_inserter_; /**< the kitchen type inserter for adding the kitchen's attributes and methods to the address space */
-    std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run */
-    discovery_util discovery_util_; /**< the discovery utility */
-    std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods */
-    std::thread server_iterate_thread_; /**< the server iteration thread */
-    std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
-    std::thread client_iterate_thread_; /**< the client iteration thread */
-    std::thread worker_thread_; /**< the worker thread for assigning placed orders to remote robots */
-    boost::asio::io_context io_context_; /**< the io context managing the worker thread */
-    boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_ */
-    /* remote robot related member variables */
-    std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances */
-    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed */
-    object_type_node_inserter remote_robot_type_inserter_; /**< the remote robot type inserter for adding the robot's attributes to the address space */
-    std::thread cyclic_remote_robot_discovery_thread_; /**< the remote robot thread discovering robots periodically */
-    std::mutex remote_robot_discovery_mutex_; /**< the remote robot discovery mutex for synchronizing remote robot map operations */
-    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set */
-    uint32_t robot_count_; /**< the total robot count in the kitchen */
-    std::condition_variable remote_robot_discovery_cv; /**< the condition variable to make the discovery thread wait when all robots are discovered */
-    /* controller related member variables */
-    UA_Client* controller_client_; /**< the OPC UA controller client pointer */
-    object_type_node_inserter remote_controller_type_inserter_; /**< the remote controller type inserter for adding the controller's attributes to the address space */
-    std::condition_variable remote_controller_connected_cv_; /**< the condition variable to wait for the controller connection to be restored */
-    /* conveyor related member variables */
-    UA_Client* conveyor_client_; /**< the OPC UA conveyor client pointer */
-    object_type_node_inserter remote_conveyor_type_inserter_; /**< the remote conveyor type inserter for adding the conveyor's attributes to the address space */
-    /* random distribution */
-    std::random_device random_device_; /**< the random number generator device */
-    std::mt19937 mersenne_twister_; /**< the mersenne twister for uniform pseudo-random number generation */
-    std::uniform_int_distribution<std::uint32_t> uniform_int_distribution_; /**< uniform discrete distribution for random numbers */
+    /* kitchen related member variables. */
+    UA_Server* server_; /**< the OPC UA kitchen server. */
+    std::string kitchen_uri_; /**< the kitchen's uniform resource identifier. */
+    object_type_node_inserter kitchen_type_inserter_; /**< the kitchen type inserter for adding the kitchen's attributes and methods to the address space. */
+    std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
+    discovery_util discovery_util_; /**< the discovery utility. */
+    std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
+    std::thread server_iterate_thread_; /**< the server iteration thread. */
+    std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
+    std::thread client_iterate_thread_; /**< the client iteration thread. */
+    std::thread worker_thread_; /**< the worker thread for assigning placed orders to remote robots. */
+    boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
+    boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
+    /* remote robot related member variables. */
+    std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
+    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
+    object_type_node_inserter remote_robot_type_inserter_; /**< the remote robot type inserter for adding the robot's attributes to the address space. */
+    std::thread cyclic_remote_robot_discovery_thread_; /**< the remote robot thread discovering robots periodically. */
+    std::mutex remote_robot_discovery_mutex_; /**< the remote robot discovery mutex for synchronizing remote robot map operations. */
+    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
+    uint32_t robot_count_; /**< the total robot count in the kitchen. */
+    std::condition_variable remote_robot_discovery_cv; /**< the condition variable to make the discovery thread wait when all robots are discovered. */
+    /* controller related member variables. */
+    UA_Client* controller_client_; /**< the OPC UA controller client pointer. */
+    object_type_node_inserter remote_controller_type_inserter_; /**< the remote controller type inserter for adding the controller's attributes to the address space. */
+    std::condition_variable remote_controller_connected_cv_; /**< the condition variable to wait for the controller connection to be restored. */
+    /* conveyor related member variables. */
+    UA_Client* conveyor_client_; /**< the OPC UA conveyor client pointer. */
+    object_type_node_inserter remote_conveyor_type_inserter_; /**< the remote conveyor type inserter for adding the conveyor's attributes to the address space. */
+    /* random distribution. */
+    std::random_device random_device_; /**< the random number generator device. */
+    std::mt19937 mersenne_twister_; /**< the mersenne twister for uniform pseudo-random number generation. */
+    std::uniform_int_distribution<std::uint32_t> uniform_int_distribution_; /**< uniform discrete distribution for random numbers. */
 
     /**
      * @brief Receives a completed order.
      * 
-     * @param _server the server instance from which this method is called
-     * @param _session_id the client session id
-     * @param _session_context user-defined context data passed via the access control/plugin
-     * @param _method_id the node id of this method
-     * @param _method_context user-defined context data passed to the method node
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
      * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
      * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
-     * @param _input_size the count of the input parameters
-     * @param _input the input pointer of the input parameters
-     * @param _output_size the allocated output size
-     * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode the status code
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
      */
     static UA_StatusCode
     receive_completed_order(UA_Server* _server,
@@ -310,18 +310,18 @@ private:
     /**
      * @brief Places a random order.
      * 
-     * @param _server the server instance from which this method is called
-     * @param _session_id the client session id
-     * @param _session_context user-defined context data passed via the access control/plugin
-     * @param _method_id the node id of this method
-     * @param _method_context user-defined context data passed to the method node
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
      * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
      * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
-     * @param _input_size the count of the input parameters
-     * @param _input the input pointer of the input parameters
-     * @param _output_size the allocated output size
-     * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode the status code
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
      */
     static UA_StatusCode
     place_random_order(UA_Server* _server,
@@ -341,29 +341,29 @@ private:
     /**
      * @brief Extracts the returned robot state parameters.
      * 
-     * @param _output_size the count of returned output values
-     * @param _output the variant containing the output values
-     * @return true if instruction suceeded
-     * @return false if instruction failed
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
+     * @return true if instruction suceeded.
+     * @return false if instruction failed.
      */
     bool
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
 
     /**
-     * @brief Extracts the returned remote robot parameters
+     * @brief Extracts the returned remote robot parameters.
      * 
-     * @param _output_size the count of returned output values
-     * @param _output the variant containing the output values
-     * @return remote_robot* the pointer of the remote robot extracted by the returned parameters
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
+     * @return remote_robot* the pointer of the remote robot extracted by the returned parameters.
      */
     remote_robot*
     choose_next_robot_called(size_t _output_size, UA_Variant *_output);
 
     /**
-     * @brief Helper method for incrementing X_ORDERS attribute nodes
+     * @brief Helper method for incrementing X_ORDERS attribute nodes.
      * 
-     * @param _attribute_name the attribute name
-     * @return UA_StatusCode the status code indicating whether incrementing succeeded
+     * @param _attribute_name the attribute name.
+     * @return UA_StatusCode the status code indicating whether incrementing succeeded.
      */
     UA_StatusCode
     increment_orders_counter(std::string _attribute_name);
@@ -371,7 +371,7 @@ private:
     /**
      * @brief Marks a remote robot for removal.
      * 
-     * @param _position the position of the remote robot to mark for removal
+     * @param _position the position of the remote robot to mark for removal.
      */
     void
     mark_robot_for_removal(position_t _position); 
@@ -394,12 +394,12 @@ public:
     /**
      * @brief Constructs a new kitchen object
      * 
-     * @param _robot_count the total robot count in the kitchen
+     * @param _robot_count the total robot count in the kitchen.
      */
     kitchen(uint32_t _robot_count);
 
     /**
-     * @brief Destroys the kitchen object
+     * @brief Destroys the kitchen object.
      * 
      */
     ~kitchen();

@@ -1,3 +1,4 @@
+// TODO: Add header doxygen
 #ifndef CONTROLLER_HPP
 #define CONTROLLER_HPP
 
@@ -27,32 +28,32 @@
 
 using namespace cps_kitchen;
 
-typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal */
+typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal. */
 
 /**
- * @brief Remote robot client to monitor kitchen robot attributes
+ * @brief Remote robot client to monitor kitchen robot attributes.
  * 
  */
 struct remote_robot {
     private:
-        UA_Client* client_; /**< the OPC UA remote robot client pointer */
-        std::string endpoint_; /**< the endpoint address */
-        const position_t position_; /**< the position on the conveyor belt */
-        std::unordered_set<std::string> capabilities_; /**< the capabilites */
-        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal */
-        std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the robot's attribute node ids */
-        robot_tool last_equipped_tool_; /**< the last equipped tool */
-        duration_t overall_time_; /**< the total time the robot will be in use */
-        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run */
-        std::thread client_iterate_thread_; /**< the client iteration thread */
-        std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
+        UA_Client* client_; /**< the OPC UA remote robot client pointer. */
+        std::string endpoint_; /**< the endpoint address. */
+        const position_t position_; /**< the position on the conveyor belt. */
+        std::unordered_set<std::string> capabilities_; /**< the capabilites. */
+        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
+        std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the robot's attribute node ids. */
+        robot_tool last_equipped_tool_; /**< the last equipped tool. */
+        duration_t overall_time_; /**< the total time the robot will be in use. */
+        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
+        std::thread client_iterate_thread_; /**< the client iteration thread. */
+        std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
 
     public:
         /**
          * @brief Constructs a new remote robot object.
          * 
-         * @param _endpoint the robot's endpoint url
-         * @param _position the position of the remote robot at the conveyor
+         * @param _endpoint the robot's endpoint url.
+         * @param _position the position of the remote robot at the conveyor.
          */
         remote_robot(std::string _endpoint, position_t _position, std::unordered_set<std::string> _capabilities, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) :  endpoint_(_endpoint), position_(_position), capabilities_(_capabilities), client_(nullptr), running_(true), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
             client_connection_establisher robot_connection_establisher;
@@ -118,7 +119,7 @@ struct remote_robot {
         }
 
         /**
-         * @brief Destroys the remote robot object
+         * @brief Destroys the remote robot object.
          * 
          */
         ~remote_robot() {
@@ -129,9 +130,9 @@ struct remote_robot {
         }
 
         /**
-         * @brief Returns the robot's endpoint
+         * @brief Returns the robot's endpoint.
          * 
-         * @return std::string the endpoint url
+         * @return std::string the endpoint url.
          */
         std::string
         get_endpoint() const {
@@ -141,7 +142,7 @@ struct remote_robot {
         /**
          * @brief Returns the remote robot's position.
          * 
-         * @return position_t the remote robot position
+         * @return position_t the remote robot position.
          */
         position_t
         get_position() const {
@@ -149,11 +150,11 @@ struct remote_robot {
         }
 
         /**
-         * @brief Indicates if a robot is capable to perform the given action
+         * @brief Indicates if a robot is capable to perform the given action.
          * 
-         * @param _capability the action to check whether it can be performed
-         * @return true if the remote is capable to perform the action
-         * @return false if the remote is not capable to perform the action
+         * @param _capability the action to check whether it can be performed.
+         * @return true if the remote is capable to perform the action.
+         * @return false if the remote is not capable to perform the action.
          */
         bool
         is_capable_to(std::string _capability) const {
@@ -161,9 +162,9 @@ struct remote_robot {
         }
 
         /**
-         * @brief Returns the remote robot's last equipped tool
+         * @brief Returns the remote robot's last equipped tool.
          * 
-         * @return robot_tool the last equipped tool
+         * @return robot_tool the last equipped tool.
          */
         robot_tool
         get_last_equipped_tool() const {
@@ -171,9 +172,9 @@ struct remote_robot {
         }
 
         /**
-         * @brief Returns the remote robot's overall time
+         * @brief Returns the remote robot's overall time.
          * 
-         * @return duration_t the remote robot's overall time
+         * @return duration_t the remote robot's overall time.
          */
         duration_t
         get_overall_time() const {
@@ -181,13 +182,13 @@ struct remote_robot {
         }
 
         /**
-         * @brief The overall time changed callback for the subscription
+         * @brief The overall time changed callback for the subscription.
          * 
-         * @param _client the client issuing the subscription
-         * @param _sub_id server-assigned subscription id that delivered this notification
-         * @param _sub_context user-defined context data passed when creating the subscription
-         * @param _mon_id server-assigned MonitoredItemId that produced the data change
-         * @param _mon_context user-defined context data passed when creating the monitored item
+         * @param _client the client issuing the subscription.
+         * @param _sub_id server-assigned subscription id that delivered this notification.
+         * @param _sub_context user-defined context data passed when creating the subscription.
+         * @param _mon_id server-assigned MonitoredItemId that produced the data change.
+         * @param _mon_context user-defined context data passed when creating the monitored item.
          * @param _value the reported UA_DataValue
          */
         static void
@@ -208,14 +209,14 @@ struct remote_robot {
         }
 
         /**
-         * @brief The last equipped tool changed callback for the subscription
+         * @brief The last equipped tool changed callback for the subscription.
          * 
-         * @param _client the client issuing the subscription
-         * @param _sub_id server-assigned subscription id that delivered this notification
-         * @param _sub_context user-defined context data passed when creating the subscription
-         * @param _mon_id server-assigned MonitoredItemId that produced the data change
-         * @param _mon_context user-defined context data passed when creating the monitored item
-         * @param _value the reported UA_DataValue
+         * @param _client the client issuing the subscription.
+         * @param _sub_id server-assigned subscription id that delivered this notification.
+         * @param _sub_context user-defined context data passed when creating the subscription.
+         * @param _mon_id server-assigned MonitoredItemId that produced the data change.
+         * @param _mon_context user-defined context data passed when creating the monitored item.
+         * @param _value the reported UA_DataValue.
          */
         static void
         last_equipped_tool_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
@@ -237,34 +238,34 @@ struct remote_robot {
 
 class controller {
 private:
-    /* controller related member variables */
-    UA_Server* server_; /**< the OPC UA controller server pointer */
-    object_type_node_inserter controller_type_inserter_; /**< the controller type insert for adding the controller's methods and attributes to the address space */
-    std::atomic<bool> running_; /**< flag to indicate whether the server thread should run */
-    std::thread server_iterate_thread_; /**< the server iteration thread */
-    discovery_util discovery_util_; /**< the discovery utility */
-    /* robot related member variables */
-    std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_; /**< the map holding the remote robot instances */
-    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed */
-    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set */
-    /* recipe related member variables */
-    recipe_parser recipe_parser_; /**< the recipe parser */
+    /* controller related member variables. */
+    UA_Server* server_; /**< the OPC UA controller server pointer. */
+    object_type_node_inserter controller_type_inserter_; /**< the controller type insert for adding the controller's methods and attributes to the address space. */
+    std::atomic<bool> running_; /**< flag to indicate whether the server thread should run. */
+    std::thread server_iterate_thread_; /**< the server iteration thread. */
+    discovery_util discovery_util_; /**< the discovery utility. */
+    /* robot related member variables. */
+    std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
+    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
+    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
+    /* recipe related member variables. */
+    recipe_parser recipe_parser_; /**< the recipe parser. */
  
     /**
      * @brief Extracts the received robot registration parameters.
      * 
-     * @param _server the server instance from which this method is called
-     * @param _session_id the client session id
-     * @param _session_context user-defined context data passed via the access control/plugin
-     * @param _method_id the node id of this method
-     * @param _method_context user-defined context data passed to the method node
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
      * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
      * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
-     * @param _input_size the count of the input parameters
-     * @param _input the input pointer of the input parameters
-     * @param _output_size the allocated output size
-     * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode the status code
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
      */
     static UA_StatusCode
     register_robot(UA_Server* _server,
@@ -277,10 +278,10 @@ private:
     /**
      * @brief Registers a remote robot.
      * 
-     * @param _endpoint the robot's endpoint url
-     * @param _position the position of the remote robot
-     * @param _remote_robot_capabilities the capabilities of the remote robot
-     * @param _output the output pointer to store return parameters
+     * @param _endpoint the robot's endpoint url.
+     * @param _position the position of the remote robot.
+     * @param _remote_robot_capabilities the capabilities of the remote robot.
+     * @param _output the output pointer to store return parameters.
      */
     void
     handle_robot_registration(std::string _endpoint, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output);
@@ -288,18 +289,18 @@ private:
     /**
      * @brief Extracts the received robot and recipe parameters.
      * 
-     * @param _server the server instance from which this method is called
-     * @param _session_id the client session id
-     * @param _session_context user-defined context data passed via the access control/plugin
-     * @param _method_id the node id of this method
-     * @param _method_context user-defined context data passed to the method node
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
      * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
      * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
-     * @param _input_size the count of the input parameters
-     * @param _input the input pointer of the input parameters
-     * @param _output_size the allocated output size
-     * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode the status code
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
      */
     static UA_StatusCode
     choose_next_robot(UA_Server* _server,
@@ -310,21 +311,21 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     /**
-     * @brief Chooses the next suitable robot
+     * @brief Chooses the next suitable robot.
      * 
-     * @param _recipe_id the recipe id of the partial finished order
-     * @param _processed_steps the steps until the recipe is processed
-     * @param _output the output pointer to store return parameters
+     * @param _recipe_id the recipe id of the partial finished order.
+     * @param _processed_steps the steps until the recipe is processed.
+     * @param _output the output pointer to store return parameters.
      */
     void
     handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
 
     /**
-     * @brief Returns a suitable robot for the given recipe ID starting from the next step to be processed
+     * @brief Returns a suitable robot for the given recipe ID starting from the next step to be processed.
      * 
-     * @param _recipe_id the recipe ID
-     * @param _processed_steps the steps until the recipe is processed
-     * @return remote_robot* the suitable robot
+     * @param _recipe_id the recipe ID.
+     * @param _processed_steps the steps until the recipe is processed.
+     * @return remote_robot* the suitable robot.
      */
     remote_robot*
     find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps);
@@ -332,7 +333,7 @@ private:
     /**
      * @brief Marks a remote robot for removal.
      * 
-     * @param _position the position of the remote robot to mark for removal
+     * @param _position the position of the remote robot to mark for removal.
      */
     void
     mark_robot_for_removal(position_t _position); 
@@ -347,9 +348,9 @@ private:
     /**
      * @brief Helper method for incrementing or decrementing a numerical UA_UINT32 attribute node (increments by default).
      * 
-     * @param _attribute_name the attribute name
-     * @param _increment indicator for incrementing or decrementing
-     * @return UA_StatusCode the status code indicating whether incrementing/decrementing succeeded
+     * @param _attribute_name the attribute name.
+     * @param _increment indicator for incrementing or decrementing.
+     * @return UA_StatusCode the status code indicating whether incrementing/decrementing succeeded.
      */
     UA_StatusCode
     increment_or_decrement_counter_node(std::string _attribute_name, bool increment = true);

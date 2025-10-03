@@ -1,8 +1,8 @@
 /**
  * @file robot_state.hpp
- * @brief Defines the robot states
+ * @brief Defines the robot states.
  *
- * This header defines the robot states of the kitchen robot agent
+ * This header defines the robot states of the kitchen robot agent.
  */
 #ifndef ROBOT_STATE_HPP
 #define ROBOT_STATE_HPP
@@ -22,8 +22,8 @@ enum class robot_state {
 /**
  * @brief Returns the corresponding string for a robot state.
  * 
- * @param _state the robot state
- * @return std::string the corresponding string
+ * @param _state the robot state.
+ * @return std::string the corresponding string.
  */
 static std::string
 robot_state_to_string(robot_state _state) {

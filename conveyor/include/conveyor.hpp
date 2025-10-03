@@ -42,29 +42,29 @@
 
 using namespace cps_kitchen;
 
-typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal */
+typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal. */
 
 /**
- * @brief Remote robot client to pass and retrieve dishes to/from kitchen robots and maintaining the connectivity
+ * @brief Remote robot client to pass and retrieve dishes to/from kitchen robots and maintaining the connectivity.
  * 
  */
 struct remote_robot {
     private:
-        UA_Client* client_; /**< the OPC UA remote robot client pointer */
-        std::string endpoint_; /**< the endpoint address */
-        const position_t position_; /**< the position on the conveyor belt */
-        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal */
-        std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods */
-        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run */
-        std::thread client_iterate_thread_; /**< the client iteration thread */
-        std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
+        UA_Client* client_; /**< the OPC UA remote robot client pointer. */
+        std::string endpoint_; /**< the endpoint address. */
+        const position_t position_; /**< the position on the conveyor belt. */
+        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
+        std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
+        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
+        std::thread client_iterate_thread_; /**< the client iteration thread. */
+        std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
 
     public:
         /**
          * @brief Constructs a new remote robot object.
          * 
-         * @param _endpoint the remote robot's endpoint
-         * @param _position the position of the remote robot
+         * @param _endpoint the remote robot's endpoint.
+         * @param _position the position of the remote robot.
          */
         remote_robot(std::string _endpoint, position_t _position, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) :  endpoint_(_endpoint), position_(_position), client_(nullptr), running_(true), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
@@ -130,9 +130,9 @@ struct remote_robot {
         }
 
         /**
-         * @brief Returns the robot's endpoint
+         * @brief Returns the robot's endpoint.
          * 
-         * @return std::string the robot's endpoint url
+         * @return std::string the robot's endpoint url.
          */
         std::string
         get_endpoint() const {
@@ -140,21 +140,21 @@ struct remote_robot {
         }
 
         /**
-         * @brief Returns the robot's position at the conveyor
+         * @brief Returns the robot's position at the conveyor.
          * 
-         * @return position_t the robot's position at the conveyor
+         * @return position_t the robot's position at the conveyor.
          */
         position_t get_position() const {
             return position_;
         }
 
         /**
-         * @brief Notifies the robot to hand over the finished order
+         * @brief Notifies the robot to hand over the finished order.
          * 
-         * @param _output_size the count of returned output values
-         * @param _output the variant containing the output values
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
          * 
-         * @return UA_StatusCode the status whether the method call was successful
+         * @return UA_StatusCode the status whether the method call was successful.
          */
         UA_StatusCode handover_finished_order(size_t* _output_size, UA_Variant** _output) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
@@ -178,12 +178,12 @@ struct remote_robot {
         /**
          * @brief Instructs the remote robot to process a partially processed dish.
          * 
-         * @param _recipe_id the recipe ID of the dish
-         * @param _processed_steps the processed steps of the recipe ID so far
-         * @param _output_size the count of returned output values
-         * @param _output the variant containing the output values
+         * @param _recipe_id the recipe ID of the dish.
+         * @param _processed_steps the processed steps of the recipe ID so far.
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
          * 
-         * @return UA_StatusCode the status whether the method call was successful
+         * @return UA_StatusCode the status whether the method call was successful.
          */
         UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
@@ -208,57 +208,57 @@ struct remote_robot {
 };
 
 /**
- * @brief Wrapper for representing plates on the conveyor and tracking their status and occupancy status
+ * @brief Wrapper for representing plates on the conveyor and tracking their status and occupancy status.
  * 
  */
 struct plate {
     private:
-        const plate_id_t id_; /**< the plate id */
-        position_t position_; /**< the current position on the conveyor */
-        recipe_id_t placed_recipe_id_; /**< the recipe currently covering the plate */
-        UA_UInt32 processed_steps_of_placed_recipe_id_; /**< the processed steps of the current dish */
-        UA_Boolean occupied_; /**< indicates whether the plate is occupied or free */
-        UA_Boolean is_dish_finished_; /**< indicates whether it holds a completed dish or a partially finished dish when occupied */
-        position_t target_position_; /**< the target position for the next preparation steps or the output when finished */
-        std::string instance_name_id_; /**< the instance name id in the address space */
-        object_type_node_inserter& plate_type_inserter_; /**< the plate type inserter for adding the plate's attributes to the address space */
+        const plate_id_t id_; /**< the plate id. */
+        position_t position_; /**< the current position on the conveyor. */
+        recipe_id_t placed_recipe_id_; /**< the recipe currently covering the plate. */
+        UA_UInt32 processed_steps_of_placed_recipe_id_; /**< the processed steps of the current dish. */
+        UA_Boolean occupied_; /**< indicates whether the plate is occupied or free. */
+        UA_Boolean is_dish_finished_; /**< indicates whether it holds a completed dish or a partially finished dish when occupied. */
+        position_t target_position_; /**< the target position for the next preparation steps or the output when finished. */
+        std::string instance_name_id_; /**< the instance name id in the address space. */
+        object_type_node_inserter& plate_type_inserter_; /**< the plate type inserter for adding the plate's attributes to the address space. */
     public:
         /**
-         * @brief Setup the plate object type
+         * @brief Setup the plate object type.
          * 
-         * @param _plate_type_inserter the plate type inserter
-         * @param _conveyor the conveyor server
-         * @return UA_StatusCode the status code
+         * @param _plate_type_inserter the plate type inserter.
+         * @param _conveyor the conveyor server.
+         * @return UA_StatusCode the status code.
          */
         static UA_StatusCode setup_plate_object_type(object_type_node_inserter& _plate_type_inserter, UA_Server* _conveyor) {
             UA_StatusCode status;
-            /* Add attributes */
+            /* Add attributes. */
             status = _plate_type_inserter.add_attribute(PLATE_TYPE, PLATE_ID);
             status |= _plate_type_inserter.add_attribute(PLATE_TYPE, PLATE_POSITION);
             status |= _plate_type_inserter.add_attribute(PLATE_TYPE, PLATE_RECIPE_ID);
             status |= _plate_type_inserter.add_attribute(PLATE_TYPE, PLATE_OCCUPIED);
-            /* Add plate type constructor */
+            /* Add plate type constructor. */
             status |= _plate_type_inserter.add_object_type_constructor(_conveyor, _plate_type_inserter.get_object_type_id(PLATE_TYPE));
             return status;
         }
 
         /**
-         * @brief Construct a new plate object.
+         * @brief Constructs a new plate object.
          * 
-         * @param _id the plate id
-         * @param _position the plate position
-         * @param _conveyor_instance_id the conveyor instance id
-         * @param _plate_type_inserter the plate type inserter
+         * @param _id the plate id.
+         * @param _position the plate position.
+         * @param _conveyor_instance_id the conveyor instance id.
+         * @param _plate_type_inserter the plate type inserter.
          */
         plate(plate_id_t _id, position_t _position, UA_NodeId _conveyor_instance_id, object_type_node_inserter& _plate_type_inserter) : id_(_id), position_(_position), placed_recipe_id_(0),
                 processed_steps_of_placed_recipe_id_(0), occupied_(false), is_dish_finished_(false), target_position_(0), instance_name_id_(std::string(PLATE_INSTANCE_NAME) + " " + std::to_string(id_)), plate_type_inserter_(_plate_type_inserter) {
-            /* Instantiate plate type */
+            /* Instantiate plate type. */
             UA_StatusCode status = plate_type_inserter_.add_object_instance(instance_name_id_.c_str(), PLATE_TYPE, _conveyor_instance_id, UA_NODEID_NUMERIC(0, UA_NS0ID_HASCOMPONENT));
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding plate object instance (%s)", __FUNCTION__, UA_StatusCode_name(status));
                 return;
             }
-            /* Set attribute values */
+            /* Set attribute values. */
             status = plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_ID, const_cast<plate_id_t*>(&id_), UA_TYPES_UINT32);
             status |= plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_POSITION, &position_, UA_TYPES_UINT32);
             status |= plate_type_inserter_.set_scalar_attribute(instance_name_id_, PLATE_RECIPE_ID, &placed_recipe_id_, UA_TYPES_UINT32);
@@ -269,34 +269,34 @@ struct plate {
         }
 
         /**
-         * @brief Destroys the plate object
+         * @brief Destroys the plate object.
          * 
          */
         ~plate() {
         }
 
         /**
-         * @brief Constructs a new plate object
+         * @brief Constructs a new plate object from another plate.
          * 
-         * @param _plate 
+         * @param _plate the plate.
          */
         plate(const plate& _plate) : id_(_plate.id_), position_(_plate.position_), placed_recipe_id_(_plate.placed_recipe_id_), processed_steps_of_placed_recipe_id_(_plate.processed_steps_of_placed_recipe_id_),
             occupied_(_plate.occupied_), is_dish_finished_(_plate.is_dish_finished_), target_position_(_plate.target_position_), instance_name_id_(_plate.instance_name_id_), plate_type_inserter_(_plate.plate_type_inserter_) {
         }
 
         /**
-         * @brief Get the plate id
+         * @brief Returns the plate id.
          * 
-         * @return plate_id_t 
+         * @return plate_id_t the plate id.
          */
         plate_id_t get_plate_id() const {
             return id_;
         }
 
         /**
-         * @brief Set the position and write to the information node
+         * @brief Set the position and write to the information node.
          * 
-         * @param _position the plate position
+         * @param _position the plate position.
          */
         void set_position(position_t _position) {
             position_ = _position;
@@ -304,9 +304,9 @@ struct plate {
         }
 
         /**
-         * @brief Get the current position of the plate on the conveyor
+         * @brief Get the current position of the plate on the conveyor.
          * 
-         * @return position_t the current position on the conveyor
+         * @return position_t the current position on the conveyor.
          */
         position_t get_position() const {
             return position_;
@@ -315,7 +315,7 @@ struct plate {
         /**
          * @brief Places the finished dish on the plate.
          * 
-         * @param _placed_recipe_id the placed dish's recipe id
+         * @param _placed_recipe_id the placed dish's recipe id.
          */
         void place_recipe_id(recipe_id_t _placed_recipe_id) {
             placed_recipe_id_ = _placed_recipe_id;
@@ -323,40 +323,45 @@ struct plate {
         }
 
         /**
-         * @brief Get the placed recipe id
+         * @brief Get the placed recipe id.
          * 
-         * @return recipe_id_t the recipe id
+         * @return recipe_id_t the recipe id.
          */
         recipe_id_t get_placed_recipe_id() const {
             return placed_recipe_id_;
         }
 
+        /**
+         * @brief Sets the target position.
+         * 
+         * @param _target_position the target position.
+         */
         void set_target_position(position_t _target_position) {
             target_position_ = _target_position;
         }
 
         /**
-         * @brief Get the target position to where the dish has to be transferred
+         * @brief Get the target position to where the dish has to be transferred.
          * 
-         * @return position_ the target position
+         * @return position_ the target position.
          */
         position_t get_target_position() const {
             return target_position_;
         }
 
         /**
-         * @brief Sets the processed steps of the currently placed recipe id on the plate
+         * @brief Sets the processed steps of the currently placed recipe id on the plate.
          * 
-         * @param _processed_steps_of_placed_recipe_id the processed steps
+         * @param _processed_steps_of_placed_recipe_id the processed steps.
          */
         void set_processed_steps(UA_UInt32 _processed_steps_of_placed_recipe_id) {
             processed_steps_of_placed_recipe_id_ = _processed_steps_of_placed_recipe_id;
         }
 
         /**
-         * @brief Returns the processed steps of the currently placed recipe id on the plate
+         * @brief Returns the processed steps of the currently placed recipe id on the plate.
          * 
-         * @return UA_UInt32 the processed steps
+         * @return UA_UInt32 the processed steps.
          */
         UA_UInt32 get_processed_steps() const {
             return processed_steps_of_placed_recipe_id_;
@@ -365,7 +370,7 @@ struct plate {
         /**
          * @brief Sets the plate's occupied state.
          * 
-         * @param _occupied the occupied state
+         * @param _occupied the occupied state.
          */
         void set_occupied(UA_Boolean _occupied) {
             occupied_ = _occupied;
@@ -373,27 +378,27 @@ struct plate {
         }
 
         /**
-         * @brief Returns whether plate is occupied or not
+         * @brief Returns whether plate is occupied or not.
          * 
-         * @return UA_Boolean indicates whether plate is occupied or not
+         * @return UA_Boolean indicates whether plate is occupied or not.
          */
         UA_Boolean is_occupied() const {
             return occupied_;
         }
 
         /**
-         * @brief Sets the dish finished state
+         * @brief Sets the dish finished state.
          * 
-         * @param _is_dish_finished the dish finished state
+         * @param _is_dish_finished the dish finished state.
          */
         void set_dish_finished(UA_Boolean _is_dish_finished) {
             is_dish_finished_ = _is_dish_finished;
         }
 
         /**
-         * @brief Returns whether the placed dish is finished or not
+         * @brief Returns whether the placed dish is finished or not.
          * 
-         * @return UA_Boolean indicates whether the dish is finished (deliver to output) or needs to be processed further by another robot
+         * @return UA_Boolean indicates whether the dish is finished (deliver to output) or needs to be processed further by another robot.
          */
         UA_Boolean is_dish_finished() const {
             return is_dish_finished_;
@@ -403,7 +408,7 @@ struct plate {
 class conveyor {
 
 /**
- * @brief The states in which the conveyor can be
+ * @brief The states in which the conveyor can be.
  * 
  */
 enum state {
@@ -412,45 +417,45 @@ enum state {
 };
 
 private:
-    /* conveyor related member variables */
-    UA_Server* server_; /**< the OPC UA conveyor server pointer */
-    object_type_node_inserter conveyor_type_inserter_; /**< the conveyor type inserter for adding the conveyor's attributes and methods to the address space */
-    object_type_node_inserter plate_type_inserter_; /**< the plate type inserter for adding the plate's attributes to the address space */
-    std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run */
-    state state_status_; /**< the current state of the conveyor */
-    std::vector<plate> plates_; /**< the plates on the conveyor */
-    std::thread server_iterate_thread_; /**< the server iteration thread */
-    discovery_util discovery_util_; /**< the discovery utility */
-    std::unordered_set<plate_id_t> occupied_plates_; /**< the currently occupied plates */
-    std::unordered_map<position_t, plate_id_t> position_plate_id_map_; /**< the map tracking the current positions of the plates */
-    std::unordered_map<position_t, std::string> notifications_map_; /**< the notifications received by the robots */
-    std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map tracking the current positions of robots */
-    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed */
-    std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods */
-    /* controller related member variables */
-    std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
-    std::thread client_iterate_thread_; /**< the client iteration thread */
-    UA_Client* controller_client_; /**< the OPC UA controller client pointer */
-    /* robot related member variables */
-    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set */
-    /* kitchen related member variables */
-    UA_Client* kitchen_client_; /**< the OPC UA kitchen client pointer */
+    /* conveyor related member variables. */
+    UA_Server* server_; /**< the OPC UA conveyor server pointer. */
+    object_type_node_inserter conveyor_type_inserter_; /**< the conveyor type inserter for adding the conveyor's attributes and methods to the address space. */
+    object_type_node_inserter plate_type_inserter_; /**< the plate type inserter for adding the plate's attributes to the address space. */
+    std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
+    state state_status_; /**< the current state of the conveyor. */
+    std::vector<plate> plates_; /**< the plates on the conveyor. */
+    std::thread server_iterate_thread_; /**< the server iteration thread. */
+    discovery_util discovery_util_; /**< the discovery utility. */
+    std::unordered_set<plate_id_t> occupied_plates_; /**< the currently occupied plates. */
+    std::unordered_map<position_t, plate_id_t> position_plate_id_map_; /**< the map tracking the current positions of the plates. */
+    std::unordered_map<position_t, std::string> notifications_map_; /**< the notifications received by the robots. */
+    std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map tracking the current positions of robots. */
+    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
+    std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
+    /* controller related member variables. */
+    std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
+    std::thread client_iterate_thread_; /**< the client iteration thread. */
+    UA_Client* controller_client_; /**< the OPC UA controller client pointer. */
+    /* robot related member variables. */
+    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
+    /* kitchen related member variables. */
+    UA_Client* kitchen_client_; /**< the OPC UA kitchen client pointer. */
 
     /**
      * @brief Extracts the remote robot port and position on which a finished order is ready to be retrieved.
      * 
-     * @param _server the server instance from which this method is called
-     * @param _session_id the client session id
-     * @param _session_context user-defined context data passed via the access control/plugin
-     * @param _method_id the node id of this method
-     * @param _method_context user-defined context data passed to the method node
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
      * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
      * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
-     * @param _input_size the count of the input parameters
-     * @param _input the input pointer of the input parameters
-     * @param _output_size the allocated output size
-     * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode the status code
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
      */
     static UA_StatusCode
     receive_finished_order_notification(UA_Server *_server,
@@ -464,9 +469,9 @@ private:
      * @brief Stores the extracted finished order notification parameters from the receive_finished_order_notification method
      * and schedules the retrieval of finished orders if the conveyor is idling.
      * 
-     * @param _robot_endpoint the endpoint from which the finished order notification is sent
-     * @param _robot_position the position on which the finished order is ready to be retrieved
-     * @param _output the output pointer to store return parameters
+     * @param _robot_endpoint the endpoint from which the finished order notification is sent.
+     * @param _robot_position the position on which the finished order is ready to be retrieved.
+     * @param _output the output pointer to store return parameters.
      */
     void
     handle_finished_order_notification(std::string _robot_endpoint, position_t _robot_position, UA_Variant* _output);
@@ -474,8 +479,8 @@ private:
     /**
      * @brief Timed callback to call handle_retrieve_finished_orders.
      * 
-     * @param _server the server instance from which this method is called
-     * @param _data the conveyor instance passed to the scheduling call
+     * @param _server the server instance from which this method is called.
+     * @param _data the conveyor instance passed to the scheduling call.
      */
     static void
     retrieve_finished_orders(UA_Server* _server, void* _data);
@@ -490,7 +495,7 @@ private:
     /**
      * @brief Moves the conveyor and updates plate position accordingly.
      * 
-     * @param _steps the steps the conveyor has to move
+     * @param _steps the steps the conveyor has to move.
      */
     void
     move_conveyor(steps_t _steps);
@@ -503,11 +508,11 @@ private:
     deliver_finished_order();
 
     /**
-     * @brief Extracts the returned result to indicate whether the completed dish is delivered successfully
+     * @brief Extracts the returned result to indicate whether the completed dish is delivered successfully.
      * 
-     * @param _output_size the count of returned output values
-     * @param _output the variant containing the output values
-     * @return UA_StatusCode the status code indicating the successful or failed delivery
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
+     * @return UA_StatusCode the status code indicating the successful or failed delivery.
      */
     UA_StatusCode
     receive_completed_order_called(size_t _output_size, UA_Variant* _output);
@@ -522,8 +527,8 @@ private:
     /**
      * @brief Extracts the robot port and position as well as the recipe id of the finished dish.
      * 
-     * @param _output_size the count of returned output values
-     * @param _output the variant containing the output values
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
      */
     void
     handover_finished_order_called(size_t _output_size, UA_Variant* _output);
@@ -531,17 +536,17 @@ private:
     /**
      * @brief Retrieves finished orders if corresponding plate is not occupied and schedules the next movement.
      * 
-     * @param _remote_robot_endpoint the endpoint from which the finished dish is retrieved
-     * @param _remote_robot_position the position on which the finished dish is retrieved
-     * @param _finished_recipe the recipe id of the finished dish
-     * @param _processed_steps the steps count processed so far
-     * @param _is_dish_finished indicates if the dish is finished partially or completely
+     * @param _remote_robot_endpoint the endpoint from which the finished dish is retrieved.
+     * @param _remote_robot_position the position on which the finished dish is retrieved.
+     * @param _finished_recipe the recipe id of the finished dish.
+     * @param _processed_steps the steps count processed so far.
+     * @param _is_dish_finished indicates if the dish is finished partially or completely.
      */
     void
     handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, UA_Boolean _is_dish_finished);
 
     /**
-     * @brief Requests next robot
+     * @brief Requests next robot.
      * 
      */
     void
@@ -550,17 +555,17 @@ private:
     /**
      * @brief Timed callback to call move_conveyor, deliver_finished_order and determine_next_movement.
      * 
-     * @param _server the server instance from which this method is called
-     * @param _data the conveyor instance passed to the scheduling call
+     * @param _server the server instance from which this method is called.
+     * @param _data the conveyor instance passed to the scheduling call.
      */
     static void
     perform_movement(UA_Server* _server, void* _data);
 
     /**
-     * @brief Extracts the returned robot state parameters and updates plates
+     * @brief Extracts the returned robot state parameters and updates plates.
      * 
-     * @param _output_size the count of returned output values
-     * @param _output the variant containing the output values
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
      */
     void
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
@@ -568,7 +573,7 @@ private:
     /**
      * @brief Marks a remote robot for removal.
      * 
-     * @param _position the position of the remote robot to mark for removal
+     * @param _position the position of the remote robot to mark for removal.
      */
     void
     mark_robot_for_removal(position_t _position); 
@@ -581,9 +586,9 @@ private:
     remove_marked_robots();
 
     /**
-     * @brief Resets the plate attributes to their default values
+     * @brief Resets the plate attributes to their default values.
      * 
-     * @param _plate the plate
+     * @param _plate the plate.
      */
     void
     reset_plate(plate& _plate);
@@ -599,7 +604,7 @@ public:
     /**
      * @brief Construct a new conveyor object.
      * 
-     * @param _robot_count the robot count
+     * @param _robot_count the robot count.
      */
     conveyor(UA_UInt32 _robot_count);
 
