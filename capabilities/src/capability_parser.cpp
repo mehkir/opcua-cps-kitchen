@@ -8,7 +8,7 @@
 #include <filesystem>
 #include <iostream>
 
-capability_parser::capability_parser(std::string _capabilities_file_name, position_t _robot_position) {
+capability_parser::capability_parser(std::string _capabilities_file_name) {
     robot_actions* actions = robot_actions::get_instance();
     char buffer[PATH_MAX + 1];  // +1 for the null terminator
     ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
