@@ -3,6 +3,7 @@
  * @brief OPC UA CPS Kitchen server assigning robots with placed orders and monitoring
  * the connectivity status of all robot, controller and conveyor agents.
  *
+ * @details
  * This header declares the CPS kitchen agent which exposes an OPC UA server, registers
  * itself to a discovery server, communicates with the controller and kitchen robots via
  * OPC UA method calls, and assigns orders to kitchen robots as well as receives completed
