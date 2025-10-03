@@ -1,3 +1,16 @@
+/**
+ * @file conveyor.hpp
+ * @brief OPC UA Conveyor agent that coordinates dish handover between robots and the kitchen.
+ *
+ * @details
+ * The conveyor hosts an OPC UA server (open62541) that models a circular belt with one plate per
+ * robot plus an output position. It receives notifications from robots about finished or partially
+ * finished dishes, retrieves dishes, schedules belt movement, delivers completed dishes to the
+ * kitchen, and requests the next suitable robot from the controller for partially finished dishes.
+ *
+ * The implementation is multithreaded: The conveyor hosts its own server iterate loop and maintains
+ * client connections to external services.
+ */
 #ifndef CONVEYOR_HPP
 #define CONVEYOR_HPP
 
@@ -29,22 +42,22 @@
 
 using namespace cps_kitchen;
 
-typedef std::function<void(position_t)> mark_robot_for_removal_callback_t;
+typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal */
 
 struct remote_robot {
     private:
-        UA_Client* client_;
-        std::string endpoint_;
-        const position_t position_;
-        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_;
-        std::unordered_map<std::string, object_method_info> method_id_map_;
-        std::atomic<bool> running_;
-        std::thread client_iterate_thread_;
-        std::mutex client_mutex_;
+        UA_Client* client_; /**< the OPC UA remote robot client pointer */
+        std::string endpoint_; /**< the remote robot's endpoint address */
+        const position_t position_; /**< the remote robot's position on the conveyor belt */
+        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal */
+        std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods */
+        std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run */
+        std::thread client_iterate_thread_; /**< the client iteration thread */
+        std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
 
     public:
         /**
-         * @brief Construct a new remote robot object.
+         * @brief Constructs a new remote robot object.
          * 
          * @param _endpoint the remote robot's endpoint
          * @param _position the position of the remote robot
@@ -102,7 +115,7 @@ struct remote_robot {
         }
 
         /**
-         * @brief Destroy the remote robot object.
+         * @brief Destroys the remote robot object.
          * 
          */
         ~remote_robot() {
@@ -190,17 +203,21 @@ struct remote_robot {
         }
 };
 
+/**
+ * @brief Wrapper for representing plates on the conveyor and tracking their status and occupancy status
+ * 
+ */
 struct plate {
     private:
-        const plate_id_t id_;
-        position_t position_;
-        recipe_id_t placed_recipe_id_;
-        UA_UInt32 processed_steps_of_placed_recipe_id_;
-        UA_Boolean occupied_;
-        UA_Boolean is_dish_finished_;
-        position_t target_position_;
-        std::string instance_name_id_;
-        object_type_node_inserter& plate_type_inserter_;
+        const plate_id_t id_; /**< the plate id */
+        position_t position_; /**< the current position on the conveyor */
+        recipe_id_t placed_recipe_id_; /**< the recipe currently covering the plate */
+        UA_UInt32 processed_steps_of_placed_recipe_id_; /**< the processed steps of the current dish */
+        UA_Boolean occupied_; /**< indicates whether the plate is occupied or free */
+        UA_Boolean is_dish_finished_; /**< indicates whether it holds a completed dish or a partially finished dish when occupied */
+        position_t target_position_; /**< the target position for the next preparation steps or the output when finished */
+        std::string instance_name_id_; /**< the instance name id in the address space */
+        object_type_node_inserter& plate_type_inserter_; /**< the plate type inserter for adding the plate's attributes to the address space */
     public:
         /**
          * @brief Setup the plate object type
@@ -381,6 +398,10 @@ struct plate {
 
 class conveyor {
 
+/**
+ * @brief The states in which the conveyor can be
+ * 
+ */
 enum state {
     IDLING,
     MOVING
@@ -388,44 +409,44 @@ enum state {
 
 private:
     /* conveyor related member variables */
-    UA_Server* server_;
-    object_type_node_inserter conveyor_type_inserter_;
-    object_type_node_inserter plate_type_inserter_;
-    std::atomic<bool> running_;
-    state state_status_;
-    std::vector<plate> plates_;
-    std::thread server_iterate_thread_;
-    discovery_util discovery_util_;
-    std::unordered_set<plate_id_t> occupied_plates_;
-    std::unordered_map<position_t, plate_id_t> position_plate_id_map_;
-    std::unordered_map<position_t, std::string> notifications_map_;
-    std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_;
-    std::unordered_set<position_t> robots_to_be_removed_;
-    std::unordered_map<std::string, object_method_info> method_id_map_;
+    UA_Server* server_; /**< the OPC UA conveyor server pointer */
+    object_type_node_inserter conveyor_type_inserter_; /**< the conveyor type inserter for adding the conveyor's attributes and methods to the address space */
+    object_type_node_inserter plate_type_inserter_; /**< the plate type inserter for adding the plate's attributes to the address space */
+    std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run */
+    state state_status_; /**< the current state of the conveyor */
+    std::vector<plate> plates_; /**< the plates on the conveyor */
+    std::thread server_iterate_thread_; /**< the server iteration thread */
+    discovery_util discovery_util_; /**< the discovery utility */
+    std::unordered_set<plate_id_t> occupied_plates_; /**< the currently occupied plates */
+    std::unordered_map<position_t, plate_id_t> position_plate_id_map_; /**< the map tracking the current positions of the plates */
+    std::unordered_map<position_t, std::string> notifications_map_; /**< the notifications received by the robots */
+    std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map tracking the current positions of robots */
+    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed */
+    std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods */
     /* controller related member variables */
-    std::mutex client_mutex_;
-    std::thread client_iterate_thread_; 
-    UA_Client* controller_client_;
+    std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
+    std::thread client_iterate_thread_; /**< the client iteration thread */
+    UA_Client* controller_client_; /**< the OPC UA controller client pointer */
     /* robot related member variables */
-    std::mutex mark_for_removal_mutex_;
+    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set */
     /* kitchen related member variables */
-    UA_Client* kitchen_client_;
+    UA_Client* kitchen_client_; /**< the OPC UA kitchen client pointer */
 
     /**
      * @brief Extracts the remote robot port and position on which a finished order is ready to be retrieved.
      * 
      * @param _server the server instance from which this method is called
-     * @param _session_id 
-     * @param _session_context 
-     * @param _method_id 
-     * @param _method_context the node context data passed to the method node
-     * @param _object_id 
-     * @param _object_context 
+     * @param _session_id the client session id
+     * @param _session_context user-defined context data passed via the access control/plugin
+     * @param _method_id the node id of this method
+     * @param _method_context user-defined context data passed to the method node
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
      * @param _input_size the count of the input parameters
      * @param _input the input pointer of the input parameters
      * @param _output_size the allocated output size
      * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode 
+     * @return UA_StatusCode the status code
      */
     static UA_StatusCode
     receive_finished_order_notification(UA_Server *_server,
