@@ -191,7 +191,7 @@ struct remote_robot {
         }
 
         /**
-         * @brief Callback for position subscription
+         * @brief The position changed callback for the subscription
          * 
          * @param _client the client issuing the subscription
          * @param _sub_id server-assigned subscription id that delivered this notification
