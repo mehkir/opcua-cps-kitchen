@@ -27,25 +27,29 @@
 
 using namespace cps_kitchen;
 
-typedef std::function<void(position_t)> mark_robot_for_removal_callback_t;
+typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal */
 
+/**
+ * @brief Remote robot client to monitor kitchen robot attributes
+ * 
+ */
 struct remote_robot {
     private:
-        UA_Client* client_;
-        std::string endpoint_;
-        const position_t position_;
-        std::unordered_set<std::string> capabilities_;
-        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_;
-        std::unordered_map<std::string, UA_NodeId> attribute_id_map_;
-        robot_tool last_equipped_tool_;
-        duration_t overall_time_;
-        std::atomic<bool> running_;
-        std::thread client_iterate_thread_;
-        std::mutex client_mutex_;
+        UA_Client* client_; /**< the OPC UA remote robot client pointer */
+        std::string endpoint_; /**< the endpoint address */
+        const position_t position_; /**< the position on the conveyor belt */
+        std::unordered_set<std::string> capabilities_; /**< the capabilites */
+        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal */
+        std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the robot's attribute node ids */
+        robot_tool last_equipped_tool_; /**< the last equipped tool */
+        duration_t overall_time_; /**< the total time the robot will be in use */
+        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run */
+        std::thread client_iterate_thread_; /**< the client iteration thread */
+        std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
 
     public:
         /**
-         * @brief Construct a new remote robot object.
+         * @brief Constructs a new remote robot object.
          * 
          * @param _endpoint the robot's endpoint url
          * @param _position the position of the remote robot at the conveyor
@@ -114,7 +118,7 @@ struct remote_robot {
         }
 
         /**
-         * @brief Destroy the remote robot object.
+         * @brief Destroys the remote robot object
          * 
          */
         ~remote_robot() {
@@ -176,6 +180,16 @@ struct remote_robot {
             return overall_time_;
         }
 
+        /**
+         * @brief The overall time changed callback for the subscription
+         * 
+         * @param _client the client issuing the subscription
+         * @param _sub_id server-assigned subscription id that delivered this notification
+         * @param _sub_context user-defined context data passed when creating the subscription
+         * @param _mon_id server-assigned MonitoredItemId that produced the data change
+         * @param _mon_context user-defined context data passed when creating the monitored item
+         * @param _value the reported UA_DataValue
+         */
         static void
         overall_time_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
             UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
@@ -193,6 +207,16 @@ struct remote_robot {
                 // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's overall time at position %d is %ld", __FUNCTION__, self->position_, self->overall_time_);
         }
 
+        /**
+         * @brief The last equipped tool changed callback for the subscription
+         * 
+         * @param _client the client issuing the subscription
+         * @param _sub_id server-assigned subscription id that delivered this notification
+         * @param _sub_context user-defined context data passed when creating the subscription
+         * @param _mon_id server-assigned MonitoredItemId that produced the data change
+         * @param _mon_context user-defined context data passed when creating the monitored item
+         * @param _value the reported UA_DataValue
+         */
         static void
         last_equipped_tool_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
             UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
@@ -214,34 +238,33 @@ struct remote_robot {
 class controller {
 private:
     /* controller related member variables */
-    UA_Server* server_;
-    port_t port_;
-    object_type_node_inserter controller_type_inserter_;
-    std::atomic<bool> running_;
-    std::thread server_iterate_thread_;
-    discovery_util discovery_util_;
+    UA_Server* server_; /**< the OPC UA controller server pointer */
+    object_type_node_inserter controller_type_inserter_; /**< the controller type insert for adding the controller's methods and attributes to the address space */
+    std::atomic<bool> running_; /**< flag to indicate whether the server thread should run */
+    std::thread server_iterate_thread_; /**< the server iteration thread */
+    discovery_util discovery_util_; /**< the discovery utility */
     /* robot related member variables */
-    std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_;
-    std::unordered_set<position_t> robots_to_be_removed_;
-    std::mutex mark_for_removal_mutex_;
+    std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_; /**< the map holding the remote robot instances */
+    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed */
+    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set */
     /* recipe related member variables */
-    recipe_parser recipe_parser_;
-
+    recipe_parser recipe_parser_; /**< the recipe parser */
+ 
     /**
      * @brief Extracts the received robot registration parameters.
      * 
      * @param _server the server instance from which this method is called
-     * @param _session_id 
-     * @param _session_context 
-     * @param _method_id 
-     * @param _method_context the node context data passed to the method node
-     * @param _object_id 
-     * @param _object_context 
+     * @param _session_id the client session id
+     * @param _session_context user-defined context data passed via the access control/plugin
+     * @param _method_id the node id of this method
+     * @param _method_context user-defined context data passed to the method node
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
      * @param _input_size the count of the input parameters
      * @param _input the input pointer of the input parameters
      * @param _output_size the allocated output size
      * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode the status whether the registration was successful
+     * @return UA_StatusCode the status code
      */
     static UA_StatusCode
     register_robot(UA_Server* _server,
@@ -266,17 +289,17 @@ private:
      * @brief Extracts the received robot and recipe parameters.
      * 
      * @param _server the server instance from which this method is called
-     * @param _session_id 
-     * @param _session_context 
-     * @param _method_id 
-     * @param _method_context the node context data passed to the method node
-     * @param _object_id 
-     * @param _object_context 
+     * @param _session_id the client session id
+     * @param _session_context user-defined context data passed via the access control/plugin
+     * @param _method_id the node id of this method
+     * @param _method_context user-defined context data passed to the method node
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
      * @param _input_size the count of the input parameters
      * @param _input the input pointer of the input parameters
      * @param _output_size the allocated output size
      * @param _output the output pointer to store return parameters
-     * @return UA_StatusCode the status whether a suitable robot was found
+     * @return UA_StatusCode the status code
      */
     static UA_StatusCode
     choose_next_robot(UA_Server* _server,
