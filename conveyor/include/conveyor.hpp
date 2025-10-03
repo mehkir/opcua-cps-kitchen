@@ -44,14 +44,18 @@ using namespace cps_kitchen;
 
 typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal */
 
+/**
+ * @brief Remote robot client to pass and retrieve dishes to/from kitchen robots and maintaining the connectivity
+ * 
+ */
 struct remote_robot {
     private:
         UA_Client* client_; /**< the OPC UA remote robot client pointer */
-        std::string endpoint_; /**< the remote robot's endpoint address */
-        const position_t position_; /**< the remote robot's position on the conveyor belt */
+        std::string endpoint_; /**< the endpoint address */
+        const position_t position_; /**< the position on the conveyor belt */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods */
-        std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run */
+        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run */
         std::thread client_iterate_thread_; /**< the client iteration thread */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
 
