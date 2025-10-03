@@ -269,14 +269,14 @@ struct plate {
         }
 
         /**
-         * @brief Destroy the plate object.
+         * @brief Destroys the plate object
          * 
          */
         ~plate() {
         }
 
         /**
-         * @brief Construct a new plate object.
+         * @brief Constructs a new plate object
          * 
          * @param _plate 
          */
@@ -294,7 +294,7 @@ struct plate {
         }
 
         /**
-         * @brief Set the position and write to the information node.
+         * @brief Set the position and write to the information node
          * 
          * @param _position the plate position
          */
