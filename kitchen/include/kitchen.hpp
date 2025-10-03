@@ -41,7 +41,7 @@
 
 using namespace cps_kitchen;
 
-typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal */
+typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback typedef to mark robots for removal */
 
 struct remote_robot {
     private:
@@ -50,7 +50,7 @@ struct remote_robot {
         position_t position_; /**< the remote robot's position on the conveyor belt */
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run */
         object_type_node_inserter& remote_robot_type_inserter_; /**< the remote robot type inserter for adding the remote robot's attributes to the address space*/
-        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback declaration to mark robots for removal */
+        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal */
         std::thread client_iterate_thread_; /**< the client iteration thread */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the ids of remote robot methods */
