@@ -40,7 +40,7 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     }
     /* Add receive completed order method node */
     method_arguments receive_completed_order_arguments;
-    receive_completed_order_arguments.add_input_argument("receives a completed order", "receive_completed_order", UA_TYPES_UINT32);
+    receive_completed_order_arguments.add_input_argument("recipe id of completed order", "recipe_id", UA_TYPES_UINT32);
     receive_completed_order_arguments.add_output_argument("indicated whether the completed order is received", "completed_order_received", UA_TYPES_BOOLEAN);
     status = kitchen_type_inserter_.add_method(KITCHEN_TYPE, RECEIVE_COMPLETED_ORDER, receive_completed_order, receive_completed_order_arguments, this);
     /* Add kitchen type constructor */
