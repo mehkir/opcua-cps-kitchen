@@ -11,7 +11,8 @@ INPUT                  = \
                         "@CMAKE_SOURCE_DIR@/actions" \
                         "@CMAKE_SOURCE_DIR@/capabilities" \
                         "@CMAKE_SOURCE_DIR@/recipe" \
-                        "@CMAKE_SOURCE_DIR@/wrappers"
+                        "@CMAKE_SOURCE_DIR@/wrappers" \
+                        "@CMAKE_SOURCE_DIR@/README.md"
 EXCLUDE                = "@CMAKE_SOURCE_DIR@/build" "@CMAKE_SOURCE_DIR@/build_debug" "@CMAKE_SOURCE_DIR@/build_sanitized"
 EXCLUDE_PATTERNS       = */CMakeFiles/* */build/* */build_*/*
 RECURSIVE              = YES
@@ -36,6 +37,7 @@ EXTRACT_ALL            = YES
 EXTRACT_PRIVATE        = NO
 EXTRACT_STATIC         = YES
 
+GENERATE_TREEVIEW      = YES
 GENERATE_HTML          = YES
 GENERATE_LATEX         = NO
 GENERATE_XML           = NO
