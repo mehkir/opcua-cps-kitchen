@@ -245,7 +245,7 @@ class object_type_node_inserter {
          * @brief Adds an instance of the given type.
          * 
          * @param _instance_name the instance name.
-         * @param _type_object_name the object type name.
+         * @param _type_name the object type name.
          * @param _parent_node_id the parent node id under which the instance will be added.
          * @param _reference_type the reference type this object is referenced by its parent node.
          * @return UA_StatusCode the status code.

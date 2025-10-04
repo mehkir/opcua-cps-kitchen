@@ -58,10 +58,10 @@ struct remote_robot {
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the ids of remote robot attributes. */
     public:
         /**
-         * @brief Setup the remote robot object type.
+         * @brief Sets up the remote robot object type.
          * 
          * @param _remote_robot_type_inserter the remote robot type inserter.
-         * @param _conveyor the conveyor server.
+         * @param _kitchen the kitchen server.
          * @return UA_StatusCode the status code.
          */
         static UA_StatusCode setup_remote_robot_object_type(object_type_node_inserter& _remote_robot_type_inserter, UA_Server* _kitchen) {

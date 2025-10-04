@@ -276,6 +276,7 @@ public:
      * @brief Constructs a new robot object.
      * 
      * @param _position the position of the robot at the conveyor.
+     * @param _capabilities_file_name the capabilities file name.
      */
     robot(position_t _position, std::string _capabilities_file_name);
 

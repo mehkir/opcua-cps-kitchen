@@ -71,3 +71,25 @@ if (USE_TSAN)
     target_compile_options(start_kitchen_instance PRIVATE -fsanitize=thread)
     target_link_options(start_kitchen_instance PRIVATE -fsanitize=thread)
 endif()
+
+# Find Doxygen
+find_package(Doxygen QUIET)
+
+if (DOXYGEN_FOUND)
+    # Set input and output files
+    set(DOXYGEN_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
+    set(DOXYGEN_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+
+    # Configure the template Doxyfile
+    configure_file(${DOXYGEN_IN} ${DOXYGEN_OUT} @ONLY)
+
+    # Add a custom target to build the docs
+    add_custom_target(doc
+        COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYGEN_OUT}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+        COMMENT "Generating API documentation with Doxygen"
+        VERBATIM
+    )
+else ()
+    message(STATUS "Doxygen not found. Documentation will not be generated.")
+endif ()

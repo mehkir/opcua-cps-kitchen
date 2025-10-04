@@ -65,6 +65,7 @@ struct remote_robot {
          * 
          * @param _endpoint the remote robot's endpoint.
          * @param _position the position of the remote robot.
+         * @param _mark_robot_for_removal_callback the mark for removal callback.
          */
         remote_robot(std::string _endpoint, position_t _position, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) :  endpoint_(_endpoint), position_(_position), client_(nullptr), running_(true), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);

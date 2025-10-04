@@ -1,7 +1,9 @@
 #!/usr/bin/bash
+SCRIPT_PATH="$(realpath "$0")"
+PROJECT_DIR="$(dirname "$SCRIPT_PATH")"
 
-cmake -B /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build -S /home/mehmet/vscode-workspaces/opcua-cps-kitchen -DUSE_CUSTOM_VERSION=ON
-$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/demos --config Release --target \
+cmake -B "${PROJECT_DIR}/build" -S "${PROJECT_DIR}" -DUSE_CUSTOM_VERSION=ON
+$(which cmake) --build "${PROJECT_DIR}/build/demos" --config Release --target \
     robot_demo \
     clock_demo \
     string_server_for_subscription \
@@ -17,12 +19,12 @@ $(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/de
     client_call_method \
     -- -j$(nproc)
 
-$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build/tests --config Release --target \
+$(which cmake) --build "${PROJECT_DIR}/build/tests" --config Release --target \
     information_node_tester \
     test_now_monotonic \
     -- -j$(nproc)
 
-$(which cmake) --build /home/mehmet/vscode-workspaces/opcua-cps-kitchen/build --config Release --target \
+$(which cmake) --build "${PROJECT_DIR}/build" --config Release --target \
     start_robot_instance \
     start_controller_instance \
     start_conveyor_instance \
