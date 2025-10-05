@@ -119,6 +119,13 @@ class recipe_parser {
          * @return recipe the recipe for the given id.
          */
         recipe get_recipe(cps_kitchen::recipe_id_t _recipe_id);
+
+        /**
+         * @brief Returns the recipe count.
+         * 
+         * @return size_t the known recipes in total.
+         */
+        size_t get_recipe_count();
 };
 
 #endif // RECIPE_PARSER_HPP

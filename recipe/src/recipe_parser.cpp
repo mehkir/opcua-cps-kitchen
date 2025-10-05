@@ -95,3 +95,7 @@ bool recipe_parser::has_recipe(const cps_kitchen::recipe_id_t _recipe_id) const 
 recipe recipe_parser::get_recipe(cps_kitchen::recipe_id_t _recipe_id) {
     return recipe_map_.at(_recipe_id).operator*();
 }
+
+size_t recipe_parser::get_recipe_count() {
+    return recipe_map_.size();
+}
