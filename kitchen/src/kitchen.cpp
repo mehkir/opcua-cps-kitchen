@@ -12,7 +12,7 @@
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 
 kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE), robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE),
-                        remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), mersenne_twister_(random_device_()), uniform_int_distribution_(1,3), controller_client_(nullptr), conveyor_client_(nullptr), work_guard_(boost::asio::make_work_guard(io_context_)) {
+                        remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(), mersenne_twister_(random_device_()), uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr), work_guard_(boost::asio::make_work_guard(io_context_)) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);

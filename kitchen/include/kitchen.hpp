@@ -39,6 +39,7 @@
 #include "node_value_subscriber.hpp"
 #include "method_node_caller.hpp"
 #include "types.hpp"
+#include "recipe_parser.hpp"
 
 using namespace cps_kitchen;
 
@@ -278,6 +279,8 @@ private:
     /* conveyor related member variables. */
     UA_Client* conveyor_client_; /**< the OPC UA conveyor client pointer. */
     object_type_node_inserter remote_conveyor_type_inserter_; /**< the remote conveyor type inserter for adding the conveyor's attributes to the address space. */
+    /* recipe related member variables. */
+    recipe_parser recipe_parser_; /**< the recipe parser. */
     /* random distribution. */
     std::random_device random_device_; /**< the random number generator device. */
     std::mt19937 mersenne_twister_; /**< the mersenne twister for uniform pseudo-random number generation. */
