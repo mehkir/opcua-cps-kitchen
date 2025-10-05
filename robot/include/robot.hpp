@@ -20,6 +20,7 @@
 #include <queue>
 #include <boost/asio.hpp>
 #include <atomic>
+#include <random>
 
 #include "method_node_caller.hpp"
 #include "types.hpp"
@@ -127,6 +128,10 @@ private:
     /* conveyor related member variables. */
     UA_Client* conveyor_client_; /**< the OPC UA conveyor client pointer. */
     std::condition_variable conveyor_connected_condition_; /**< the condition variable to wait for the conveyor connection to be restored. */
+    /* random distribution. */
+    std::random_device random_device_; /**< the random number generator device. */
+    std::mt19937 mersenne_twister_; /**< the mersenne twister for uniform pseudo-random number generation. */
+    std::uniform_int_distribution<std::uint32_t> uniform_int_distribution_; /**< uniform discrete distribution for random numbers. */
 
     /**
      * @brief Callback called after controller received robot registration. Extracts the controller output values and idicates whether the regeistration was successful.

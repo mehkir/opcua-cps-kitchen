@@ -6,6 +6,7 @@
 #include <open62541/client_highlevel.h>
 #include <string>
 #include <chrono>
+#include <set>
 #include "client_connection_establisher.hpp"
 #include "time_unit.hpp"
 #include "filtered_logger.hpp"
@@ -15,8 +16,9 @@
 #define INSTANCE_NAME "KitchenRobot"
 
 robot::robot(position_t _position, std::string _capabilities_file_name) :
-        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true), current_tool_(robot_tool::ROBOT_TOOLS_COUNT),
-        current_action_duration_(0), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr), conveyor_client_(nullptr), pending_pickup_(false) {
+        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true),
+        current_action_duration_(0), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
+        conveyor_client_(nullptr), pending_pickup_(false), mersenne_twister_(random_device_()), uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -92,6 +94,19 @@ robot::robot(position_t _position, std::string _capabilities_file_name) :
     UA_UInt32 overall_time = 0;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
     /* Set current tool */
+    std::unordered_set<std::string> capabilities_uset = capability_parser_.get_capabilities();
+    std::set<std::string> capabilities_set(capabilities_uset.begin(), capabilities_uset.end());
+    auto it = std::next(capabilities_set.begin(), uniform_int_distribution_(mersenne_twister_));
+    std::shared_ptr<action> act = robot_actions::get_instance()->get_robot_action(*it);
+    if (std::dynamic_pointer_cast<autonomous_action>(act) != nullptr) {
+        current_tool_ = std::dynamic_pointer_cast<autonomous_action>(act)->get_required_tool();
+    } else if (std::dynamic_pointer_cast<recipe_timed_action>(act)) {
+        current_tool_ = std::dynamic_pointer_cast<recipe_timed_action>(act)->get_required_tool();
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting initial tool randomly", __FUNCTION__);
+        running_ = false;
+        return;
+    }
     UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(current_tool_)));
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
     /* Set last equipped tool */
