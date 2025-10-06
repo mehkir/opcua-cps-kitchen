@@ -14,6 +14,7 @@
 #include "discovery_and_connection.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
+#define TIME_UNIT_UPDATE_RATE 1
 
 robot::robot(position_t _position, std::string _capabilities_file_name) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true),

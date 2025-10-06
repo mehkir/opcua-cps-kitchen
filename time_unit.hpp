@@ -4,11 +4,10 @@
 #include <open62541/types.h>
 
 #define MILLISECOND 1
-#define SECOND 1000
+// #define SECOND 1000
 // #define TIME_UNIT MILLISECOND
 #define TIME_UNIT (MILLISECOND * 10LL)
 // #define TIME_UNIT (MILLISECOND * 100LL)
 // #define TIME_UNIT SECOND
-#define TIME_UNIT_UPDATE_RATE 1
 
 #endif // TIME_UNIT_HPP
