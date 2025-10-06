@@ -1,4 +1,11 @@
-// TODO: Add header doxygen
+/**
+ * @file controller.hpp
+ * @brief OPC UA based production controller that monitors robot attributes to appoint the next suitable robot on request.
+ *
+ * @details
+ * The controller hosts an OPC UA server (open62541) that monitors robot attributes to appoint a suitable robot
+ * for the next preparation steps of a recipe requested by the Kitchen- and Conveyor-Agent.
+ */
 #ifndef CONTROLLER_HPP
 #define CONTROLLER_HPP
 
