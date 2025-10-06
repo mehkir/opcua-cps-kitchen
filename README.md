@@ -2,7 +2,7 @@
 
 ## Intro
 Cyberphysical systems in dynamic environments require adaptability to react appropriately.
-The OPC UA standard facilitates service accessibility and monitoring of cyberphysical devices of the industrial domain. This implementation integrates a cyberphysical kitchen into a OPC UA structure.
+The OPC UA standard facilitates service accessibility and monitoring of cyberphysical devices of the industrial domain. This implementation integrates a cyberphysical kitchen into a OPC UA structure using the open62541 library.
 
 ## Kitchen Environment
 The kitchen environment consists of several robots positioned along a circular conveyor belt that moves in one direction.
@@ -93,6 +93,10 @@ It may also work with older versions.
 - python 3.10
 - JavaScript Dashboard: justgage@1.7.0, node-opcua@2.156.0, ws@8.18.2, commander@2.20.3, raphael@2.3.0
 - Code Documentation (optional): doxygen 1.9.1, graphviz 2.42.2
+
+## Relevant Directories
+This repository contains directories and files which were helpful to familiarize oneself with the open62541 library.
+The following directories can be ignored and are not relevant to the functionality of this project: demos (except the discovery_server.cpp), statistics, tests and timestamp.
 
 ## Compilation
 There are the following build scripts in the project root directory:
