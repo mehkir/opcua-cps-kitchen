@@ -29,4 +29,3 @@ sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_kitchen.bash $ROBOTS_COUNT &
 # Wait for all background processes to finish
 wait
-echo "All startup scripts closed successfully."

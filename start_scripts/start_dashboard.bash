@@ -33,4 +33,3 @@ sleep 1
 python3 -m http.server 8000 &
 # Wait for all background processes to finish
 wait
-echo "Dashboard startup completed successfully."
