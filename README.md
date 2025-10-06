@@ -98,6 +98,11 @@ start_scripts/start_dashboard.bash 4
 ```
 *Note: The backend and frontend for the dashboard use the ports 8080 and 8000. Either make sure they are not already in use or change them in [backend.js](cps-kitchen-dashboard/backend.js), [frontend.js](cps-kitchen-dashboard/frontend.js) and [start_dashboard.bash](start_scripts/start_dashboard.bash)*
 
+Open the dashboard in an Internet browser with the address *localhost:8000*.
+In the input field *SETUP DASHBOARD* type the robot count you used in the steps before and press enter.
+Then type any positive number in the input field *PLACE RANDOM ORDER/S* and press enter.
+The Robot-Agents and Conveyor-Agent should now prepare and transport orders.
+
 ## Define and Set Capabilities
 Capability profiles are set in separate JSON files in the capabilites folder.
 Valid actions with their duration are defined in the [robot_actions.cpp](actions/src/robot_actions.cpp) file.
