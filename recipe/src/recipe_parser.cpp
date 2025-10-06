@@ -37,6 +37,8 @@ recipe_parser::recipe_parser() {
         std::cerr << reader.getFormattedErrorMessages() << std::endl;
     }
     for (size_t recipe_id = 1; recipe_id <= recipes.size(); recipe_id++) {
+        if (!recipes.isMember(std::to_string(recipe_id)))
+            continue;
         std::string dish_name = recipes[std::to_string(recipe_id)][DISH_NAME_KEY].asString();
         std::queue<robot_action> action_queue;
         duration_t cooking_time = 0;
