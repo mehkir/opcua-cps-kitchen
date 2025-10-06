@@ -3,15 +3,22 @@
 PROJECT_NAME           = "@PROJECT_NAME@"
 OUTPUT_DIRECTORY       = "@CMAKE_CURRENT_BINARY_DIR@/docs"
 INPUT                  = \
-                        "@CMAKE_SOURCE_DIR@/robot" \
-                        "@CMAKE_SOURCE_DIR@/controller" \
-                        "@CMAKE_SOURCE_DIR@/conveyor" \
-                        "@CMAKE_SOURCE_DIR@/kitchen" \
-                        "@CMAKE_SOURCE_DIR@/statistics" \
                         "@CMAKE_SOURCE_DIR@/actions" \
                         "@CMAKE_SOURCE_DIR@/capabilities" \
+                        "@CMAKE_SOURCE_DIR@/controller" \
+                        "@CMAKE_SOURCE_DIR@/conveyor" \
+                        "@CMAKE_SOURCE_DIR@/demos/discovery_server.cpp" \
+                        "@CMAKE_SOURCE_DIR@/kitchen" \
                         "@CMAKE_SOURCE_DIR@/recipe" \
+                        "@CMAKE_SOURCE_DIR@/robot" \
                         "@CMAKE_SOURCE_DIR@/wrappers" \
+                        "@CMAKE_SOURCE_DIR@/browsenames.h" \
+                        "@CMAKE_SOURCE_DIR@/start_controller_instance.cpp" \
+                        "@CMAKE_SOURCE_DIR@/start_conveyor_instance.cpp" \
+                        "@CMAKE_SOURCE_DIR@/start_kitchen_instance.cpp" \
+                        "@CMAKE_SOURCE_DIR@/start_robot_instance.cpp" \
+                        "@CMAKE_SOURCE_DIR@/time_unit.hpp" \
+                        "@CMAKE_SOURCE_DIR@/types.hpp" \
                         "@CMAKE_SOURCE_DIR@/README.md"
 EXCLUDE                = "@CMAKE_SOURCE_DIR@/build" "@CMAKE_SOURCE_DIR@/build_debug" "@CMAKE_SOURCE_DIR@/build_sanitized"
 EXCLUDE_PATTERNS       = */CMakeFiles/* */build/* */build_*/*
