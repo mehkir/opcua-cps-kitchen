@@ -91,7 +91,7 @@ It may also work with older versions.
 - boost 1.83
 - jsoncpp 1.9.5
 - python 3.10
-- JavaScript Dashboard: justgage@1.7.0, node-opcua@2.156.0, ws@8.18.2, commander@2.20.3, raphael@2.3.0
+- JavaScript Dashboard: justgage 1.7.0, node-opcua 2.156.0, ws 8.18.2, commander 2.20.3, raphael 2.3.0
 - Code Documentation (optional): doxygen 1.9.1, graphviz 2.42.2
 
 ## Relevant Directories
