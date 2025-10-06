@@ -110,7 +110,7 @@ A capability profile for a Robot-Agent at a certain position can be set in the *
 ## Define Recipes
 Recipes are defined in the [recipes.json](recipes.json) file in the root folder.
 Recipe IDs must be consecutive starting at 1 with no gaps (e.g. 1,2,3,4,5 is valid; 1,2,4,5 is invalid because 3 is missing).
-Only recipe timed actions must define a duration; other actions do not (see also [Defining and Setting Capabilities](#defining-and-setting-capabilities)).
+Only recipe timed actions must define a duration; other actions do not (see also [Define and Set Capabilities](#define-and-set-capabilities)).
 
 ## Setting Time Units
 TODO
