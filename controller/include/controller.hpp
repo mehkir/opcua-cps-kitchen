@@ -42,8 +42,8 @@ struct remote_robot {
         std::unordered_set<std::string> capabilities_; /**< the capabilites. */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the robot's attribute node ids. */
-        robot_tool last_equipped_tool_; /**< the last equipped tool. */
-        duration_t overall_time_; /**< the total time the robot will be in use. */
+        std::atomic<robot_tool> last_equipped_tool_; /**< the last equipped tool. */
+        std::atomic<duration_t> overall_time_; /**< the total time the robot will be in use. */
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
         std::thread client_iterate_thread_; /**< the client iteration thread. */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
@@ -170,7 +170,7 @@ struct remote_robot {
          */
         robot_tool
         get_last_equipped_tool() const {
-            return last_equipped_tool_;
+            return last_equipped_tool_.load(std::memory_order_relaxed);
         }
 
         /**
@@ -180,7 +180,7 @@ struct remote_robot {
          */
         duration_t
         get_overall_time() const {
-            return overall_time_;
+            return overall_time_.load(std::memory_order_relaxed);
         }
 
         /**
@@ -206,7 +206,7 @@ struct remote_robot {
                     self->mark_robot_for_removal_callback_(self->position_);
                     return;
                 }
-                self->overall_time_ = *(UA_UInt32*) _value->value.data;
+                self->overall_time_.store(*(UA_UInt32*) _value->value.data, std::memory_order_relaxed);
                 // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's overall time at position %d is %ld", __FUNCTION__, self->position_, self->overall_time_);
         }
 
@@ -233,7 +233,7 @@ struct remote_robot {
                     self->mark_robot_for_removal_callback_(self->position_);
                     return;
                 }
-                self->last_equipped_tool_ = *(robot_tool*) _value->value.data;
+                self->last_equipped_tool_.store(*(robot_tool*) _value->value.data, std::memory_order_relaxed);
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, self->position_, robot_tool_to_string(self->last_equipped_tool_));
         }
 };
