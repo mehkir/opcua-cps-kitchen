@@ -109,6 +109,14 @@ Compile the project with the [build.bash](build.bash) script in the project root
 Optionally compile the code documentation with the [build_doc.bash](build_doc.bash) script in the project root directory.
 
 ## Starting the Environment and Dashboard
+If you have not yet cloned the project, proceed as follows:
+```bash
+git clone --recurse-submodules git@github.com:mehkir/opcua-cps-kitchen
+```
+If you already cloned the project without the `--recurse-submodules` parameter, run the following command in the project directory:
+```bash
+git submodule update --init --recursive
+```
 The kitchen environment is started with the [startup_kitchen.bash](start_scripts/startup_kitchen.bash) script and expects the robot count as a parameter.
 For example, when you are in the project root directory:
 ```bash
