@@ -1,3 +1,3 @@
 [submodule "cps-kitchen-dashboard"]
 	path = cps-kitchen-dashboard
-	url = gitarchserver:/home/git/Repositories/cps-kitchen-dashboard
+	url = git@github.com:mehkir/opcua-cps-kitchen-dashboard.git
