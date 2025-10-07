@@ -27,7 +27,9 @@ kill_http_server_and_backend() {
 trap kill_http_server_and_backend SIGINT
 
 cd "$PROJECT_DIRECTORY/cps-kitchen-dashboard"
-export LD_LIBRARY_PATH="$(pwd)/my-addons/open62541/lib"
+# Preserve existing LD_LIBRARY_PATH while prepending our library dir
+LIB_DIR="$(pwd)/my-addons/open62541/lib"
+export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 node backend.js --robot-count $ROBOTS_COUNT &
 sleep 1
 python3 -m http.server 8000 &
