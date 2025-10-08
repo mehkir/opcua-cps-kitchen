@@ -709,6 +709,39 @@ robot::retool() {
     determine_next_action();
 }
 
+
+UA_StatusCode
+robot::switch_position(UA_Server *_server,
+        const UA_NodeId *_session_id, void *_session_context,
+        const UA_NodeId *_method_id, void *_method_context,
+        const UA_NodeId *_object_id, void *_object_context,
+        size_t _input_size, const UA_Variant *_input,
+        size_t _output_size, UA_Variant *_output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_input_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+
+    if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+    position_t new_position = *(position_t*)_input[0].data;
+
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+    robot* self = static_cast<robot*>(_method_context);
+    return UA_STATUSCODE_GOOD;
+}
+
+void
+robot::handle_switch_position(position_t _new_position) {
+
+}
+
 void
 robot::join_threads() {
     if (server_iterate_thread_.joinable())
