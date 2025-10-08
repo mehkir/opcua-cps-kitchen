@@ -17,7 +17,7 @@
 #define TIME_UNIT_UPDATE_RATE 1
 
 robot::robot(position_t _position, std::string _capabilities_file_name) :
-        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), pending_target_position_(0), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true),
+        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true),
         current_action_duration_(0), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
         conveyor_client_(nullptr), pending_pickup_(false), mersenne_twister_(random_device_()), uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1) {
     /* Setup robot */
@@ -245,8 +245,6 @@ robot::receive_task(UA_Server *_server,
     robot* self = static_cast<robot*>(_method_context);
     // Set output parameters
     UA_Boolean task_received = true;
-    if (self->pending_target_position_ != 0)
-        task_received = false;
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &self->position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[1], &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
@@ -254,10 +252,9 @@ robot::receive_task(UA_Server *_server,
         self->stop();
         return UA_STATUSCODE_BAD;
     }
-    if (task_received)
-        self->io_context_.post([self, recipe_id, overall_processed_steps] {
-            self->handle_receive_task(recipe_id, overall_processed_steps);
-        });
+    self->io_context_.post([self, recipe_id, overall_processed_steps] {
+        self->handle_receive_task(recipe_id, overall_processed_steps);
+    });
     return UA_STATUSCODE_GOOD;
 }
 
@@ -710,39 +707,6 @@ robot::retool() {
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Current tool now is %s", robot_tool_to_string(current_tool_));
     determine_next_action();
-}
-
-UA_StatusCode
-robot::switch_position(UA_Server *_server,
-        const UA_NodeId *_session_id, void *_session_context,
-        const UA_NodeId *_method_id, void *_method_context,
-        const UA_NodeId *_object_id, void *_object_context,
-        size_t _input_size, const UA_Variant *_input,
-        size_t _output_size, UA_Variant *_output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_input_size != 1) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
-        return UA_STATUSCODE_BAD;
-    }
-
-    if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32])) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
-        return UA_STATUSCODE_BAD;
-    }
-    position_t new_position = *(position_t*)_input[0].data;
-
-    if(_method_context == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
-        return UA_STATUSCODE_BAD;
-    }
-    robot* self = static_cast<robot*>(_method_context);
-    self->pending_target_position_ = new_position;
-    return UA_STATUSCODE_GOOD;
-}
-
-void
-robot::handle_switch_position(position_t _new_position) {
-
 }
 
 void

@@ -101,7 +101,6 @@ private:
     /* robot related member variables. */
     UA_Server* server_; /**< the OPC UA robot server pointer. */
     position_t position_; /**< the robot's position on the conveyor belt. */
-    position_t pending_target_position_; /**< the robot's target position set by a switch position request */
     std::string robot_uri_; /**< the robot's uniform resource identifier. */
     UA_String server_endpoint_; /**< the robot's endpoint address. */
     object_type_node_inserter robot_type_inserter_; /**< the robot type inserter for adding the robot's attributes and methods to the address space. */
@@ -269,38 +268,6 @@ private:
      */
     void
     retool();
-
-    /**
-     * @brief Extracts the new position parameter.
-     * 
-     * @param _server the server instance from which this method is called.
-     * @param _session_id the client session id.
-     * @param _session_context user-defined context data passed via the access control/plugin.
-     * @param _method_id the node id of this method.
-     * @param _method_context user-defined context data passed to the method node.
-     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
-     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
-     * @param _input_size the count of the input parameters.
-     * @param _input the input pointer of the input parameters.
-     * @param _output_size the allocated output size.
-     * @param _output the output pointer to store return parameters.
-     * @return UA_StatusCode the status code.
-     */
-    static UA_StatusCode
-    switch_position(UA_Server *_server,
-            const UA_NodeId *_session_id, void *_session_context,
-            const UA_NodeId *_method_id, void *_method_context,
-            const UA_NodeId *_object_id, void *_object_context,
-            size_t _input_size, const UA_Variant *_input,
-            size_t _output_size, UA_Variant *_output);
-    
-    /**
-     * @brief Handles the extracted new position parameter from the switch_position method and performs the position switch.
-     * 
-     * @param _new_position the new position to switch to.
-     */
-    void
-    handle_switch_position(position_t _new_position);
 
     /**
      * @brief Joins all started threads.
