@@ -17,6 +17,7 @@ cd ..
 PROJECT_DIRECTORY="$(pwd)"
 $PROJECT_DIRECTORY/build.bash
 ROBOTS_COUNT=$1
+CONVEYOR_SIZE=$(( ROBOTS_COUNT + 1 ))
 
 $PROJECT_DIRECTORY/build/demos/discovery_server &
 sleep 1
@@ -24,7 +25,7 @@ $PROJECT_DIRECTORY/start_scripts/start_controller.bash &
 sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_conveyor.bash $ROBOTS_COUNT &
 sleep 1
-$PROJECT_DIRECTORY/start_scripts/start_robots.bash $ROBOTS_COUNT &
+$PROJECT_DIRECTORY/start_scripts/start_robots.bash $ROBOTS_COUNT $CONVEYOR_SIZE &
 sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_kitchen.bash $ROBOTS_COUNT &
 # Wait for all background processes to finish

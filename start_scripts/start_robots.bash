@@ -1,11 +1,16 @@
 #!/usr/bin/bash
-if [ "$#" -lt 1 ]; then
-    echo "Usage: $0 <number_of_robots>"
+if [ "$#" -lt 2 ]; then
+    echo "Usage: $0 <number_of_robots> <conveyor_size>"
     exit 1
 fi
 ROBOTS=$1
 if [[ $ROBOTS -lt 1 ]]; then
     echo "Number of robots must be >= 1"
+    exit 1
+fi
+CONVEYOR_SIZE=$2
+if [[ $CONVEYOR_SIZE -lt 2 ]]; then
+    echo "Coveyor size must be >= 2"
     exit 1
 fi
 declare -A position_capabilities=(
@@ -26,7 +31,7 @@ for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
         echo "No capabilities file mapped for position $robot_position" >&2
         continue
     fi
-    "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" &
+    "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" &
     # $PROJECT_DIRECTORY/build/start_robot_instance $robot_position 1>/dev/null &
     # $PROJECT_DIRECTORY/build/start_robot_instance $robot_position >./logs/robot_${robot_position}_${ROBOTS}_$(date +%Y%m%d%H%M%S) &
     exit_code=$?
