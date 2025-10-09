@@ -769,7 +769,7 @@ robot::switch_position(UA_Server *_server,
         if(status != UA_STATUSCODE_GOOD) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
             self->stop();
-            return;
+            return status;
         }
         return UA_STATUSCODE_GOOD;
     }
@@ -791,7 +791,7 @@ robot::switch_position(UA_Server *_server,
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
         self->stop();
-        return;
+        return status;
     }
     return UA_STATUSCODE_GOOD;
 }
