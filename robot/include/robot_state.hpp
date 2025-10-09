@@ -14,9 +14,9 @@
  * 
  */
 enum class robot_state {
-    IDLING,
-    COOKING,
-    FINISHED
+    AVAILABLE,
+    SWITCHING,
+    REARRANGING
 };
 
 /**
@@ -28,9 +28,9 @@ enum class robot_state {
 static std::string
 robot_state_to_string(robot_state _state) {
     switch (_state) {
-        case robot_state::IDLING: return "IDLING";
-        case robot_state::COOKING: return "COOKING";
-        case robot_state::FINISHED: return "FINISHED";
+        case robot_state::AVAILABLE: return "AVAILABLE";
+        case robot_state::SWITCHING: return "SWITCHING";
+        case robot_state::REARRANGING: return "REARRANGING";
         default: return "Unimplemented item";
     }
 }
