@@ -14,6 +14,7 @@
 // method nodes
 #define RECEIVE_TASK "ReceiveTask"
 #define HANDOVER_FINISHED_ORDER "HandoverFinishedOrder"
+#define SWITCH_POSITION "SwitchPosition"
 // attribute nodes
 #define POSITION "Position"
 #define RECIPE_ID "RecipeId"
