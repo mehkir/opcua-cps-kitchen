@@ -14,12 +14,13 @@
 #include "discovery_and_connection.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
-#define TIME_UNIT_UPDATE_RATE 1
+#define TIME_UNIT_UPDATE_RATE 1LL
+#define MOVE_TIME 5LL
 
-robot::robot(position_t _position, std::string _capabilities_file_name) :
-        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), is_dish_finished_(false), running_(true),
+robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
+        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_switching_(false), is_dish_finished_(false), running_(true),
         current_action_duration_(0), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
-        conveyor_client_(nullptr), pending_pickup_(false), mersenne_twister_(random_device_()), uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1) {
+        conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_state_(robot_state::AVAILABLE), new_target_position_(0), mersenne_twister_(random_device_()), uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -69,6 +70,16 @@ robot::robot(position_t _position, std::string _capabilities_file_name) :
     status = robot_type_inserter_.add_method(ROBOT_TYPE, HANDOVER_FINISHED_ORDER, handover_finished_order, handover_finished_order_method_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, HANDOVER_FINISHED_ORDER);
+        running_ = false;
+        return;
+    }
+    /* Add switch position method node */
+    method_arguments switch_position_method_arguments;
+    switch_position_method_arguments.add_input_argument("the new position", "new_position", UA_TYPES_UINT32);
+    switch_position_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
+    status = robot_type_inserter_.add_method(ROBOT_TYPE, SWITCH_POSITION, switch_position, switch_position_method_arguments, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, SWITCH_POSITION);
         running_ = false;
         return;
     }
@@ -252,9 +263,13 @@ robot::receive_task(UA_Server *_server,
         self->stop();
         return UA_STATUSCODE_BAD;
     }
-    self->io_context_.post([self, recipe_id, overall_processed_steps] {
-        self->handle_receive_task(recipe_id, overall_processed_steps);
-    });
+    {
+        std::lock_guard<std::mutex> lock(self->state_mutex_);
+        if (self->robot_state_ == robot_state::AVAILABLE)
+            self->io_context_.post([self, recipe_id, overall_processed_steps] {
+                self->handle_receive_task(recipe_id, overall_processed_steps);
+            });
+    }
     return UA_STATUSCODE_GOOD;
 }
 
@@ -284,6 +299,13 @@ robot::handle_receive_task(recipe_id_t _recipe_id, UA_UInt32 _overall_processed_
 void
 robot::cook_next_order() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        if (robot_state_ == robot_state::SWITCHING) {
+            handle_switch_position();
+            return;
+        }
+    }
     if (order_queue_.empty()) {
         preparing_dish_ = false;
         return;
@@ -380,22 +402,25 @@ robot::handover_finished_order(UA_Server *_server,
 void
 robot::handle_handover_finished_order(UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (!pending_pickup_) {
-        UA_UInt32 recipe_id = 0;
-        UA_UInt32 processed_steps = 0;
-        UA_Boolean is_dish_finished = false;
-        UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &server_endpoint_, &UA_TYPES[UA_TYPES_STRING]);
-        status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
-        status |= UA_Variant_setScalarCopy(&_output[2], &recipe_id, &UA_TYPES[UA_TYPES_UINT32]);
-        status |= UA_Variant_setScalarCopy(&_output[3], &processed_steps, &UA_TYPES[UA_TYPES_UINT32]);
-        status |= UA_Variant_setScalarCopy(&_output[4], &is_dish_finished, &UA_TYPES[UA_TYPES_BOOLEAN]);
-        if(status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
-            stop();
+    {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        if (!pending_pickup_) {
+            UA_UInt32 recipe_id = 0;
+            UA_UInt32 processed_steps = 0;
+            UA_Boolean is_dish_finished = false;
+            UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &server_endpoint_, &UA_TYPES[UA_TYPES_STRING]);
+            status |= UA_Variant_setScalarCopy(&_output[1], &position_, &UA_TYPES[UA_TYPES_UINT32]);
+            status |= UA_Variant_setScalarCopy(&_output[2], &recipe_id, &UA_TYPES[UA_TYPES_UINT32]);
+            status |= UA_Variant_setScalarCopy(&_output[3], &processed_steps, &UA_TYPES[UA_TYPES_UINT32]);
+            status |= UA_Variant_setScalarCopy(&_output[4], &is_dish_finished, &UA_TYPES[UA_TYPES_BOOLEAN]);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+                stop();
+                return;
+            }
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: UNCOORDINATED HANDOVER: Passed zero response", __FUNCTION__);
             return;
         }
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: UNCOORDINATED HANDOVER: Passed zero response", __FUNCTION__);
-        return;
     }
     pending_pickup_ = false;
     /* Get recipe id in process */
@@ -727,19 +752,80 @@ robot::switch_position(UA_Server *_server,
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
+
     position_t new_position = *(position_t*)_input[0].data;
 
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
+
+    UA_Boolean result = true;
     robot* self = static_cast<robot*>(_method_context);
+    if (new_position <= 0 || new_position > (self->conveyor_size_ - 1)) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: New position must not <= 0 and > available positions (%d)", __FUNCTION__, self->conveyor_size_ - 1);
+        result = false;
+        UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+            self->stop();
+            return;
+        }
+        return UA_STATUSCODE_GOOD;
+    }
+    {
+        std::lock_guard<std::mutex> lock(self->state_mutex_);
+        if (self->robot_state_ == robot_state::AVAILABLE) {
+            self->robot_state_ = robot_state::SWITCHING;
+            self->new_target_position_ = new_position;
+            self->io_context_.post([self] {
+                if (!self->preparing_dish_) {
+                    self->handle_switch_position();
+                }
+            });
+        } else {
+            result = false;
+        }
+    }
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+        self->stop();
+        return;
+    }
     return UA_STATUSCODE_GOOD;
 }
 
 void
-robot::handle_switch_position(position_t _new_position) {
+robot::handle_switch_position() {
+    if (already_switching_)
+        return;
+    already_switching_ = true;
+    uint32_t cw  = (new_target_position_ - position_ + conveyor_size_) % conveyor_size_;
+    uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
+    uint32_t distance = std::min(cw, ccw);
+    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * MOVE_TIME));
+    steady_timer_.async_wait([this](const boost::system::error_code& _error) {
+        if (_error) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling switch position (%s)", __FUNCTION__, _error.what().c_str());
+            stop();
+            return;
+        }
+        switch_position();
+    });
+}
 
+void
+robot::switch_position() {
+    {
+        std::lock_guard<std::mutex> lock(state_mutex_);
+        position_ = new_target_position_;
+        new_target_position_ = 0;
+        robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, POSITION, &position_, UA_TYPES_UINT32);
+        already_switching_ = false;
+        robot_state_ = robot_state::AVAILABLE;
+    }
+    cook_next_order();
 }
 
 void

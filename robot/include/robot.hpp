@@ -30,6 +30,7 @@
 #include "object_type_node_inserter.hpp"
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
+#include "robot_state.hpp"
 
 using namespace cps_kitchen;
 
@@ -45,6 +46,15 @@ struct order {
         UA_UInt32 processable_steps_; /**< the processable steps on the current robot. */
         std::queue<robot_action> action_queue_; /**< the open actions for the dish to be finished w/o the actions already performed. */
     public:
+        /**
+         * @brief Constructs a new order object.
+         * 
+         * @param _recipe_id the recipe id of the order.
+         * @param _overall_processed_steps the already processed steps on the recipe.
+         * @param _overall_processing_steps the total processing steps to complete the recipe.
+         * @param _processable_steps the steps count this robot is able to do.
+         * @param _action_queue the action queue containing the remaining steps.
+         */
         order(recipe_id_t _recipe_id, UA_UInt32 _overall_processed_steps, UA_UInt32 _overall_processing_steps, UA_UInt32 _processable_steps, std::queue<robot_action> _action_queue) :
             recipe_id_(_recipe_id), overall_processed_steps_(_overall_processed_steps), overall_processing_steps_(_overall_processing_steps), processable_steps_(_processable_steps), action_queue_(_action_queue) {
         }
@@ -109,9 +119,13 @@ private:
     duration_t current_action_duration_; /**< the current action duration. */
     std::queue<robot_action> action_queue_in_process_; /**< the current actions in process. */
     bool preparing_dish_; /**< flag to indicate whether the robot is busy preparing a dish. */
+    bool already_switching_; /**< flag to indicate whether the worker thread is already switching. */
     bool is_dish_finished_; /**< flag to indicate whether the robot is holding a completed dish or partially finished dish. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
     std::atomic<bool> pending_pickup_; /**< flag to indicate whether there is a pending pickup for an sucessfully sent notifcation to the conveyor. */
+    robot_state robot_state_; /**< state to indicate if robot is either available or performing an adaptive action */
+    std::mutex state_mutex_; /**< the mutex to synchronize robot state checks. */
+    position_t new_target_position_; /**< new target position requested by the controller. */
     discovery_util discovery_util_; /**< the discovery utility. */
     std::thread server_iterate_thread_; /**< the server iteration thread. */
     recipe_parser recipe_parser_; /**< the recipe parser. */
@@ -128,6 +142,7 @@ private:
     /* conveyor related member variables. */
     UA_Client* conveyor_client_; /**< the OPC UA conveyor client pointer. */
     std::condition_variable conveyor_connected_condition_; /**< the condition variable to wait for the conveyor connection to be restored. */
+    position_t conveyor_size_; /**< the total count of conveyor positions. */
     /* random distribution. */
     std::random_device random_device_; /**< the random number generator device. */
     std::mt19937 mersenne_twister_; /**< the mersenne twister for uniform pseudo-random number generation. */
@@ -296,10 +311,17 @@ private:
     /**
      * @brief Handles the extracted new position parameter from the switch_position method and performs the position switch.
      * 
-     * @param _new_position the new position to switch to.
      */
     void
-    handle_switch_position(position_t _new_position);
+    handle_switch_position();
+
+
+    /**
+     * @brief Timed callback to indicate position change completion.
+     * 
+     */
+    void
+    switch_position();
 
     /**
      * @brief Joins all started threads.
@@ -314,8 +336,9 @@ public:
      * 
      * @param _position the position of the robot at the conveyor.
      * @param _capabilities_file_name the capabilities file name.
+     * @param _conveyor_size the total count of conveyor positions. 
      */
-    robot(position_t _position, std::string _capabilities_file_name);
+    robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size);
 
     /**
      * @brief Destroys the robot object.
