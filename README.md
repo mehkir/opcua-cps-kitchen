@@ -87,7 +87,11 @@ It may also work with older versions.
 - OS: Ubuntu 22.04.5 LTS
 - gcc/g++ 15.1.0
 - cmake 4.1.2
-- open62541 1.4.7 (Installation may not be necessary, as precompiled dependencies are already included in the repository.)
+- open62541 1.4.7, which may not need to be installed as precompiled dependencies are already included in the repository. If the precompiled dependencies don't work, note the following for your manual build or installation:
+    - When building from source, pull git submodules.
+    - Build options: UA_MULTITHREADING>=100, UA_ENABLE_DISCOVERY=ON, UA_ENABLE_DISCOVERY_MULTICAST=ON.
+
+    For additional help see also chapter 3 in the [manual](https://www.open62541.org/doc/open62541-v1.4.7.pdf).
 - boost 1.83
 - jsoncpp 1.9.5
 - python 3.10
