@@ -90,6 +90,7 @@ It may also work with older versions.
 - open62541 1.4.7, which may not need to be installed as precompiled dependencies are already included in the repository. If the precompiled dependencies don't work, note the following for your manual build or installation:
     - When building from source, pull git submodules.
     - Build options: UA_MULTITHREADING>=100, UA_ENABLE_DISCOVERY=ON, UA_ENABLE_DISCOVERY_MULTICAST=ON.
+    - Set -DUSE_CUSTOM_VERSION=OFF in [build.bash](build.bash), [build_debug.bash](build_debug.bash) or [build_for_sanitizer.bash](build_for_sanitizer.bash) for a system-wide installation.
 
     For additional help see also chapter 3 in the [manual](https://www.open62541.org/doc/open62541-v1.4.7.pdf).
 - boost 1.83
