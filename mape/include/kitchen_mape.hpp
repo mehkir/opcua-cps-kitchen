@@ -1,0 +1,4 @@
+#ifndef KITCHEN_MAPE_HPP
+#define KITCHEN_MAPE_HPP
+
+#endif // KITCHEN_MAPE_HPP
