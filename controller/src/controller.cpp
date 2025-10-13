@@ -6,7 +6,7 @@
 
 #define INSTANCE_NAME "KitchenController"
 
-controller::controller() : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), recipe_parser_() {
+controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), recipe_parser_(), kitchen_mape_(std::move(_kitchen_mape)) {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
@@ -218,6 +218,7 @@ controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_ste
     for (size_t i = 0; i < _processed_steps; i++) {
         recipe_action_queue.pop();
     }
+    kitchen_mape_->on_new_order();
     remote_robot* suitable_robot = NULL;
     std::string next_action = recipe_action_queue.front().get_name();
     for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {

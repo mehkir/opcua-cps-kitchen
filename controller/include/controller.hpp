@@ -32,6 +32,7 @@
 #include "object_type_node_inserter.hpp"
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
+#include "mape.hpp"
 
 using namespace cps_kitchen;
 
@@ -321,6 +322,8 @@ private:
     std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
     /* recipe related member variables. */
     recipe_parser recipe_parser_; /**< the recipe parser. */
+    /* mape interface related member variables */
+    std::unique_ptr<mape> kitchen_mape_;
  
     /**
      * @brief Extracts the received robot registration parameters.
@@ -438,7 +441,7 @@ public:
      * @brief Construct a new controller object.
      * 
      */
-    controller();
+    controller(std::unique_ptr<mape> _kitchen_mape);
 
     /**
      * @brief Destroy the controller object.

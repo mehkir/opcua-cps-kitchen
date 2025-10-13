@@ -1,6 +1,8 @@
 #ifndef MAPE_HPP
 #define MAPE_HPP
 
+struct remote_robot;
+
 class mape {
 private:
 
@@ -11,7 +13,7 @@ public:
     ~mape() = default;
 
     virtual
-    double on_new_order() = 0;
+    remote_robot* on_new_order() = 0;
 };
 
 #endif // MAPE_HPP
