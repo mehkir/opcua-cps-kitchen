@@ -254,21 +254,24 @@ robot::receive_task(UA_Server *_server,
         return UA_STATUSCODE_BAD;
     }
     robot* self = static_cast<robot*>(_method_context);
-    // Set output parameters
     UA_Boolean task_received = true;
+    {
+        std::lock_guard<std::mutex> lock(self->state_mutex_);
+        if (self->robot_state_ == robot_state::AVAILABLE) {
+            self->io_context_.post([self, recipe_id, overall_processed_steps] {
+                self->handle_receive_task(recipe_id, overall_processed_steps);
+            });
+        } else {
+            task_received = false;
+        }
+    }
+    // Set output parameters
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &self->position_, &UA_TYPES[UA_TYPES_UINT32]);
     status |= UA_Variant_setScalarCopy(&_output[1], &task_received, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error returning states", __FUNCTION__);
         self->stop();
         return UA_STATUSCODE_BAD;
-    }
-    {
-        std::lock_guard<std::mutex> lock(self->state_mutex_);
-        if (self->robot_state_ == robot_state::AVAILABLE)
-            self->io_context_.post([self, recipe_id, overall_processed_steps] {
-                self->handle_receive_task(recipe_id, overall_processed_steps);
-            });
     }
     return UA_STATUSCODE_GOOD;
 }
