@@ -567,8 +567,10 @@ private:
      * 
      * @param _output_size the count of returned output values.
      * @param _output the variant containing the output values.
+     * @return true if delivery succeedes.
+     * @return false if delivery fails.
      */
-    void
+    bool
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
 
     /**

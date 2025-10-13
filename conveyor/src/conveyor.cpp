@@ -433,11 +433,12 @@ conveyor::deliver_finished_order() {
                 occupied_plate_id++;
                 continue;
             }
-            receive_robot_task_called(output_size, output);
-            occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
-            UA_UInt32 occupied_plates_count = occupied_plates_.size();
-            conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
-            continue;
+            if (receive_robot_task_called(output_size, output)) {
+                occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
+                UA_UInt32 occupied_plates_count = occupied_plates_.size();
+                conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
+                continue;
+            }
         }
         occupied_plate_id++;
     }
@@ -481,7 +482,7 @@ conveyor::determine_next_movement() {
     }
 }
 
-void
+bool
 conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
@@ -489,7 +490,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
-        return;
+        return false;
     }
 
     if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_UINT32])
@@ -498,7 +499,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
-        return;
+        return false;
     }
 
     position_t remote_robot_position = *(position_t*) _output[0].data;
@@ -508,8 +509,7 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, remote_robot_position);
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        stop();
-        return;
+        return result;
     }
 
     plate& p = plates_[position_plate_id_map_[remote_robot_position]];
@@ -519,12 +519,13 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
-        return;    
+        return false;
     }
     reset_plate(p);
     if (_output != nullptr)
         UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: Delivered dish at position %d successfully", remote_robot_position);
+    return result;
 }
 
 void
