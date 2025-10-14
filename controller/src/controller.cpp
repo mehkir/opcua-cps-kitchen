@@ -222,6 +222,49 @@ controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_ste
 }
 
 void
+controller::swap_robot_positions(position_t _from, position_t _to) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (position_remote_robot_map_.find(_from) == position_remote_robot_map_.end())
+        return;
+    remote_robot* robot = position_remote_robot_map_.at(_from).get();
+    size_t output_size = 0;
+    UA_Variant* output = nullptr;
+    UA_StatusCode status = robot->switch_position_to(_to, &output_size, &output);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method (%s)", __FUNCTION__, SWITCH_POSITION, UA_StatusCode_name(status));
+        if (output != nullptr)
+            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        return;
+    }
+    if (output_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        if (output != nullptr)
+            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        stop();
+        return;
+    }
+    if(!UA_Variant_hasScalarType(&output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        if (output != nullptr)
+            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        return;
+    }
+    UA_Boolean will_switch = *(UA_Boolean*) output[0].data;
+    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+    if (!will_switch) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot will not switch position", __FUNCTION__);
+        return;
+    }
+    robot->set_adaptivity_flag();
+    auto key = (_from < _to) ? std::make_tuple(_from, _to) : std::make_tuple(_to, _from);
+    pending_swaps_[key];
+    // TODO: Do it for both positions before adding entry.
+    // So extract the most part and also think of guarding since we want to handle acks after
+    // the instructions
+
+}
+
+void
 controller::mark_robot_for_removal(position_t _position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);

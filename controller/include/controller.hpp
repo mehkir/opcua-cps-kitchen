@@ -50,6 +50,7 @@ struct remote_robot {
         std::unordered_set<std::string> capabilities_; /**< the capabilites. */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the robot's attribute node ids. */
+        std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
         std::atomic<robot_tool> last_equipped_tool_; /**< the last equipped tool. */
         std::atomic<duration_t> overall_time_; /**< the total time the robot will be in use. */
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
@@ -111,6 +112,11 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
+            if ((method_id_map_[SWITCH_POSITION] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, SWITCH_POSITION)) == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, SWITCH_POSITION);
+                mark_robot_for_removal_callback_(position_.load());
+                return;
+            }
             try {
                 client_iterate_thread_ = std::thread([this]() {
                     while(running_) {
@@ -150,6 +156,35 @@ struct remote_robot {
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
             UA_Client_delete(client_);
+        }
+
+        /**
+         * @brief Instructs the remote robot to switch its position to the given one.
+         * 
+         * @param _new_position the new position to switch to.
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
+         * @return UA_StatusCode the status whether method call was successful.
+         */
+        UA_StatusCode
+        switch_position_to(position_t _new_position, size_t* _output_size, UA_Variant** _output) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SWITCH POSTION: Instruct robot on position %d to switch to position %d", position_.load(), _new_position);
+            method_node_caller switch_robot_position_caller;
+            switch_robot_position_caller.add_scalar_input_argument(&_new_position, UA_TYPES_UINT32);
+            object_method_info omi = method_id_map_[SWITCH_POSITION];
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = switch_robot_position_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, SWITCH_POSITION, UA_StatusCode_name(status));
+                    running_ = false;
+                    mark_robot_for_removal_callback_(position_.load());
+                    return UA_STATUSCODE_BAD;
+                }
+            }
+            return status;
         }
 
         /**
@@ -288,12 +323,18 @@ struct remote_robot {
 
         /**
          * @brief Set the adaptivity flag.
-         * 
-         * @param _new_adaptivity_flag_value the new adaptivity flag value.
          */
         void
-        set_adaptivity_flag(bool _new_adaptivity_flag_value) {
-            adaptivity_is_pending_.store(_new_adaptivity_flag_value);
+        set_adaptivity_flag() {
+            adaptivity_is_pending_.store(true);
+        }
+
+        /**
+         * @brief Reset the adaptivity flag.
+         */
+        void
+        reset_adaptivity_flag() {
+            adaptivity_is_pending_.store(false);
         }
 
         /**
@@ -308,6 +349,29 @@ struct remote_robot {
         }
 };
 
+/**
+ * @brief Custom tuple hash functor with golden ratio magic number.
+ * 
+ */
+struct tuple_hash {
+    template <typename T1, typename T2>
+    std::size_t operator()(const std::tuple<T1, T2>& t) const noexcept {
+        std::size_t h1 = std::hash<T1>{}(std::get<0>(t));
+        std::size_t h2 = std::hash<T2>{}(std::get<1>(t));
+        return h1 ^ (h2 + 0x9e3779b9 + (h1 << 6) + (h1 >> 2));
+    }
+};
+
+/**
+ * @brief Tracks whether pair-wise swap is acknowledged by both robots.
+ * 
+ */
+struct swap_state {
+    bool ack_from_first = false;
+    bool ack_from_second = false;
+};
+
+using swap_key = std::tuple<UA_UInt32, UA_UInt32>;
 class controller {
 private:
     /* controller related member variables. */
@@ -323,7 +387,9 @@ private:
     /* recipe related member variables. */
     recipe_parser recipe_parser_; /**< the recipe parser. */
     /* mape interface related member variables */
-    std::unique_ptr<mape> kitchen_mape_;
+    std::unique_ptr<mape> kitchen_mape_; /**< the kitchen mape. */
+    /* adaptivity related member variables */
+    std::unordered_map<swap_key, swap_state, tuple_hash> pending_swaps_;
  
     /**
      * @brief Extracts the received robot registration parameters.
@@ -403,6 +469,15 @@ private:
      */
     remote_robot*
     find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps);
+
+    /**
+     * @brief Instructs a remote robot to swap its position with another robot.
+     * 
+     * @param _from the robot's current position.
+     * @param _to the robot's new target position.
+     */
+    void
+    swap_robot_positions(position_t _from, position_t _to);
 
     /**
      * @brief Marks a remote robot for removal.
