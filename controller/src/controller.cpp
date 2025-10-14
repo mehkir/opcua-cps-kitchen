@@ -192,7 +192,7 @@ controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _process
     remote_robot* next_suitable_robot = find_suitable_robot(_recipe_id, _processed_steps);
     UA_String next_suitable_robot_endpoint = UA_STRING_ALLOC("");
     position_t next_suitable_robot_position = 0;
-    if (next_suitable_robot != NULL) {
+    if (next_suitable_robot != NULL && !next_suitable_robot->is_adaptivity_pending()) {
         UA_String_clear(&next_suitable_robot_endpoint);
         next_suitable_robot_endpoint = UA_STRING_ALLOC(next_suitable_robot->get_endpoint().c_str());
         next_suitable_robot_position = next_suitable_robot->get_position();
@@ -218,17 +218,7 @@ controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_ste
     for (size_t i = 0; i < _processed_steps; i++) {
         recipe_action_queue.pop();
     }
-    kitchen_mape_->on_new_order();
-    remote_robot* suitable_robot = NULL;
-    std::string next_action = recipe_action_queue.front().get_name();
-    for (auto position_remote_robot = position_remote_robot_map_.begin(); position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
-        remote_robot* robot = position_remote_robot->second.get();
-        if (robot->is_capable_to(next_action)) {
-            suitable_robot = robot;
-            break;
-        }
-    }
-    return suitable_robot;
+    return kitchen_mape_->on_new_order(position_remote_robot_map_, recipe_action_queue);
 }
 
 void
