@@ -149,7 +149,7 @@ private:
     std::uniform_int_distribution<std::uint32_t> uniform_int_distribution_; /**< uniform discrete distribution for random numbers. */
 
     /**
-     * @brief Callback called after controller received robot registration. Extracts the controller output values and idicates whether the regeistration was successful.
+     * @brief Callback called after controller received robot registration. Extracts the controller output values and idicates whether the registration was successful.
      * 
      * @param _output_size the count of returned output values.
      * @param _output the variant containing the output values.
