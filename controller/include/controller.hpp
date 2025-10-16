@@ -367,8 +367,9 @@ struct tuple_hash {
  * 
  */
 struct swap_state {
-    bool ack_from_first = false;
-    bool ack_from_second = false;
+    bool ack_from_lower_position = false;
+    bool ack_from_greater_position = false;
+    bool second_robot_failed = false;
 };
 
 using swap_key = std::tuple<UA_UInt32, UA_UInt32>;
@@ -390,6 +391,7 @@ private:
     std::unique_ptr<mape> kitchen_mape_; /**< the kitchen mape. */
     /* adaptivity related member variables */
     std::unordered_map<swap_key, swap_state, tuple_hash> pending_swaps_;
+    std::mutex adaptivity_mutex_; /**< synchronizes access to robot adaptivity relevant members. */
  
     /**
      * @brief Extracts the received robot registration parameters.
@@ -478,6 +480,17 @@ private:
      */
     void
     swap_robot_positions(position_t _from, position_t _to);
+
+    /**
+     * @brief Extracts return values of swap robot position call.
+     * 
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
+     * @return true if the robot will switch.
+     * @return false if the robot denies the switch request.
+     */
+    bool
+    swap_robot_positions_called(size_t _output_size, UA_Variant* _output);
 
     /**
      * @brief Marks a remote robot for removal.
