@@ -765,8 +765,8 @@ robot::switch_position(UA_Server *_server,
 
     UA_Boolean result = true;
     robot* self = static_cast<robot*>(_method_context);
-    if (new_position <= 0 || new_position > (self->conveyor_size_ - 1)) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: New position must not <= 0 and > available positions (%d)", __FUNCTION__, self->conveyor_size_ - 1);
+    if (new_position <= 0 || new_position > (self->conveyor_size_ - 1) || new_position == self->position_) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: New position must not <= 0, > available positions (%d) and different form current position", __FUNCTION__, self->conveyor_size_ - 1);
         result = false;
         UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
         if(status != UA_STATUSCODE_GOOD) {
