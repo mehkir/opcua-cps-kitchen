@@ -1,12 +1,6 @@
 #include "../include/kitchen_mape.hpp"
 #include "controller.hpp"
 
-kitchen_mape::kitchen_mape() {
-}
-
-kitchen_mape::~kitchen_mape() {
-}
-
 remote_robot*
 kitchen_mape::on_new_order(std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) {
     remote_robot* suitable_robot = nullptr;;
@@ -19,4 +13,9 @@ kitchen_mape::on_new_order(std::map<position_t, std::unique_ptr<remote_robot>, s
         }
     }
     return suitable_robot;
+}
+
+void
+kitchen_mape::set_swap_robot_positions_callback(swap_robot_positions_callback_t _swap_robot_positions_callback) {
+    swap_robot_positions_callback_ = _swap_robot_positions_callback;
 }
