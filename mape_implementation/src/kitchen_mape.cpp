@@ -7,7 +7,7 @@ kitchen_mape::on_new_order(std::map<position_t, std::unique_ptr<remote_robot>, s
     std::string next_action = _recipe_action_queue.front().get_name();
     for (auto position_remote_robot = _position_remote_robot_map.begin(); position_remote_robot != _position_remote_robot_map.end(); position_remote_robot++) {
         remote_robot* robot = position_remote_robot->second.get();
-        if (robot->is_capable_to(next_action)) {
+        if (!robot->is_adaptivity_pending() && robot->is_capable_to(next_action)) {
             suitable_robot = robot;
             break;
         }
