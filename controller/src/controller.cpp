@@ -12,7 +12,7 @@ controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the controller server");
-        running_ = false;
+        running_.store(false);
         return;
     }
     UA_String_clear(&server_config->applicationDescription.applicationUri);
@@ -27,7 +27,7 @@ controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_
     status = controller_type_inserter_.add_method(CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT, choose_next_robot, choose_next_robot_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, CHOOSE_NEXT_ROBOT);
-        running_ = false;
+        running_.store(false);
         return;
     }
     /* Add register robot method node */
@@ -39,7 +39,7 @@ controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_
     status = controller_type_inserter_.add_method(CONTROLLER_TYPE, REGISTER_ROBOT, register_robot, register_robot_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, REGISTER_ROBOT);
-        running_ = false;
+        running_.store(false);
         return;
     }
     /* Add controller attributes */
@@ -54,7 +54,7 @@ controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error at controller startup");
-        running_ = false;
+        running_.store(false);
         return;
     }
     /* Register at discovery server repeatedly */
@@ -66,13 +66,13 @@ controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_
     /* Start the controller event loop */
     try {
         server_iterate_thread_ = std::thread([this]() {
-            while(running_) {
+            while(running_.load()) {
                 UA_Server_run_iterate(server_, true);
             }
         });
     } catch (...) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running controller");
-        running_ = false;
+        running_.store(false);
         return;
     }
     kitchen_mape_->set_swap_robot_positions_callback(std::bind(&controller::swap_robot_positions, this,
@@ -476,14 +476,14 @@ controller::join_threads() {
 
 void
 controller::start() {
-    if (!running_)
+    if (!running_.load())
         stop();
     join_threads();
 }
 
 void
 controller::stop() {
-    running_ = false;
+    running_.store(false);
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
