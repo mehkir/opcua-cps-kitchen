@@ -257,12 +257,23 @@ robot::receive_task(UA_Server *_server,
     UA_Boolean task_received = true;
     {
         std::lock_guard<std::mutex> lock(self->state_mutex_);
-        if (self->robot_state_ == robot_state::AVAILABLE) {
+        if (self->robot_state_ != robot_state::AVAILABLE) {
+            task_received = false;
+        }
+    }
+    if (task_received) {
+        recipe incoming_recipe = self->recipe_parser_.get_recipe(recipe_id);
+        std::queue<robot_action> action_queue = incoming_recipe.get_action_queue();
+        // Remove already processed steps
+        for (size_t i = 0; i < overall_processed_steps; i++) {
+            action_queue.pop();
+        }
+        if (!self->capability_parser_.is_capable_to(action_queue.front().get_name()))
+            task_received = false;
+        else {
             self->io_context_.post([self, recipe_id, overall_processed_steps] {
                 self->handle_receive_task(recipe_id, overall_processed_steps);
             });
-        } else {
-            task_received = false;
         }
     }
     // Set output parameters
