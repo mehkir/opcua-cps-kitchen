@@ -17,7 +17,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error with setting up the conveyor server");
-        running_ = false;
+        running_.store(false);
         return;
     }
     UA_String_clear(&server_config->applicationDescription.applicationUri);
@@ -34,7 +34,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     status = conveyor_type_inserter_.add_method(CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION, receive_finished_order_notification, receive_finished_order_notification_arguments, this);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
-        running_ = false;
+        running_.store(false);
         return;
     }
     /* Add conveyor type constructor */
@@ -55,7 +55,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error at conveyor startup");
-        running_ = false;
+        running_.store(false);
         return;
     }
     /* Register at discovery server repeatedly */
@@ -67,7 +67,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     /* Start the conveyor event loop */
     try {
         server_iterate_thread_ = std::thread([this]() {
-            while(running_) {
+            while(running_.load()) {
                 UA_Server_run_iterate(server_, true);
             }
         });
@@ -80,7 +80,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     std::string controller_endpoint;
     while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-        if (!running_) {
+        if (!running_.load()) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
             stop();
             return;
@@ -95,7 +95,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     /* Setup kitchen client */
     std::string kitchen_endpoint;
     while((status = discover_and_connect(kitchen_client_, discovery_util_, kitchen_endpoint, KITCHEN_TYPE)) != UA_STATUSCODE_GOOD) {
-        if (!running_) {
+        if (!running_.load()) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to kitchen", __FUNCTION__);
             stop();
             return;
@@ -576,12 +576,12 @@ conveyor::join_threads() {
 void
 conveyor::start() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (!running_)
+    if (!running_.load())
         stop();
     /* Run the client iterate thread */
     try {
         client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
+            while(running_.load()) {
                 {
                     std::lock_guard<std::mutex> lock(client_mutex_);
                     /* Handle controller client iterate */
@@ -633,7 +633,7 @@ conveyor::start() {
 void
 conveyor::stop() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    running_ = false;
+    running_.store(false);
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
