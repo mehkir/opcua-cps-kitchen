@@ -37,6 +37,7 @@
 using namespace cps_kitchen;
 
 typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal. */
+typedef std::function<void(position_t)> position_swapped_callback_t; /**< the callback declaration to notify about position change. */
 
 /**
  * @brief Remote robot client to monitor kitchen robot attributes.
@@ -49,6 +50,7 @@ struct remote_robot {
         std::atomic<position_t> position_; /**< the position on the conveyor belt. */
         std::unordered_set<std::string> capabilities_; /**< the capabilites. */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
+        position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the robot's attribute node ids. */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
         std::atomic<robot_tool> last_equipped_tool_; /**< the last equipped tool. */
@@ -67,7 +69,11 @@ struct remote_robot {
          * @param _capabilities the capabilities.
          * @param _mark_robot_for_removal_callback the mark for removal callback.
          */
-        remote_robot(std::string _endpoint, position_t _position, std::unordered_set<std::string> _capabilities, mark_robot_for_removal_callback_t _mark_robot_for_removal_callback) :  endpoint_(_endpoint), position_(_position), capabilities_(_capabilities), client_(nullptr), running_(true), adaptivity_is_pending_(false), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback) {
+        remote_robot(std::string _endpoint, position_t _position, std::unordered_set<std::string> _capabilities,
+                    mark_robot_for_removal_callback_t _mark_robot_for_removal_callback,
+                    position_swapped_callback_t _position_swapped_callback) :
+                    endpoint_(_endpoint), position_(_position), capabilities_(_capabilities), client_(nullptr),
+                    running_(true), adaptivity_is_pending_(false), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback), position_swapped_callback_(_position_swapped_callback) {
             client_connection_establisher robot_connection_establisher;
             bool connected = robot_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
@@ -264,6 +270,7 @@ struct remote_robot {
                 }
                 UA_UInt32 old_position = self->position_.load();
                 self->position_.store(*(UA_UInt32*) _value->value.data);
+                self->position_swapped_callback_(self->position_.load());
                 // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position changed from %d to %d", __FUNCTION__, old_position, self->position_.load());
         }
 
@@ -429,6 +436,17 @@ private:
     handle_robot_registration(std::string _endpoint, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output);
 
     /**
+     * @brief Checks if the position is involved in a position swap and returns the corresponding map key.
+     * 
+     * @param _position the requested position to check for.
+     * @param _out_key stores the corresponding key for the pending_swaps_ map.
+     * @return true if position is swapping.
+     * @return false if position is not swapping.
+     */
+    bool
+    is_robot_position_swapping(position_t _position, swap_key& _out_key);
+
+    /**
      * @brief Extracts the received robot and recipe parameters.
      * 
      * @param _server the server instance from which this method is called.
@@ -491,6 +509,21 @@ private:
      */
     bool
     swap_robot_positions_called(size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Called when robot switched to its new position.
+     * 
+     * @param _new_position the robot's new position.
+     */
+    void
+    position_swapped_callback(position_t _new_position);
+
+    /**
+     * @brief Erases stale pending entries where both positions are not occupied anymore.
+     * 
+     */
+    void
+    erase_stale_pending_swap_entries();
 
     /**
      * @brief Marks a remote robot for removal.
