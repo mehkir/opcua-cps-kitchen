@@ -37,7 +37,7 @@
 using namespace cps_kitchen;
 
 typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal. */
-typedef std::function<void(position_t)> position_swapped_callback_t; /**< the callback declaration to notify about position change. */
+typedef std::function<void(position_t, position_t)> position_swapped_callback_t; /**< the callback declaration to notify about position change. */
 
 /**
  * @brief Remote robot client to monitor kitchen robot attributes.
@@ -63,12 +63,13 @@ struct remote_robot {
 
     public:
         /**
-         * @brief Construct a new remote robot object
+         * @brief Constructs a new remote robot object.
          * 
          * @param _endpoint the robot's endpoint url.
          * @param _position the position of the remote robot at the conveyor.
          * @param _capabilities the capabilities.
          * @param _mark_robot_for_removal_callback the mark for removal callback.
+         * @param _position_swapped_callback the position swapped callback.
          */
         remote_robot(std::string _endpoint, position_t _position, std::unordered_set<std::string> _capabilities,
                     mark_robot_for_removal_callback_t _mark_robot_for_removal_callback,
@@ -276,7 +277,7 @@ struct remote_robot {
                     self->initial_subscription_ = false;
                     return;
                 }
-                self->position_swapped_callback_(self->position_.load());
+                self->position_swapped_callback_(old_position, self->position_.load());
                 // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position changed from %d to %d", __FUNCTION__, old_position, self->position_.load());
         }
 
@@ -519,10 +520,11 @@ private:
     /**
      * @brief Called when robot switched to its new position.
      * 
+     * @param _old_position the robot's old position.
      * @param _new_position the robot's new position.
      */
     void
-    position_swapped_callback(position_t _new_position);
+    position_swapped_callback(position_t _old_position, position_t _new_position);
 
     /**
      * @brief Erases stale pending entries where both positions are not occupied anymore.

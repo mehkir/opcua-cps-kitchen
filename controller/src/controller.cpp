@@ -341,33 +341,28 @@ controller::swap_robot_positions_called(size_t _output_size, UA_Variant* _output
 }
 
 void
-controller::position_swapped_callback(position_t _new_position) {
+controller::position_swapped_callback(position_t _old_position, position_t _new_position) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     remove_marked_robots();
     erase_stale_pending_swap_entries();
     std::lock_guard<std::mutex> lock(adaptivity_mutex_);
-    swap_key sk = std::make_tuple(0,0);
-    if (!is_robot_position_swapping(_new_position, sk)) {
+    swap_key sk = (_old_position < _new_position) ? std::make_tuple(_old_position, _new_position) : std::make_tuple(_new_position, _old_position);
+    if (pending_swaps_.find(sk) == pending_swaps_.end()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no pending swap entry for position %d", __FUNCTION__, _new_position);
         stop();
         return;
     }
     swap_state& swap_states = pending_swaps_.at(sk);
-    position_t original_position = (get<0>(sk) != _new_position) ? get<0>(sk) : get<1>(sk);
     if (swap_states.second_robot_failed) {
         if (position_remote_robot_map_.find(_new_position) != position_remote_robot_map_.end()) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Second robot failed at swap call but is still registered ... Robot at position %d will be removed anyway", __FUNCTION__, _new_position);
             position_remote_robot_map_.erase(_new_position);
             increment_or_decrement_counter_node(REGISTERED_ROBOTS, false);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", _new_position);
-            if (_new_position == std::get<1>(sk))
-                swap_states.ack_from_greater_position = true;
-            else
-                swap_states.ack_from_lower_position = true;
         }
         swap_states.second_robot_failed = false;
     }
-    if (original_position == std::get<1>(sk))
+    if (_old_position == std::get<1>(sk))
         swap_states.ack_from_greater_position = true;
     else
         swap_states.ack_from_lower_position = true;
