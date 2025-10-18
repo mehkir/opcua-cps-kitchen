@@ -371,6 +371,7 @@ controller::position_swapped_callback(position_t _new_position) {
         swap_states.ack_from_greater_position = true;
     else
         swap_states.ack_from_lower_position = true;
+    // If there is no robot at the target position anymore, then set ack true
     if (position_remote_robot_map_.find(_new_position) == position_remote_robot_map_.end()) {
         if (_new_position == std::get<1>(sk))
             swap_states.ack_from_greater_position = true;
