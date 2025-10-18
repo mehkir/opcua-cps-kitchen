@@ -386,10 +386,14 @@ controller::position_swapped_callback(position_t _new_position) {
             second = std::move(position_remote_robot_map_[std::get<1>(sk)]);
         position_remote_robot_map_.erase(std::get<0>(sk));
         position_remote_robot_map_.erase(std::get<1>(sk));
-        if (first != nullptr)
+        if (first != nullptr) {
+            first->reset_adaptivity_flag();
             position_remote_robot_map_[first->get_position()] = std::move(first);
-        if (second != nullptr)
+        }
+        if (second != nullptr) {
+            second->reset_adaptivity_flag();
             position_remote_robot_map_[second->get_position()] = std::move(second);
+        }
         pending_swaps_.erase(sk);
     }
 }
