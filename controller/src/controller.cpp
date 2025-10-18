@@ -376,12 +376,14 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
     if (swap_states.ack_from_lower_position && swap_states.ack_from_greater_position) {
         std::unique_ptr<remote_robot> first = nullptr;
         std::unique_ptr<remote_robot> second = nullptr;
-        if (position_remote_robot_map_.find(std::get<0>(sk)) != position_remote_robot_map_.end())
+        if (position_remote_robot_map_.find(std::get<0>(sk)) != position_remote_robot_map_.end()) {
             first = std::move(position_remote_robot_map_[std::get<0>(sk)]);
-        if (position_remote_robot_map_.find(std::get<1>(sk)) != position_remote_robot_map_.end())
+            position_remote_robot_map_.erase(std::get<0>(sk));
+        }
+        if (position_remote_robot_map_.find(std::get<1>(sk)) != position_remote_robot_map_.end()) {
             second = std::move(position_remote_robot_map_[std::get<1>(sk)]);
-        position_remote_robot_map_.erase(std::get<0>(sk));
-        position_remote_robot_map_.erase(std::get<1>(sk));
+            position_remote_robot_map_.erase(std::get<1>(sk));
+        }
         if (first != nullptr) {
             first->reset_adaptivity_flag();
             position_remote_robot_map_[first->get_position()] = std::move(first);
