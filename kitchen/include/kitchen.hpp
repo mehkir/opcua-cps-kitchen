@@ -121,20 +121,20 @@ struct remote_robot {
             }
             try {
                 client_iterate_thread_ = std::thread([this]() {
-                    while(running_) {
+                    while(running_.load()) {
                         {
                             std::lock_guard<std::mutex> lock(client_mutex_);
                             UA_StatusCode status = UA_Client_run_iterate(client_, 1);
                             if (status != UA_STATUSCODE_GOOD) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
-                                running_ = false;
+                                running_.store(false);
                                 mark_robot_for_removal_callback_(position_);
                                 return;
                             }
                         }
                         if (usleep(1*1000)) {
                             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at robot client iterate sleep", __FUNCTION__);
-                            running_ = false;
+                            running_.store(false);
                             mark_robot_for_removal_callback_(position_);
                             return;
                         }
@@ -143,7 +143,7 @@ struct remote_robot {
                 });
             } catch (...) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the robot client iterate thread at position %d", __FUNCTION__, position_);
-                running_ = false;
+                running_.store(false);
                 mark_robot_for_removal_callback_(position_);
                 return;
             }
@@ -173,7 +173,7 @@ struct remote_robot {
                 status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling instruct method (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    running_ = false;
+                    running_.store(false);
                     mark_robot_for_removal_callback_(position_);
                     return UA_STATUSCODE_BAD;
                 }
@@ -238,7 +238,7 @@ struct remote_robot {
          * 
          */
         ~remote_robot() {
-            running_ = false;
+            running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
             UA_Client_delete(client_);

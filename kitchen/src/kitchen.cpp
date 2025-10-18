@@ -95,13 +95,13 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     /* Start the kitchen event loop */
     try {
         server_iterate_thread_ = std::thread([this]() {
-            while(running_) {
+            while(running_.load()) {
                 UA_Server_run_iterate(server_, true);
             }
         });
     } catch (...) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running kitchen");
-        running_ = false;
+        running_.store(false);
         return;
     }
     /* Setup controller client */
@@ -109,7 +109,7 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller, retrying in %d seconds (%s)", __FUNCTION__, LOOKUP_INTERVAL, UA_StatusCode_name(status));
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-        if (!running_) {
+        if (!running_.load()) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
             stop();
             return;
@@ -128,7 +128,7 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
     while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor, retrying in %d seconds (%s)", __FUNCTION__, LOOKUP_INTERVAL, UA_StatusCode_name(status));
         std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-        if (!running_) {
+        if (!running_.load()) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
             stop();
             return;
@@ -232,7 +232,7 @@ kitchen::handle_random_order_request() {
         while (status != UA_STATUSCODE_GOOD) {
             if (controller_client_ != nullptr)
                 status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-            if (running_ && status != UA_STATUSCODE_GOOD) {
+            if (running_.load() && status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
                 if (output != nullptr ) {
                     UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
@@ -243,7 +243,7 @@ kitchen::handle_random_order_request() {
                 controller_client_ = nullptr;
                 remote_controller_connected_cv_.wait(lock);
             }
-            if (!running_) {
+            if (!running_.load()) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to call choose next robot", __FUNCTION__);
                 if (output != nullptr )
                     UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
@@ -447,7 +447,7 @@ kitchen::join_threads() {
 
 void
 kitchen::start() {
-    if (!running_) {
+    if (!running_.load()) {
         stop();
         return;
     }
@@ -459,7 +459,7 @@ kitchen::start() {
     /* Run the client iterate thread */
     try {
         client_iterate_thread_ = std::thread([this]() {
-            while(running_) {
+            while(running_.load()) {
                 {
                     std::lock_guard<std::mutex> lock(client_mutex_);
                     if (controller_client_ != nullptr) {
@@ -523,7 +523,7 @@ kitchen::start() {
     /* Run the cyclic remote robot discovery thread */
     try {
         cyclic_remote_robot_discovery_thread_ = std::thread([this]() {
-            while (running_) {
+            while (running_.load()) {
                 {
                     std::unique_lock<std::mutex> lock(remote_robot_discovery_mutex_);
                     std::vector<std::string> endpoints;
@@ -594,7 +594,7 @@ kitchen::stop() {
     {
         std::lock_guard<std::mutex> remote_robot_lock(remote_robot_discovery_mutex_);
         std::lock_guard<std::mutex> client_loop_lock(client_mutex_);
-        running_ = false;
+        running_.store(false);
         remote_robot_discovery_cv.notify_all();
         remote_controller_connected_cv_.notify_all();
     }
