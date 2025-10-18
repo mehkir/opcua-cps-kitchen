@@ -59,6 +59,7 @@ struct remote_robot {
         std::thread client_iterate_thread_; /**< the client iteration thread. */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
         std::atomic<bool> adaptivity_is_pending_; /**< flag to indicate whether adaptivity is pending. */
+        bool initial_subscription_; /**< flag to indicate initial subscription notification. */
 
     public:
         /**
@@ -73,7 +74,8 @@ struct remote_robot {
                     mark_robot_for_removal_callback_t _mark_robot_for_removal_callback,
                     position_swapped_callback_t _position_swapped_callback) :
                     endpoint_(_endpoint), position_(_position), capabilities_(_capabilities), client_(nullptr),
-                    running_(true), adaptivity_is_pending_(false), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback), position_swapped_callback_(_position_swapped_callback) {
+                    running_(true), adaptivity_is_pending_(false), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback),
+                    position_swapped_callback_(_position_swapped_callback), initial_subscription_(true) {
             client_connection_establisher robot_connection_establisher;
             bool connected = robot_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
@@ -270,6 +272,10 @@ struct remote_robot {
                 }
                 UA_UInt32 old_position = self->position_.load();
                 self->position_.store(*(UA_UInt32*) _value->value.data);
+                if (self->initial_subscription_) {
+                    self->initial_subscription_ = false;
+                    return;
+                }
                 self->position_swapped_callback_(self->position_.load());
                 // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position changed from %d to %d", __FUNCTION__, old_position, self->position_.load());
         }
