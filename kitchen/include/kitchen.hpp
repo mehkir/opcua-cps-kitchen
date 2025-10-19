@@ -30,6 +30,8 @@
 #include <functional>
 #include <unistd.h>
 #include <boost/asio.hpp>
+#include <boost/unordered_set.hpp>
+#include <boost/functional/hash.hpp>
 
 #include "object_type_node_inserter.hpp"
 #include "client_connection_establisher.hpp"
@@ -85,6 +87,7 @@ struct remote_robot {
          * @param _position the remote robot's position.
          * @param _remote_robot_type_inserter the remote robot type inserter.
          * @param _mark_robot_for_removal_callback the mark robot for removal callback.
+         * @param _position_swapped_callback the position swapped callback.
          */
         remote_robot(std::string _endpoint, UA_UInt32 _position, object_type_node_inserter& _remote_robot_type_inserter,
                     mark_robot_for_removal_callback_t _mark_robot_for_removal_callback,
@@ -223,12 +226,26 @@ struct remote_robot {
                 self->mark_robot_for_removal_callback_(self->position_.load());
                 return;
             }
+            UA_UInt32 old_position = self->position_.load();
             self->position_.store(*(position_t*)_value->value.data);
             UA_StatusCode status;
             if ((status = self->remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(self->position_.load()).c_str(), POSITION, &self->position_, UA_TYPES_UINT32)) != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting %s information node", __FUNCTION__, POSITION, UA_StatusCode_name(status));
                 self->mark_robot_for_removal_callback_(self->position_.load());
+                return;
             }
+            bool connected = true;
+            status = self->remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(self->position_.load()), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot connectivity attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                self->mark_robot_for_removal_callback_(self->position_.load());
+                return;
+            }
+            if (self->initial_subscription_) {
+                self->initial_subscription_ = false;
+                return;
+            }
+            self->position_swapped_callback_(old_position, self->position_.load());
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->position_);
         }
 
@@ -256,8 +273,8 @@ struct remote_robot {
         }
 };
 
+using swap_key = std::pair<UA_UInt32, UA_UInt32>;
 class kitchen {
-
 private:
     /* kitchen related member variables. */
     UA_Server* server_; /**< the OPC UA kitchen server. */
@@ -281,6 +298,7 @@ private:
     std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
     uint32_t robot_count_; /**< the total robot count in the kitchen. */
     std::condition_variable remote_robot_discovery_cv; /**< the condition variable to make the discovery thread wait when all robots are discovered. */
+    boost::unordered_set<swap_key> pending_swaps_; /**< tracks pending swaps. */
     /* controller related member variables. */
     UA_Client* controller_client_; /**< the OPC UA controller client pointer. */
     object_type_node_inserter remote_controller_type_inserter_; /**< the remote controller type inserter for adding the controller's attributes to the address space. */
@@ -370,6 +388,15 @@ private:
      */
     remote_robot*
     choose_next_robot_called(size_t _output_size, UA_Variant *_output);
+
+    /**
+     * @brief Called when robot switched to its new position.
+     * 
+     * @param _old_position the robot's old position.
+     * @param _new_position the robot's new position.
+     */
+    void
+    position_swapped_callback(position_t _old_position, position_t _new_position);
 
     /**
      * @brief Helper method for incrementing X_ORDERS attribute nodes.

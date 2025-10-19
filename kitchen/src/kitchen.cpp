@@ -11,8 +11,9 @@
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 
-kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE), robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE),
-                        remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(), mersenne_twister_(random_device_()), uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr), work_guard_(boost::asio::make_work_guard(io_context_)) {
+kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
+                                        robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
+                                        mersenne_twister_(random_device_()), uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr), work_guard_(boost::asio::make_work_guard(io_context_)) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -350,7 +351,9 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
     {
         std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
         if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end())
-            position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, remote_robot_position, remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
+            position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(remote_robot_endpoint_str, remote_robot_position, remote_robot_type_inserter_,
+                                                                                            std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1),
+                                                                                            std::bind(&kitchen::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
     }
     bool remote_robot_init_failed = false;
     {
@@ -377,6 +380,40 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
 
     }
     return next_remote_robot;
+}
+
+void
+kitchen::position_swapped_callback(position_t _old_position, position_t _new_position) {
+    remove_marked_robots();
+    std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+    swap_key sk = (_old_position < _new_position) ? std::make_pair(_old_position, _new_position) : std::make_pair(_new_position, _old_position);
+    if (pending_swaps_.erase(sk)) {
+        return;
+    }
+    pending_swaps_.insert(sk);
+    std::unique_ptr<remote_robot> first = nullptr;
+    std::unique_ptr<remote_robot> second = nullptr;
+    if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {
+        first = std::move(position_remote_robot_map_[_old_position]);
+        position_remote_robot_map_.erase(_old_position);
+    }
+    if (position_remote_robot_map_.find(_new_position) != position_remote_robot_map_.end()) {
+        second = std::move(position_remote_robot_map_[_new_position]);
+        position_remote_robot_map_.erase(_new_position);
+    }
+    if (first != nullptr) {
+        position_remote_robot_map_[_new_position] = std::move(first);
+    }
+    if (second != nullptr) {
+        position_remote_robot_map_[_old_position] = std::move(second);
+    } else {
+        pending_swaps_.erase(sk);
+        bool connected = false;
+        UA_StatusCode status = remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_old_position), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot connectivity attribute during position swap (%s)", __FUNCTION__, UA_StatusCode_name(status));
+        }
+    }
 }
 
 UA_StatusCode
@@ -556,7 +593,9 @@ kitchen::start() {
                             }
                             position_t remote_robot_position = *(position_t*)inr.get_variant()->data;
                             if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end()) {
-                                position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(endpoint, remote_robot_position, remote_robot_type_inserter_, std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1));
+                                position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(endpoint, remote_robot_position, remote_robot_type_inserter_,
+                                                                                                                std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1),
+                                                                                                                std::bind(&kitchen::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
                             }
                             bool instantiating_failed = false;
                             {

@@ -150,7 +150,7 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
         else if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
             position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities,
                                                                                     std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1),
-                                                                                    std::bind(&controller::position_swapped_callback, this, std::placeholders::_1));
+                                                                                    std::bind(&controller::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
             increment_or_decrement_counter_node(REGISTERED_ROBOTS);
             robot_registration_success = true;
         } else {
