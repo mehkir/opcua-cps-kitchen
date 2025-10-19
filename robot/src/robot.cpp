@@ -48,6 +48,7 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     robot_type_inserter_.add_attribute(ROBOT_TYPE, PROCESSABLE_STEPS);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, OVERALL_PROCESSED_STEPS);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, OVERALL_PROCESSING_STEPS);
+    robot_type_inserter_.add_attribute(ROBOT_TYPE, AVAILABILITY);
     /* Add receive task method node */
     method_arguments receive_task_method_arguments;
     receive_task_method_arguments.add_input_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
@@ -146,6 +147,9 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSED_STEPS, &initial_progress, UA_TYPES_UINT32);
     /* Set overall processing steps */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_PROCESSING_STEPS, &initial_progress, UA_TYPES_UINT32);
+    /* Set availability */
+    bool initial_availability = true;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &initial_availability, UA_TYPES_BOOLEAN);
     /* Run the robot server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -791,6 +795,8 @@ robot::switch_position(UA_Server *_server,
         std::lock_guard<std::mutex> lock(self->state_mutex_);
         if (self->robot_state_ == robot_state::AVAILABLE) {
             self->robot_state_ = robot_state::SWITCHING;
+            bool availability = false;
+            self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN);
             self->new_target_position_ = new_position;
             self->io_context_.post([self] {
                 if (!self->preparing_dish_) {
@@ -838,6 +844,8 @@ robot::switch_position() {
         robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, POSITION, &position_, UA_TYPES_UINT32);
         already_switching_ = false;
         robot_state_ = robot_state::AVAILABLE;
+        bool availability = true;
+        robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN);
     }
     cook_next_order();
 }
