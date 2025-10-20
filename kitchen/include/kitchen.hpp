@@ -42,6 +42,7 @@
 #include "method_node_caller.hpp"
 #include "types.hpp"
 #include "recipe_parser.hpp"
+#include "robot_state.hpp"
 
 using namespace cps_kitchen;
 
@@ -204,6 +205,28 @@ struct remote_robot {
         }
 
         /**
+         * @brief Returns whether the robot is available.
+         * 
+         * @return true if robot is available.
+         * @return false of robot is not available.
+         */
+        bool
+        is_available() {
+            std::lock_guard<std::mutex> lock(client_mutex_);
+            UA_NodeId availability_node_id = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, AVAILABILITY);
+            if (UA_NodeId_equal(&availability_node_id, &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, AVAILABILITY);
+                return false;
+            }
+            information_node_reader inr;
+            if (inr.read_information_node(client_, availability_node_id) != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, AVAILABILITY);
+                return false;
+            }
+            return (*(robot_state*)inr.get_variant()->data) == robot_state::AVAILABLE;
+        }
+
+        /**
          * @brief The position changed callback for the subscription.
          *
          * @param _client the client issuing the subscription.
@@ -273,7 +296,6 @@ struct remote_robot {
         }
 };
 
-using swap_key = std::pair<UA_UInt32, UA_UInt32>;
 class kitchen {
 private:
     /* kitchen related member variables. */
@@ -298,7 +320,6 @@ private:
     std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
     uint32_t robot_count_; /**< the total robot count in the kitchen. */
     std::condition_variable remote_robot_discovery_cv; /**< the condition variable to make the discovery thread wait when all robots are discovered. */
-    boost::unordered_set<swap_key> pending_swaps_; /**< tracks pending swaps. */
     /* controller related member variables. */
     UA_Client* controller_client_; /**< the OPC UA controller client pointer. */
     object_type_node_inserter remote_controller_type_inserter_; /**< the remote controller type inserter for adding the controller's attributes to the address space. */

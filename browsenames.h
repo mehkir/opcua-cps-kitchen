@@ -29,6 +29,7 @@
 #define PROCESSABLE_STEPS "ProcessableSteps"
 #define OVERALL_PROCESSED_STEPS "OverallProcessedSteps"
 #define OVERALL_PROCESSING_STEPS "OverallProcessingSteps"
+#define AVAILABILITY "Availability"
 
 /* CONVEYOR */
 // object type node

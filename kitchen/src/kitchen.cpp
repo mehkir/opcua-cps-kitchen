@@ -296,10 +296,9 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     position_t remote_robot_position = *(position_t*) _output[0].data;
     UA_Boolean result = *(UA_Boolean*) _output[1].data;
     remote_robot* robot = nullptr;
-    {
-        std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+    std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+    if (position_remote_robot_map_.find(remote_robot_position) != position_remote_robot_map_.end())
         robot = position_remote_robot_map_[remote_robot_position].get();
-    }
     // Sanity check
     if (robot == nullptr) {
         if (_output != nullptr)
@@ -386,11 +385,6 @@ void
 kitchen::position_swapped_callback(position_t _old_position, position_t _new_position) {
     remove_marked_robots();
     std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
-    swap_key sk = (_old_position < _new_position) ? std::make_pair(_old_position, _new_position) : std::make_pair(_new_position, _old_position);
-    if (pending_swaps_.erase(sk)) {
-        return;
-    }
-    pending_swaps_.insert(sk);
     std::unique_ptr<remote_robot> first = nullptr;
     std::unique_ptr<remote_robot> second = nullptr;
     if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {
@@ -401,19 +395,7 @@ kitchen::position_swapped_callback(position_t _old_position, position_t _new_pos
         second = std::move(position_remote_robot_map_[_new_position]);
         position_remote_robot_map_.erase(_new_position);
     }
-    if (first != nullptr) {
-        position_remote_robot_map_[_new_position] = std::move(first);
-    }
-    if (second != nullptr) {
-        position_remote_robot_map_[_old_position] = std::move(second);
-    } else {
-        pending_swaps_.erase(sk);
-        bool connected = false;
-        UA_StatusCode status = remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_old_position), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
-        if (status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot connectivity attribute during position swap (%s)", __FUNCTION__, UA_StatusCode_name(status));
-        }
-    }
+    remote_robot_discovery_cv.notify_all();
 }
 
 UA_StatusCode
@@ -592,7 +574,19 @@ kitchen::start() {
                                 continue;
                             }
                             position_t remote_robot_position = *(position_t*)inr.get_variant()->data;
-                            if (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end()) {
+                            UA_NodeId availability_node_id = node_browser_helper().get_attribute_id(remote_robot_client, ROBOT_TYPE, AVAILABILITY);
+                            if (UA_NodeId_equal(&availability_node_id, &UA_NODEID_NULL)) {
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, AVAILABILITY);
+                                UA_Client_delete(remote_robot_client);
+                                continue;
+                            }
+                            if (inr.read_information_node(remote_robot_client, availability_node_id) != UA_STATUSCODE_GOOD) {
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, AVAILABILITY);
+                                UA_Client_delete(remote_robot_client);
+                                continue;
+                            }
+                            UA_Boolean available = *(UA_Boolean*)inr.get_variant()->data;
+                            if (available && position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end()) {
                                 position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(endpoint, remote_robot_position, remote_robot_type_inserter_,
                                                                                                                 std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1),
                                                                                                                 std::bind(&kitchen::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
