@@ -303,8 +303,8 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d will not switch position", __FUNCTION__, _to);
                 swap_states.second_robot_failed = true;
             }
-            second_robot->set_adaptivity_flag();
         }
+        second_robot->set_adaptivity_flag();
     } else {
         /* there is no other robot at the target position (note: this simulates as if the robot at the target position has acked his position switch.
         i.e. the acks signalize based on robots original positions a successful switch) 
