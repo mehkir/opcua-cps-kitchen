@@ -421,6 +421,7 @@ conveyor::deliver_finished_order() {
             UA_Variant* output = nullptr;
             if (position_remote_robot_map_.find(p.get_position()) == position_remote_robot_map_.end()) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Robot at position %d is not known", p.get_position());
+                request_next_robot(p);
                 occupied_plate_id++;
                 continue;
             }
