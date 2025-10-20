@@ -139,6 +139,7 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
 }
 
 kitchen::~kitchen() {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     stop();
     join_threads();
 
@@ -217,6 +218,7 @@ kitchen::place_random_order(UA_Server* _server,
 
 void
 kitchen::handle_random_order_request() {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
     recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
@@ -383,6 +385,7 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
 
 void
 kitchen::position_swapped_callback(position_t _old_position, position_t _new_position) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     remove_marked_robots();
     std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
     if (position_remote_robot_map_.find(_old_position) == position_remote_robot_map_.end())
@@ -402,6 +405,7 @@ kitchen::position_swapped_callback(position_t _old_position, position_t _new_pos
 
 UA_StatusCode
 kitchen::increment_orders_counter(std::string _attribute_name) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_Variant value;
     UA_Variant_init(&value);
@@ -626,6 +630,7 @@ kitchen::start() {
 
 void
 kitchen::stop() {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     {
         std::lock_guard<std::mutex> remote_robot_lock(remote_robot_discovery_mutex_);
         std::lock_guard<std::mutex> client_loop_lock(client_mutex_);

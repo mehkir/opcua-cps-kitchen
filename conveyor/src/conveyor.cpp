@@ -113,7 +113,10 @@ conveyor::~conveyor() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     stop();
     join_threads();
-    position_remote_robot_map_.clear();
+    {
+        std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
+        position_remote_robot_map_.clear();
+    }
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         if (controller_client_ != nullptr)
@@ -156,8 +159,11 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "FINISHED_ORDER_NOTIFICATION: Received notification from robot at position %d with endpoint %s", _robot_position, _robot_endpoint.c_str());
     remove_marked_robots();
-    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+    {
+        std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
+        if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
+            position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+        }
     }
     UA_Boolean finished_order_notification_received = true;
     bool remote_robot_initialization_failed = false;
@@ -200,7 +206,11 @@ conveyor::handle_retrieve_finished_orders() {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: Dish at position %d is retrievable", notification->first);
             size_t output_size = 0;
             UA_Variant* output = nullptr;
-            UA_StatusCode status = position_remote_robot_map_[notification->first]->handover_finished_order(&output_size, &output);
+            UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+            {
+                std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
+                status = position_remote_robot_map_[notification->first]->handover_finished_order(&output_size, &output);
+            }
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: RETRIEVAL: Retrieving for dish at position %d failed (%s)", __FUNCTION__, notification->first, UA_StatusCode_name(status));
                 if (output != nullptr)
@@ -325,8 +335,11 @@ conveyor::request_next_robot(plate& _plate) {
         return;
     }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", target_position, target_endpoint_std_str.c_str());
-    if (position_remote_robot_map_.find(target_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[target_position] = std::make_unique<remote_robot>(target_endpoint_std_str, target_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+    {
+        std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
+        if (position_remote_robot_map_.find(target_position) == position_remote_robot_map_.end()) {
+            position_remote_robot_map_[target_position] = std::make_unique<remote_robot>(target_endpoint_std_str, target_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+        }
     }
     bool remote_robot_initialization_failed = false;
     {
@@ -419,6 +432,7 @@ conveyor::deliver_finished_order() {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Dish at position %d is deliverable", p.get_position());
             size_t output_size = 0;
             UA_Variant* output = nullptr;
+            std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
             if (position_remote_robot_map_.find(p.get_position()) == position_remote_robot_map_.end()) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Robot at position %d is not known", p.get_position());
                 request_next_robot(p);
@@ -485,7 +499,7 @@ conveyor::determine_next_movement() {
 
 bool
 conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         if (_output != nullptr)
@@ -530,6 +544,25 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
 }
 
 void
+conveyor::position_swapped_callback(position_t _old_position, position_t _new_position) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    remove_marked_robots();
+    std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
+    if (position_remote_robot_map_.find(_old_position) == position_remote_robot_map_.end())
+        return;
+    std::unique_ptr<remote_robot> first = nullptr;
+    std::unique_ptr<remote_robot> second = nullptr;
+    if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {
+        first = std::move(position_remote_robot_map_[_old_position]);
+        position_remote_robot_map_.erase(_old_position);
+    }
+    if (position_remote_robot_map_.find(_new_position) != position_remote_robot_map_.end()) {
+        second = std::move(position_remote_robot_map_[_new_position]);
+        position_remote_robot_map_.erase(_new_position);
+    }
+}
+
+void
 conveyor::mark_robot_for_removal(position_t _position) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
@@ -545,6 +578,7 @@ conveyor::remove_marked_robots() {
         std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
         robots_to_be_removed_tmp.swap(robots_to_be_removed_);
     }
+    std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
     for (position_t position : robots_to_be_removed_tmp) {
         if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_.erase(position);
