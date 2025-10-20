@@ -385,6 +385,8 @@ void
 kitchen::position_swapped_callback(position_t _old_position, position_t _new_position) {
     remove_marked_robots();
     std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
+    if (position_remote_robot_map_.find(_old_position) == position_remote_robot_map_.end())
+        return;
     std::unique_ptr<remote_robot> first = nullptr;
     std::unique_ptr<remote_robot> second = nullptr;
     if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {
