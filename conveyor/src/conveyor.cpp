@@ -548,20 +548,23 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
 void
 conveyor::position_swapped_callback(position_t _old_position, position_t _new_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    remove_marked_robots();
     std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
-    if (position_remote_robot_map_.find(_old_position) == position_remote_robot_map_.end())
-        return;
-    std::unique_ptr<remote_robot> first = nullptr;
-    std::unique_ptr<remote_robot> second = nullptr;
+    remote_robot* first = nullptr;
+    remote_robot* second = nullptr;
     if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {
-        first = std::move(position_remote_robot_map_[_old_position]);
-        position_remote_robot_map_.erase(_old_position);
+        first = position_remote_robot_map_[_old_position].get();
     }
     if (position_remote_robot_map_.find(_new_position) != position_remote_robot_map_.end()) {
-        second = std::move(position_remote_robot_map_[_new_position]);
-        position_remote_robot_map_.erase(_new_position);
+        second = position_remote_robot_map_[_new_position].get();
     }
+    if ((first != nullptr && first->get_position() != _old_position)
+        || (second != nullptr && second->get_position() != _new_position) ) {
+            std::swap(position_remote_robot_map_[_old_position], position_remote_robot_map_[_new_position]);
+    }
+    if (position_remote_robot_map_[_old_position] == nullptr)
+        position_remote_robot_map_.erase(_old_position);
+    if (position_remote_robot_map_[_new_position] == nullptr)
+        position_remote_robot_map_.erase(_new_position);
 }
 
 void

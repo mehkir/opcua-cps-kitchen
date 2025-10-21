@@ -30,7 +30,7 @@ public:
      * @param _recipe_action_queue the action queue with remaining steps to perform on the order.
      * @return remote_robot* the remote robot for the next order steps.
      */
-    virtual remote_robot* on_new_order(std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) = 0;
+    virtual remote_robot* on_new_order(const std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) = 0;
 
     /**
      * @brief Sets the swap robot positions callback.

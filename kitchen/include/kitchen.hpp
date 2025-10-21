@@ -43,7 +43,6 @@
 #include "types.hpp"
 #include "recipe_parser.hpp"
 #include "robot_state.hpp"
-#include "information_node_reader.hpp"
 
 using namespace cps_kitchen;
 
@@ -206,28 +205,6 @@ struct remote_robot {
         }
 
         /**
-         * @brief Returns whether the robot is available.
-         * 
-         * @return true if robot is available.
-         * @return false of robot is not available.
-         */
-        bool
-        is_available() {
-            std::lock_guard<std::mutex> lock(client_mutex_);
-            UA_NodeId availability_node_id = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, AVAILABILITY);
-            if (UA_NodeId_equal(&availability_node_id, &UA_NODEID_NULL)) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, AVAILABILITY);
-                return false;
-            }
-            information_node_reader inr;
-            if (inr.read_information_node(client_, availability_node_id) != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, AVAILABILITY);
-                return false;
-            }
-            return (*(robot_state*)inr.get_variant()->data) == robot_state::AVAILABLE;
-        }
-
-        /**
          * @brief The position changed callback for the subscription.
          *
          * @param _client the client issuing the subscription.
@@ -252,19 +229,6 @@ struct remote_robot {
             }
             UA_UInt32 old_position = self->position_.load();
             self->position_.store(*(position_t*)_value->value.data);
-            UA_StatusCode status;
-            if ((status = self->remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(self->position_.load()).c_str(), POSITION, &self->position_, UA_TYPES_UINT32)) != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting %s information node", __FUNCTION__, POSITION, UA_StatusCode_name(status));
-                self->mark_robot_for_removal_callback_(self->position_.load());
-                return;
-            }
-            bool connected = true;
-            status = self->remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(self->position_.load()), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
-            if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot connectivity attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                self->mark_robot_for_removal_callback_(self->position_.load());
-                return;
-            }
             if (self->initial_subscription_) {
                 self->initial_subscription_ = false;
                 return;
