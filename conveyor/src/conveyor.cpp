@@ -162,7 +162,8 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
     {
         std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
         if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
-            position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+            position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1),
+                                                                                        std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         }
     }
     UA_Boolean finished_order_notification_received = true;
@@ -338,7 +339,8 @@ conveyor::request_next_robot(plate& _plate) {
     {
         std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
         if (position_remote_robot_map_.find(target_position) == position_remote_robot_map_.end()) {
-            position_remote_robot_map_[target_position] = std::make_unique<remote_robot>(target_endpoint_std_str, target_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1));
+            position_remote_robot_map_[target_position] = std::make_unique<remote_robot>(target_endpoint_std_str, target_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1),
+                                                                                        std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         }
     }
     bool remote_robot_initialization_failed = false;

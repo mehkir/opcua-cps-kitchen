@@ -5,7 +5,6 @@
 #include <open62541/client_highlevel.h>
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
-#include "information_node_reader.hpp"
 
 #define INSTANCE_NAME "CpsKitchen"
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"

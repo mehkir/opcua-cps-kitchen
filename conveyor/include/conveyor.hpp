@@ -117,7 +117,7 @@ struct remote_robot {
                             std::lock_guard<std::mutex> lock(client_mutex_);
                             UA_StatusCode status = UA_Client_run_iterate(client_, 1);
                             if (status != UA_STATUSCODE_GOOD) {
-                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_, UA_StatusCode_name(status));
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_.load(), UA_StatusCode_name(status));
                                 running_.store(false);
                                 mark_robot_for_removal_callback_(position_.load());
                                 return;
@@ -133,7 +133,7 @@ struct remote_robot {
                     }
                 });
             } catch (...) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the robot client iterate thread at position %d", __FUNCTION__, position_);
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the robot client iterate thread at position %d", __FUNCTION__, position_.load());
                 running_.store(false);
                 mark_robot_for_removal_callback_(position_.load());
                 return;
@@ -242,7 +242,7 @@ struct remote_robot {
          */
         UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", position_, _recipe_id, _processed_steps);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", position_.load(), _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
