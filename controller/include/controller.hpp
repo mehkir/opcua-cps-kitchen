@@ -33,6 +33,7 @@
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
 #include "mape.hpp"
+#include "information_node_reader.hpp"
 
 using namespace cps_kitchen;
 
@@ -81,6 +82,12 @@ struct remote_robot {
             bool connected = robot_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d (async)", position_.load());
+                mark_robot_for_removal_callback_(position_.load());
+                return;
+            }
+            attribute_id_map_[AVAILABILITY] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, AVAILABILITY);
+            if (UA_NodeId_equal(&attribute_id_map_[AVAILABILITY], &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, AVAILABILITY);
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
@@ -333,6 +340,24 @@ struct remote_robot {
                 }
                 self->last_equipped_tool_.store(*(robot_tool*) _value->value.data);
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, self->position_.load(), robot_tool_to_string(self->last_equipped_tool_.load()));
+        }
+
+        /**
+         * @brief Returns whether the robot is available.
+         * 
+         * @return true if robot is available.
+         * @return false of robot is not available.
+         */
+        UA_Boolean
+        is_available() {
+            std::lock_guard<std::mutex> lock(client_mutex_);
+            information_node_reader inr;
+            if (inr.read_information_node(client_, attribute_id_map_[AVAILABILITY]) != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, AVAILABILITY);
+                mark_robot_for_removal_callback_(position_.load());
+                return false;
+            }
+            return *(UA_Boolean*)inr.get_variant()->data;
         }
 
         /**
