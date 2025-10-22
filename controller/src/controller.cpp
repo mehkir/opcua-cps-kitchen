@@ -266,11 +266,11 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no robot at position %d", __FUNCTION__, _from);
         return;
     }
-    if (position_remote_robot_map_.at(_from).get()->is_adaptivity_pending()) {
+    if (position_remote_robot_map_[_from]->is_adaptivity_pending() || !position_remote_robot_map_[_from]->is_available()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _from);
         return;
     }
-    if (position_remote_robot_map_.find(_to) != position_remote_robot_map_.end() && position_remote_robot_map_[_to]->is_adaptivity_pending()) {
+    if (position_remote_robot_map_.find(_to) != position_remote_robot_map_.end() && (position_remote_robot_map_[_to]->is_adaptivity_pending() || !position_remote_robot_map_[_to]->is_available())) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _to);
         return;
     }
