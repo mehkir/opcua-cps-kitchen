@@ -307,8 +307,11 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
         } else {
             UA_Boolean second_will_switch = swap_robot_positions_called(output_size, output);
             if (!second_will_switch) {
+                // Inconsistency check: This branch should actually never be entered, since availability check above would return early
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d will not switch position", __FUNCTION__, _to);
                 swap_states.second_robot_failed = true;
+                stop();
+                return;
             }
         }
         second_robot->set_adaptivity_flag();
