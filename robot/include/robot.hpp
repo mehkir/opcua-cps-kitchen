@@ -120,12 +120,14 @@ private:
     std::queue<robot_action> action_queue_in_process_; /**< the current actions in process. */
     bool preparing_dish_; /**< flag to indicate whether the robot is busy preparing a dish. */
     bool already_rearranging_; /**< flag to indicate whether the worker thread is already rearranging the robot. */
+    bool already_reconfiguring_; /**< flag to indicate whether the worker thread is already reconfiguring the robot. */
     bool is_dish_finished_; /**< flag to indicate whether the robot is holding a completed dish or partially finished dish. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
     std::atomic<bool> pending_pickup_; /**< flag to indicate whether there is a pending pickup for an sucessfully sent notifcation to the conveyor. */
     robot_state robot_state_; /**< state to indicate if robot is either available or performing an adaptive action */
     std::mutex state_mutex_; /**< the mutex to synchronize robot state checks. */
     position_t new_target_position_; /**< new target position requested by the controller. */
+    std::string new_capabilities_profile_; /**< new capabilities profile requested by the controller */
     discovery_util discovery_util_; /**< the discovery utility. */
     std::thread server_iterate_thread_; /**< the server iteration thread. */
     recipe_parser recipe_parser_; /**< the recipe parser. */
@@ -156,6 +158,13 @@ private:
      */
     void
     register_robot_called(size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Sets the capabilities node in the address space.
+     * 
+     */
+    void
+    set_capabilities_node();
 
     /**
      * @brief Extracts the instruction parameters.
@@ -321,7 +330,45 @@ private:
      * 
      */
     void
-    switch_position();
+    complete_position_change();
+
+    /**
+     * @brief Extracts the new capabilities profile parameter.
+     * 
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
+     */
+    static UA_StatusCode
+    reconfigure(UA_Server *_server,
+            const UA_NodeId *_session_id, void *_session_context,
+            const UA_NodeId *_method_id, void *_method_context,
+            const UA_NodeId *_object_id, void *_object_context,
+            size_t _input_size, const UA_Variant *_input,
+            size_t _output_size, UA_Variant *_output);
+
+    /**
+     * @brief Handles the extracted new capabilities profile parameter from the reconfigure method and performs the reconfiguration.
+     * 
+     */
+    void
+    handle_reconfiguration();
+
+    /**
+     * @brief Timed callback to indicate reconfiguration completion.
+     * 
+     */
+    void
+    complete_reconfiguration();
 
     /**
      * @brief Joins all started threads.
