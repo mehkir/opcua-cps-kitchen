@@ -119,7 +119,7 @@ private:
     duration_t current_action_duration_; /**< the current action duration. */
     std::queue<robot_action> action_queue_in_process_; /**< the current actions in process. */
     bool preparing_dish_; /**< flag to indicate whether the robot is busy preparing a dish. */
-    bool already_switching_; /**< flag to indicate whether the worker thread is already switching. */
+    bool already_rearranging_; /**< flag to indicate whether the worker thread is already rearranging the robot. */
     bool is_dish_finished_; /**< flag to indicate whether the robot is holding a completed dish or partially finished dish. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
     std::atomic<bool> pending_pickup_; /**< flag to indicate whether there is a pending pickup for an sucessfully sent notifcation to the conveyor. */

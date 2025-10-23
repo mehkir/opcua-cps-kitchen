@@ -15,8 +15,8 @@
  */
 enum class robot_state {
     AVAILABLE,
-    SWITCHING,
-    REARRANGING
+    REARRANGING,
+    RECONFIGURING
 };
 
 /**
@@ -29,8 +29,8 @@ static std::string
 robot_state_to_string(robot_state _state) {
     switch (_state) {
         case robot_state::AVAILABLE: return "AVAILABLE";
-        case robot_state::SWITCHING: return "SWITCHING";
         case robot_state::REARRANGING: return "REARRANGING";
+        case robot_state::RECONFIGURING: return "RECONFIGURING";
         default: return "Unimplemented item";
     }
 }

@@ -18,7 +18,7 @@
 #define MOVE_TIME 5LL
 
 robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
-        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_switching_(false), is_dish_finished_(false), running_(true),
+        server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_rearranging_(false), is_dish_finished_(false), running_(true),
         current_action_duration_(0), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
         conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_state_(robot_state::AVAILABLE), new_target_position_(0), mersenne_twister_(random_device_()), uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1) {
     /* Setup robot */
@@ -319,7 +319,7 @@ robot::cook_next_order() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
-        if (robot_state_ == robot_state::SWITCHING) {
+        if (robot_state_ == robot_state::REARRANGING) {
             handle_switch_position();
             return;
         }
@@ -796,7 +796,7 @@ robot::switch_position(UA_Server *_server,
         std::lock_guard<std::mutex> lock(self->state_mutex_);
         if (self->robot_state_ == robot_state::AVAILABLE
             && self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN) == UA_STATUSCODE_GOOD) {
-            self->robot_state_ = robot_state::SWITCHING;
+            self->robot_state_ = robot_state::REARRANGING;
             self->new_target_position_ = new_position;
             self->io_context_.post([self] {
                 if (!self->preparing_dish_) {
@@ -819,9 +819,9 @@ robot::switch_position(UA_Server *_server,
 void
 robot::handle_switch_position() {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (already_switching_)
+    if (already_rearranging_)
         return;
-    already_switching_ = true;
+    already_rearranging_ = true;
     uint32_t cw  = (new_target_position_ - position_ + conveyor_size_) % conveyor_size_;
     uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
     uint32_t distance = std::min(cw, ccw);
@@ -844,7 +844,7 @@ robot::switch_position() {
         position_ = new_target_position_;
         new_target_position_ = 0;
         robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, POSITION, &position_, UA_TYPES_UINT32);
-        already_switching_ = false;
+        already_rearranging_ = false;
         robot_state_ = robot_state::AVAILABLE;
         bool availability = true;
         robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN);
