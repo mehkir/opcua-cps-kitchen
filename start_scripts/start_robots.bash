@@ -1,23 +1,28 @@
 #!/usr/bin/bash
-if [ "$#" -lt 2 ]; then
+if (( $# < 1 )); then
+  echo "Usage: $0 <robots_count>"
+  exit 1
+fi
+if (( $# < 2 )); then
     echo "Usage: $0 <number_of_robots> <conveyor_size>"
     exit 1
 fi
-ROBOTS=$1
-if [[ $ROBOTS -lt 1 ]]; then
-    echo "Number of robots must be >= 1"
+if (( $1 < 1)); then
+    echo "robots count must be >= 1"
     exit 1
 fi
-CONVEYOR_SIZE=$2
-if [[ $CONVEYOR_SIZE -lt 2 ]]; then
+ROBOTS=$1
+if (( $CONVEYOR_SIZE < 2 )); then
     echo "Coveyor size must be >= 2"
     exit 1
 fi
+CONVEYOR_SIZE=$2
+
 declare -A position_capabilities=(
-    [1]="r1.json"
-    [2]="r2.json"
-    [3]="r3.json"
-    [4]="r4.json"
+    [1]="r4.json"
+    [2]="r3.json"
+    [3]="r2.json"
+    [4]="r1.json"
 )
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"

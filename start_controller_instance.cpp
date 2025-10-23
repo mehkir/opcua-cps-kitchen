@@ -14,6 +14,7 @@ static void stop_handler(int sig) {
 int main(int argc, char* argv[]) {
     signal(SIGINT, stop_handler);
     signal(SIGTERM, stop_handler);
+
     controller controller_instance(std::make_unique<kitchen_mape>());
     controller_instance_ = &controller_instance;
     controller_instance.start();

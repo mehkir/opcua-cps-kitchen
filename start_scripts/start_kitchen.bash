@@ -1,13 +1,13 @@
 #!/usr/bin/bash
+if (( $# < 1 )); then
+  echo "Usage: $0 <robots_count>"
+  exit 1
+fi
+if (( $1 < 1)); then
+    echo "robots count must be >= 1"
+    exit 1
+fi
 ROBOTS=$1
-if [[ $ROBOTS -lt 1 ]]; then
-    echo "Usage: $0 <number_of_robots>"
-    exit 1
-fi
-if [[ -z $ROBOTS ]]; then
-    echo "Error: Number of robots not specified."
-    exit 1
-fi
 
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
