@@ -13,7 +13,7 @@ using namespace cps_kitchen;
 struct remote_robot;
 
 typedef std::function<void(position_t, position_t)> swap_robot_positions_callback_t; /**< the callback declaration to swap robot positions pair-wise. */
-typedef std::function<void(std::string, position_t)> reconfigure_robot_callback_t; /**< the callback declaration to reconfigure a robot. */
+typedef std::function<void(position_t, std::string)> reconfigure_robot_callback_t; /**< the callback declaration to reconfigure a robot. */
 
 class mape {
 private:

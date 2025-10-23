@@ -78,6 +78,9 @@ controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_
     kitchen_mape_->set_swap_robot_positions_callback(std::bind(&controller::swap_robot_positions, this,
                                                         std::placeholders::_1,
                                                         std::placeholders::_2));
+    kitchen_mape_->set_reconfigure_robot_callback(std::bind(&controller::reconfigure_robot_capability, this,
+                                                        std::placeholders::_1,
+                                                        std::placeholders::_2));
 }
 
 controller::~controller() {
