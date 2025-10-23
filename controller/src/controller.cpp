@@ -150,7 +150,8 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
         else if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
             position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities,
                                                                                     std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1),
-                                                                                    std::bind(&controller::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
+                                                                                    std::bind(&controller::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2),
+                                                                                    std::bind(&controller::capabilities_reconfigured_callback, this, std::placeholders::_1));
             increment_or_decrement_counter_node(REGISTERED_ROBOTS);
             robot_registration_success = true;
         } else {
@@ -285,7 +286,7 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
             UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return;
     }
-    UA_Boolean first_will_switch = swap_robot_positions_called(output_size, output);
+    UA_Boolean first_will_switch = adaptivity_action_called(output_size, output);
     if (!first_will_switch) {
         // Inconsistency check: This branch should actually never be entered, since availability check above would return early
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d will not switch position", __FUNCTION__, _from);
@@ -307,7 +308,7 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
                 swap_states.second_robot_failed = true;
             }
         } else {
-            UA_Boolean second_will_switch = swap_robot_positions_called(output_size, output);
+            UA_Boolean second_will_switch = adaptivity_action_called(output_size, output);
             if (!second_will_switch) {
                 // Inconsistency check: This branch should actually never be entered, since availability check above would return early
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d will not switch position", __FUNCTION__, _to);
@@ -332,7 +333,7 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
 }
 
 bool
-controller::swap_robot_positions_called(size_t _output_size, UA_Variant* _output) {
+controller::adaptivity_action_called(size_t _output_size, UA_Variant* _output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
@@ -346,10 +347,10 @@ controller::swap_robot_positions_called(size_t _output_size, UA_Variant* _output
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return false;
     }
-    UA_Boolean will_switch = *(UA_Boolean*) _output[0].data;
+    UA_Boolean will_adapt = *(UA_Boolean*) _output[0].data;
     if (_output != nullptr)
         UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-    return will_switch;
+    return will_adapt;
 }
 
 void
@@ -424,6 +425,46 @@ controller::erase_stale_pending_swap_entries() {
         } else {
             pending_entry++;
         }
+    }
+}
+
+void
+controller::reconfigure_robot_capability(position_t _robot_position, std::string _new_capabilities_profile) {
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no robot at position %d", __FUNCTION__, _robot_position);
+        return;
+    }
+    if ((position_remote_robot_map_[_robot_position]->is_adaptivity_pending() || !position_remote_robot_map_[_robot_position]->is_available())) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _robot_position);
+        return;
+    }
+    size_t output_size = 0;
+    UA_Variant* output = nullptr;
+    UA_StatusCode status = position_remote_robot_map_[_robot_position]->reconfigure_capabilities(_new_capabilities_profile, &output_size, &output);
+    if (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method for remote robot at position %d (%s)", __FUNCTION__, RECONFIGURE, _robot_position, UA_StatusCode_name(status));
+        if (output != nullptr)
+            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        return;
+    }
+    UA_Boolean robot_will_reconfigure = adaptivity_action_called(output_size, output);
+    if (!robot_will_reconfigure) {
+        // Inconsistency check: This branch should actually never be entered, since availability check above would return early
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d will not reconfigure", __FUNCTION__, _robot_position);
+        stop();
+        return;
+    }
+    position_remote_robot_map_[_robot_position]->set_adaptivity_flag();
+}
+
+void
+controller::capabilities_reconfigured_callback(position_t _robot_position) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    remove_marked_robots();
+    std::lock_guard<std::mutex> lock(adaptivity_mutex_);
+    if (position_remote_robot_map_.find(_robot_position) != position_remote_robot_map_.end()) {
+        position_remote_robot_map_[_robot_position]->reset_adaptivity_flag();
     }
 }
 

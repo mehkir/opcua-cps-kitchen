@@ -621,15 +621,15 @@ private:
     swap_robot_positions(position_t _from, position_t _to);
 
     /**
-     * @brief Extracts return values of swap robot position call.
+     * @brief Extracts return values of adaptation call.
      * 
      * @param _output_size the count of returned output values.
      * @param _output the variant containing the output values.
-     * @return true if the robot will switch.
-     * @return false if the robot denies the switch request.
+     * @return true if the robot will adapt.
+     * @return false if the robot denies the adaptation request.
      */
     bool
-    swap_robot_positions_called(size_t _output_size, UA_Variant* _output);
+    adaptivity_action_called(size_t _output_size, UA_Variant* _output);
 
     /**
      * @brief Called when robot switched to its new position.
@@ -646,6 +646,23 @@ private:
      */
     void
     erase_stale_pending_swap_entries();
+
+    /**
+     * @brief Instructs a remote robot to reconfigure its capability profile.
+     * 
+     * @param _robot_position the position of the robot.
+     * @param _new_capabilities_profile the new capabilities profile.
+     */
+    void
+    reconfigure_robot_capability(position_t _robot_position, std::string _new_capabilities_profile);
+
+    /**
+     * @brief Called when robot reconfigured its capabilities.
+     * 
+     * @param _robot_position the robot position.
+     */
+    void
+    capabilities_reconfigured_callback(position_t _robot_position);
 
     /**
      * @brief Marks a remote robot for removal.

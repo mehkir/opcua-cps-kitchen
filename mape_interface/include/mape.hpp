@@ -13,6 +13,7 @@ using namespace cps_kitchen;
 struct remote_robot;
 
 typedef std::function<void(position_t, position_t)> swap_robot_positions_callback_t; /**< the callback declaration to swap robot positions pair-wise. */
+typedef std::function<void(std::string, position_t)> reconfigure_robot_callback_t; /**< the callback declaration to reconfigure a robot. */
 
 class mape {
 private:
@@ -20,6 +21,7 @@ private:
 protected:
     mape() = default;
     swap_robot_positions_callback_t swap_robot_positions_callback_;
+    reconfigure_robot_callback_t reconfigure_robot_callback_;
 public:
     virtual ~mape() = default;
 
@@ -35,9 +37,16 @@ public:
     /**
      * @brief Sets the swap robot positions callback.
      * 
-     * @param _swap_robot_positions_callback the robot position callback.
+     * @param _swap_robot_positions_callback the swap robot position callback.
      */
     virtual void set_swap_robot_positions_callback(swap_robot_positions_callback_t _swap_robot_positions_callback) = 0;
+
+    /**
+     * @brief Sets the reconfigure robot callback.
+     * 
+     * @param _reconfigure_robot_callback the reconfigure robot callback.
+     */
+    virtual void set_reconfigure_robot_callback(reconfigure_robot_callback_t _reconfigure_robot_callback) = 0;
 };
 
 #endif // MAPE_HPP
