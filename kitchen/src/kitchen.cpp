@@ -218,7 +218,7 @@ kitchen::place_random_order(UA_Server* _server,
 
 void
 kitchen::handle_random_order_request() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
     recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
@@ -381,7 +381,7 @@ kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
 
 void
 kitchen::position_swapped_callback(position_t _old_position, position_t _new_position) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
     remote_robot* first = nullptr;
     remote_robot* second = nullptr;
@@ -444,7 +444,7 @@ kitchen::mark_robot_for_removal(position_t _position) {
 
 void
 kitchen::remove_marked_robots() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::unordered_set<cps_kitchen::position_t> robots_to_be_removed_tmp;
     {
         std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);

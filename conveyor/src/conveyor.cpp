@@ -110,7 +110,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
 }
 
 conveyor::~conveyor() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     stop();
     join_threads();
     {
@@ -136,7 +136,7 @@ conveyor::receive_finished_order_notification(UA_Server *_server,
         const UA_NodeId *_object_id, void *_object_context,
         size_t _input_size, const UA_Variant *_input,
         size_t _output_size, UA_Variant *_output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_input_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Bad input size");
         return UA_STATUSCODE_BAD;
@@ -156,7 +156,7 @@ conveyor::receive_finished_order_notification(UA_Server *_server,
 
 void
 conveyor::handle_finished_order_notification(std::string _robot_endpoint, position_t _robot_position, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "FINISHED_ORDER_NOTIFICATION: Received notification from robot at position %d with endpoint %s", _robot_position, _robot_endpoint.c_str());
     remove_marked_robots();
     {
@@ -200,7 +200,7 @@ conveyor::retrieve_finished_orders(UA_Server* _server, void* _data) {
 
 void
 conveyor::handle_retrieve_finished_orders() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     remove_marked_robots();
     for (auto notification = notifications_map_.begin(); notification != notifications_map_.end();) {
         if (!plates_[position_plate_id_map_[notification->first]].is_occupied()) {
@@ -233,7 +233,7 @@ conveyor::handle_retrieve_finished_orders() {
 
 void
 conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 5) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         if (_output != nullptr)
@@ -267,7 +267,7 @@ conveyor::handover_finished_order_called(size_t _output_size, UA_Variant* _outpu
 
 void
 conveyor::handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, UA_Boolean _is_dish_finished) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     remove_marked_robots();
     if (_finished_recipe == 0) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "UNCOORDINATED HANDOVER: Robot at position %d passed recipe ID %d with processed steps of %d (%s)", _remote_robot_position, _finished_recipe, _processed_steps, (_is_dish_finished ? "completely" : "partially"));
@@ -289,7 +289,7 @@ conveyor::handle_handover_finished_order(std::string _remote_robot_endpoint, pos
 
 void
 conveyor::request_next_robot(plate& _plate) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     /* Request next robot */
     recipe_id_t finished_recipe = _plate.get_placed_recipe_id();
     UA_UInt32 processed_steps = _plate.get_processed_steps();
@@ -362,7 +362,7 @@ conveyor::request_next_robot(plate& _plate) {
 
 void
 conveyor::perform_movement(UA_Server* _server, void* _data) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_data == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Data is NULL", __FUNCTION__);
         return;
@@ -374,7 +374,7 @@ conveyor::perform_movement(UA_Server* _server, void* _data) {
 
 void
 conveyor::move_conveyor(steps_t _steps) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for (size_t i = 0; i < plates_.size(); i++) {
         position_t new_position = (plates_[i].get_position() + _steps) % plates_.size();
         plates_[i].set_position(new_position);
@@ -385,7 +385,7 @@ conveyor::move_conveyor(steps_t _steps) {
 
 void
 conveyor::deliver_finished_order() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     remove_marked_robots();
     for (auto occupied_plate_id = occupied_plates_.begin(); occupied_plate_id != occupied_plates_.end();) {
         plate& p = plates_[*occupied_plate_id];
@@ -464,7 +464,7 @@ conveyor::deliver_finished_order() {
 
 UA_StatusCode
 conveyor::receive_completed_order_called(size_t _output_size, UA_Variant* _output) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         if (_output != nullptr)
@@ -489,7 +489,7 @@ conveyor::receive_completed_order_called(size_t _output_size, UA_Variant* _outpu
 
 void
 conveyor::determine_next_movement() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (occupied_plates_.empty() && notifications_map_.empty()) {
         state_status_ = conveyor::state::IDLING;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: No occupied plates or notifications, idling now");
@@ -569,7 +569,7 @@ conveyor::position_swapped_callback(position_t _old_position, position_t _new_po
 
 void
 conveyor::mark_robot_for_removal(position_t _position) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
     robots_to_be_removed_.insert(_position);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Marked robot at position %d for removal", __FUNCTION__, _position);
@@ -577,7 +577,7 @@ conveyor::mark_robot_for_removal(position_t _position) {
 
 void
 conveyor::remove_marked_robots() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::unordered_set<cps_kitchen::plate_id_t> robots_to_be_removed_tmp;
     {
         std::lock_guard<std::mutex> lock(mark_for_removal_mutex_);
@@ -596,7 +596,7 @@ conveyor::remove_marked_robots() {
 
 void
 conveyor::reset_plate(plate& _plate) {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     _plate.place_recipe_id(0);
     _plate.set_processed_steps(0);
     _plate.set_target_position(0);
@@ -606,7 +606,7 @@ conveyor::reset_plate(plate& _plate) {
 
 void
 conveyor::join_threads() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (server_iterate_thread_.joinable())
         server_iterate_thread_.join();
     if (client_iterate_thread_.joinable())
@@ -615,7 +615,7 @@ conveyor::join_threads() {
 
 void
 conveyor::start() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (!running_.load())
         stop();
     /* Run the client iterate thread */
@@ -672,7 +672,7 @@ conveyor::start() {
 
 void
 conveyor::stop() {
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     running_.store(false);
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
