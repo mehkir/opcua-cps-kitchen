@@ -3,7 +3,7 @@
 
 remote_robot*
 kitchen_mape::on_new_order(const std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) {
-    remote_robot* suitable_robot = nullptr;;
+    remote_robot* suitable_robot = nullptr;
     std::string next_action = _recipe_action_queue.front().get_name();
     for (auto position_remote_robot = _position_remote_robot_map.begin(); position_remote_robot != _position_remote_robot_map.end(); position_remote_robot++) {
         remote_robot* robot = position_remote_robot->second.get();

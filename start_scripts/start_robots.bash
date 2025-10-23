@@ -31,9 +31,9 @@ for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
         echo "No capabilities file mapped for position $robot_position" >&2
         continue
     fi
-    # "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" &
+    "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" &
     # "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" 1>/dev/null &
-    "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" >./logs/robot_${robot_position}_${ROBOTS}_$(date +%Y%m%d%H%M%S) &
+    # "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" >./logs/robot_${robot_position}_${ROBOTS}_$(date +%Y%m%d%H%M%S) &
     exit_code=$?
     if [ $exit_code -ne 0 ]; then
         echo "Error: Non-zero exit code detected during robot startup. Exiting."
