@@ -39,6 +39,7 @@ using namespace cps_kitchen;
 
 typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal. */
 typedef std::function<void(position_t, position_t)> position_swapped_callback_t; /**< the callback declaration to notify about position change. */
+typedef std::function<void(position_t)> capabilities_reconfigured_callback_t; /**< the callback declaration to notify about position change. */
 
 /**
  * @brief Remote robot client to monitor kitchen robot attributes.
@@ -52,6 +53,7 @@ struct remote_robot {
         std::unordered_set<std::string> capabilities_; /**< the capabilites. */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
+        capabilities_reconfigured_callback_t capabilities_reconfigured_callback_; /**< the callback to notify about capabilitiy reconfgurations. */
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the robot's attribute node ids. */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
         std::atomic<robot_tool> last_equipped_tool_; /**< the last equipped tool. */
@@ -60,7 +62,8 @@ struct remote_robot {
         std::thread client_iterate_thread_; /**< the client iteration thread. */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
         std::atomic<bool> adaptivity_is_pending_; /**< flag to indicate whether adaptivity is pending. */
-        bool initial_subscription_; /**< flag to indicate initial subscription notification. */
+        bool initial_position_subscription_; /**< flag to indicate initial position subscription notification. */
+        bool initial_capabilities_subscription_; /**< flag to indicate initial capabilities subscription notification. */
 
     public:
         /**
@@ -74,10 +77,11 @@ struct remote_robot {
          */
         remote_robot(std::string _endpoint, position_t _position, std::unordered_set<std::string> _capabilities,
                     mark_robot_for_removal_callback_t _mark_robot_for_removal_callback,
-                    position_swapped_callback_t _position_swapped_callback) :
+                    position_swapped_callback_t _position_swapped_callback, capabilities_reconfigured_callback_t _capabilities_reconfigured_callback) :
                     endpoint_(_endpoint), position_(_position), capabilities_(_capabilities), client_(nullptr),
                     running_(true), adaptivity_is_pending_(false), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback),
-                    position_swapped_callback_(_position_swapped_callback), initial_subscription_(true) {
+                    position_swapped_callback_(_position_swapped_callback), capabilities_reconfigured_callback_(_capabilities_reconfigured_callback),
+                    initial_position_subscription_(true), initial_capabilities_subscription_(true) {
             client_connection_establisher robot_connection_establisher;
             bool connected = robot_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
@@ -101,6 +105,18 @@ struct remote_robot {
             UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[POSITION], position_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, POSITION, position_.load());
+                mark_robot_for_removal_callback_(position_.load());
+                return;
+            }
+            attribute_id_map_[CAPABILITIES] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, CAPABILITIES);
+            if (UA_NodeId_equal(&attribute_id_map_[CAPABILITIES], &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, CAPABILITIES);
+                mark_robot_for_removal_callback_(position_.load());
+                return;
+            }
+            status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[CAPABILITIES], capabilities_reconfigured, this);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, CAPABILITIES, position_.load());
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
@@ -130,6 +146,11 @@ struct remote_robot {
             }
             if ((method_id_map_[SWITCH_POSITION] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, SWITCH_POSITION)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, SWITCH_POSITION);
+                mark_robot_for_removal_callback_(position_.load());
+                return;
+            }
+            if ((method_id_map_[RECONFIGURE] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECONFIGURE)) == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECONFIGURE);
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
@@ -204,6 +225,38 @@ struct remote_robot {
         }
 
         /**
+         * @brief Instructs the remote robot to reconfigure its capabilities according to the given profile.
+         * 
+         * @param _new_capabilities_profile the new capabilities profile.
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
+         * @return UA_StatusCode the status whether method call was successful.
+         */
+        UA_StatusCode
+        reconfigure_capabilities(std::string _new_capabilities_profile, size_t* _output_size, UA_Variant** _output) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RECONFIGURE CAPABILITIES: Instruct robot on position %d to reconfigure capabilities to profile %s", position_.load(), _new_capabilities_profile.c_str());
+            method_node_caller reconfigure_robot_caller;
+            UA_String new_capabilities_profile = UA_STRING_ALLOC(_new_capabilities_profile.c_str());
+            reconfigure_robot_caller.add_scalar_input_argument(&new_capabilities_profile, UA_TYPES_STRING);
+            object_method_info omi = method_id_map_[RECONFIGURE];
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = reconfigure_robot_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECONFIGURE, UA_StatusCode_name(status));
+                    UA_String_clear(&new_capabilities_profile);
+                    running_ = false;
+                    mark_robot_for_removal_callback_(position_.load());
+                    return UA_STATUSCODE_BAD;
+                }
+                UA_String_clear(&new_capabilities_profile);
+            }
+            return status;
+        }
+
+        /**
          * @brief Returns the robot's endpoint.
          * 
          * @return std::string the endpoint url.
@@ -263,31 +316,67 @@ struct remote_robot {
          * @param _sub_context user-defined context data passed when creating the subscription.
          * @param _mon_id server-assigned MonitoredItemId that produced the data change.
          * @param _mon_context user-defined context data passed when creating the monitored item.
-         * @param _value the reported UA_DataValue
+         * @param _value the reported UA_DataValue.
          */
         static void
         position_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
             UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
-                if(_mon_context == NULL) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
-                    return;
-                }
-                remote_robot* self = static_cast<remote_robot*>(_mon_context);
-                if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-                    self->mark_robot_for_removal_callback_(self->position_.load());
-                    return;
-                }
-                UA_UInt32 old_position = self->position_.load();
-                self->position_.store(*(UA_UInt32*) _value->value.data);
-                if (self->initial_subscription_) {
-                    self->initial_subscription_ = false;
-                    return;
-                }
-                self->position_swapped_callback_(old_position, self->position_.load());
-                // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position changed from %d to %d", __FUNCTION__, old_position, self->position_.load());
+            if(_mon_context == NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
+                return;
+            }
+            remote_robot* self = static_cast<remote_robot*>(_mon_context);
+            if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                self->mark_robot_for_removal_callback_(self->position_.load());
+                return;
+            }
+            UA_UInt32 old_position = self->position_.load();
+            self->position_.store(*(UA_UInt32*) _value->value.data);
+            if (self->initial_position_subscription_) {
+                self->initial_position_subscription_ = false;
+                return;
+            }
+            self->position_swapped_callback_(old_position, self->position_.load());
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position changed from %d to %d", __FUNCTION__, old_position, self->position_.load());
         }
 
+        /**
+         * @brief The capabilities reconfigured callback for the subscription.
+         * 
+         * @param _client the client issuing the subscription.
+         * @param _sub_id server-assigned subscription id that delivered this notification.
+         * @param _sub_context user-defined context data passed when creating the subscription.
+         * @param _mon_id server-assigned MonitoredItemId that produced the data change.
+         * @param _mon_context user-defined context data passed when creating the monitored item.
+         * @param _value the reported UA_DataValue.
+         */
+        static void
+        capabilities_reconfigured(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
+            UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
+            if(_mon_context == NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
+                return;
+            }
+            remote_robot* self = static_cast<remote_robot*>(_mon_context);
+            if (!UA_Variant_hasArrayType(&_value->value, &UA_TYPES[UA_TYPES_STRING])) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                self->mark_robot_for_removal_callback_(self->position_.load());
+                return;
+            }
+            std::unordered_set<std::string> remote_robot_capabilities;
+            for (size_t i = 0; i < _value->value.arrayLength; i++) {
+                UA_String capability = ((UA_String*)_value->value.data)[i];
+                remote_robot_capabilities.insert(std::string((char*) capability.data, capability.length));
+            }
+            self->capabilities_ = remote_robot_capabilities;
+            if (self->initial_capabilities_subscription_) {
+                self->initial_capabilities_subscription_ = false;
+                return;
+            }
+            self->capabilities_reconfigured_callback_(self->position_.load());
+        }
+        
         /**
          * @brief The overall time changed callback for the subscription.
          * 
@@ -296,23 +385,23 @@ struct remote_robot {
          * @param _sub_context user-defined context data passed when creating the subscription.
          * @param _mon_id server-assigned MonitoredItemId that produced the data change.
          * @param _mon_context user-defined context data passed when creating the monitored item.
-         * @param _value the reported UA_DataValue
+         * @param _value the reported UA_DataValue.
          */
         static void
         overall_time_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
             UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
-                if(_mon_context == NULL) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
-                    return;
-                }
-                remote_robot* self = static_cast<remote_robot*>(_mon_context);
-                if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-                    self->mark_robot_for_removal_callback_(self->position_.load());
-                    return;
-                }
-                self->overall_time_.store(*(UA_UInt32*) _value->value.data);
-                // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's overall time at position %d is %ld", __FUNCTION__, self->position_.load(), self->overall_time_);
+            if(_mon_context == NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
+                return;
+            }
+            remote_robot* self = static_cast<remote_robot*>(_mon_context);
+            if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                self->mark_robot_for_removal_callback_(self->position_.load());
+                return;
+            }
+            self->overall_time_.store(*(UA_UInt32*) _value->value.data);
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's overall time at position %d is %ld", __FUNCTION__, self->position_.load(), self->overall_time_);
         }
 
         /**
@@ -328,18 +417,18 @@ struct remote_robot {
         static void
         last_equipped_tool_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
             UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
-                if(_mon_context == NULL) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
-                    return;
-                }
-                remote_robot* self = static_cast<remote_robot*>(_mon_context);
-                if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-                    self->mark_robot_for_removal_callback_(self->position_.load());
-                    return;
-                }
-                self->last_equipped_tool_.store(*(robot_tool*) _value->value.data);
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, self->position_.load(), robot_tool_to_string(self->last_equipped_tool_.load()));
+            if(_mon_context == NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
+                return;
+            }
+            remote_robot* self = static_cast<remote_robot*>(_mon_context);
+            if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                self->mark_robot_for_removal_callback_(self->position_.load());
+                return;
+            }
+            self->last_equipped_tool_.store(*(robot_tool*) _value->value.data);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, self->position_.load(), robot_tool_to_string(self->last_equipped_tool_.load()));
         }
 
         /**
