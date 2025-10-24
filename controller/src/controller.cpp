@@ -126,22 +126,18 @@ controller::register_robot(UA_Server* _server,
         UA_String capability = ((UA_String*)_input[2].data)[i];
         remote_robot_capabilities.insert(std::string((char*) capability.data, capability.length));
     }
+
     UA_Boolean result = true;
-    swap_key sk = std::make_tuple(0,0);
-    if (self->is_robot_position_swapping(position, sk) || self->position_remote_robot_map_.find(position) != self->position_remote_robot_map_.end()) {
-        result = false;
-    }
     UA_StatusCode status = UA_Variant_setScalarCopy(_output, &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
         self->stop();
         return UA_STATUSCODE_BAD;
     }
-    if (result) {
-        self->io_context_.post([self, endpoint, position, remote_robot_capabilities] {
-            self->handle_robot_registration(endpoint, position, remote_robot_capabilities);
-        });
-    }
+    
+    self->io_context_.post([self, endpoint, position, remote_robot_capabilities] {
+        self->handle_robot_registration(endpoint, position, remote_robot_capabilities);
+    });
     return UA_STATUSCODE_GOOD;
 }
 
@@ -536,12 +532,18 @@ void
 controller::join_threads() {
     if (server_iterate_thread_.joinable())
         server_iterate_thread_.join();
+    if (worker_thread_.joinable())
+        worker_thread_.join();
 }
 
 void
 controller::start() {
     if (!running_.load())
         stop();
+    worker_thread_ = std::thread([this]() {
+        io_context_.run();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
+    });
     join_threads();
 }
 
