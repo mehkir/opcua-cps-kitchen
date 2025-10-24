@@ -21,6 +21,7 @@
 #include <atomic>
 #include <functional>
 #include <unistd.h>
+#include <boost/asio.hpp>
 #include "node_value_subscriber.hpp"
 #include "browsenames.h"
 #include "method_node_caller.hpp"
@@ -54,6 +55,7 @@ struct remote_robot {
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
         capabilities_reconfigured_callback_t capabilities_reconfigured_callback_; /**< the callback to notify about capabilitiy reconfgurations. */
+        std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the robot's attribute node ids. */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
         std::atomic<robot_tool> last_equipped_tool_; /**< the last equipped tool. */
@@ -101,8 +103,8 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
-            node_value_subscriber nv_subscriber;
-            UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[POSITION], position_changed, this);
+            nv_subscriber_ = std::make_unique<node_value_subscriber>(client_);
+            UA_StatusCode status = nv_subscriber_->subscribe_node_value(attribute_id_map_[POSITION], position_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, POSITION, position_.load());
                 mark_robot_for_removal_callback_(position_.load());
@@ -114,7 +116,7 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
-            status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[CAPABILITIES], capabilities_reconfigured, this);
+            status = nv_subscriber_->subscribe_node_value(attribute_id_map_[CAPABILITIES], capabilities_reconfigured, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, CAPABILITIES, position_.load());
                 mark_robot_for_removal_callback_(position_.load());
@@ -126,7 +128,7 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
-            status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[OVERALL_TIME], overall_time_changed, this);
+            status = nv_subscriber_->subscribe_node_value(attribute_id_map_[OVERALL_TIME], overall_time_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, OVERALL_TIME, position_.load());
                 mark_robot_for_removal_callback_(position_.load());
@@ -138,7 +140,7 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
-            status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[LAST_EQUIPPED_TOOL], last_equipped_tool_changed, this);
+            status = nv_subscriber_->subscribe_node_value(attribute_id_map_[LAST_EQUIPPED_TOOL], last_equipped_tool_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, LAST_EQUIPPED_TOOL, position_.load());
                 mark_robot_for_removal_callback_(position_.load());
@@ -509,17 +511,18 @@ private:
     std::atomic<bool> running_; /**< flag to indicate whether the server thread should run. */
     std::thread server_iterate_thread_; /**< the server iteration thread. */
     discovery_util discovery_util_; /**< the discovery utility. */
+    std::thread worker_thread_; /**< the worker thread. */
+    boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
+    boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
     /* robot related member variables. */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
     std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
-    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
     /* recipe related member variables. */
     recipe_parser recipe_parser_; /**< the recipe parser. */
     /* mape interface related member variables */
     std::unique_ptr<mape> kitchen_mape_; /**< the kitchen mape. */
     /* adaptivity related member variables */
     std::unordered_map<swap_key, swap_state, tuple_hash> pending_swaps_;
-    std::mutex adaptivity_mutex_; /**< synchronizes access to robot adaptivity relevant members. */
  
     /**
      * @brief Extracts the received robot registration parameters.
@@ -551,10 +554,9 @@ private:
      * @param _endpoint the robot's endpoint url.
      * @param _position the position of the remote robot.
      * @param _remote_robot_capabilities the capabilities of the remote robot.
-     * @param _output the output pointer to store return parameters.
      */
     void
-    handle_robot_registration(std::string _endpoint, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities, UA_Variant* _output);
+    handle_robot_registration(std::string _endpoint, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities);
 
     /**
      * @brief Checks if the position is involved in a position swap and returns the corresponding map key.
@@ -596,10 +598,9 @@ private:
      * 
      * @param _recipe_id the recipe id of the partial finished order.
      * @param _processed_steps the steps until the recipe is processed.
-     * @param _output the output pointer to store return parameters.
      */
     void
-    handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_Variant* _output);
+    handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps);
 
     /**
      * @brief Returns a suitable robot for the given recipe ID starting from the next step to be processed.
