@@ -34,7 +34,7 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     // Set a unique application URI for the robot
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(robot_uri_.c_str());
-    // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add attributes */
     robot_type_inserter_.add_attribute(ROBOT_TYPE, POSITION);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, RECIPE_ID);
@@ -818,6 +818,7 @@ robot::switch_position(UA_Server *_server,
             && self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN) == UA_STATUSCODE_GOOD) {
             self->robot_state_ = robot_state::REARRANGING;
             self->new_target_position_ = new_position;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Robot at position %d will switch to its new position %d", self->position_, self->new_target_position_);
             self->io_context_.post([self] {
                 if (!self->preparing_dish_) {
                     self->handle_switch_position();
@@ -861,6 +862,7 @@ robot::complete_position_change() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Robot at position %d switched to its new position %d", position_, new_target_position_);
         position_ = new_target_position_;
         new_target_position_ = 0;
         robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, POSITION, &position_, UA_TYPES_UINT32);
@@ -904,7 +906,7 @@ robot::reconfigure(UA_Server *_server,
         std::lock_guard<std::mutex> lock(self->state_mutex_);
         if (self->robot_state_ == robot_state::AVAILABLE
             && self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN) == UA_STATUSCODE_GOOD) {
-            self->robot_state_ = robot_state::REARRANGING;
+            self->robot_state_ = robot_state::RECONFIGURING;
             self->new_capabilities_profile_ = std::string((char*) new_capabilities_profile.data, new_capabilities_profile.length);
             self->io_context_.post([self] {
                 if (!self->preparing_dish_) {
