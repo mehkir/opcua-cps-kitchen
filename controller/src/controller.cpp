@@ -134,7 +134,7 @@ controller::register_robot(UA_Server* _server,
         self->stop();
         return UA_STATUSCODE_BAD;
     }
-    
+
     self->io_context_.post([self, endpoint, position, remote_robot_capabilities] {
         self->handle_robot_registration(endpoint, position, remote_robot_capabilities);
     });
@@ -494,6 +494,7 @@ controller::remove_marked_robots() {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
         }
     }
+    robots_to_be_removed_.clear();
 }
 
 UA_StatusCode
