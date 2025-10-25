@@ -163,6 +163,7 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
         std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
         if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || !_robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
             position_remote_robot_map_.erase(_robot_position);
+            // TODO update mark robot for removal map
             position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1),
                                                                                         std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         }
@@ -341,6 +342,7 @@ conveyor::request_next_robot(plate& _plate) {
         std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
         if (position_remote_robot_map_.find(target_position) == position_remote_robot_map_.end() || !target_endpoint_std_str.compare(position_remote_robot_map_[target_position]->get_endpoint())) {
             position_remote_robot_map_.erase(target_position);
+            // TODO update mark robot for removal map
             position_remote_robot_map_[target_position] = std::make_unique<remote_robot>(target_endpoint_std_str, target_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1),
                                                                                         std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         }
@@ -572,8 +574,10 @@ conveyor::position_swapped_callback(position_t _old_position, position_t _new_po
     }
     if (position_remote_robot_map_[_old_position] == nullptr)
         position_remote_robot_map_.erase(_old_position);
+        // TODO update mark robot for removal map
     if (position_remote_robot_map_[_new_position] == nullptr)
         position_remote_robot_map_.erase(_new_position);
+        // TODO update mark robot for removal map
 }
 
 void
