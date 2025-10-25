@@ -480,6 +480,23 @@ struct remote_robot {
 };
 
 /**
+ * @brief Next robot reciver agents to inform 
+ * 
+ */
+struct next_robot_receiver {
+    private:
+        UA_Client* client_; /**< the OPC UA remote robot client pointer. */
+        std::string endpoint_; /**< the endpoint address. */
+        std::string type_; /**< the agent type. */
+        std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
+        std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
+        std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
+        std::thread client_iterate_thread_; /**< the client iteration thread. */
+        std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
+    public:
+};
+
+/**
  * @brief Custom tuple hash functor with golden ratio magic number.
  * 
  */
@@ -514,6 +531,7 @@ private:
     std::thread worker_thread_; /**< the worker thread. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
+    std::map<std::string, next_robot_receiver> next_robot_receiver_map_; /**< the map holding the next robot receivers. */
     /* robot related member variables. */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
     std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
@@ -598,9 +616,11 @@ private:
      * 
      * @param _recipe_id the recipe id of the partial finished order.
      * @param _processed_steps the steps until the recipe is processed.
+     * @param _endpoint the requester's endpoint.
+     * @param _type the requester's type.
      */
     void
-    handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps);
+    handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_String _endpoint, UA_String _type);
 
     /**
      * @brief Returns a suitable robot for the given recipe ID starting from the next step to be processed.

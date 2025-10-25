@@ -58,6 +58,7 @@ struct remote_robot {
         object_type_node_inserter& remote_robot_type_inserter_; /**< the remote robot type inserter for adding the remote robot's attributes to the address space. */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
+        std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
         std::thread client_iterate_thread_; /**< the client iteration thread. */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the ids of remote robot methods. */
@@ -112,8 +113,8 @@ struct remote_robot {
                 return;
             }
             /* Subscribe to position changes. */
-            node_value_subscriber nv_subscriber;
-            UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[POSITION], position_changed, this);
+            nv_subscriber_ = std::make_unique<node_value_subscriber>(client_);
+            UA_StatusCode status = nv_subscriber_->subscribe_node_value(attribute_id_map_[POSITION], position_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s", __FUNCTION__, POSITION);
                 mark_robot_for_removal_callback_(position_.load());
@@ -195,6 +196,16 @@ struct remote_robot {
         }
 
         /**
+         * @brief Returns the robot's endpoint.
+         * 
+         * @return std::string the robot's endpoint url.
+         */
+        std::string
+        get_endpoint() const {
+            return endpoint_;
+        }
+
+        /**
          * @brief Returns the remote robot's position.
          * 
          * @return position_t the remote robot position.
@@ -266,6 +277,8 @@ private:
     /* kitchen related member variables. */
     UA_Server* server_; /**< the OPC UA kitchen server. */
     std::string kitchen_uri_; /**< the kitchen's uniform resource identifier. */
+    UA_String server_endpoint_; /**< the kitchen's endpoint address. */
+    UA_String type_; /**< the kitchen's agent type. */
     object_type_node_inserter kitchen_type_inserter_; /**< the kitchen type inserter for adding the kitchen's attributes and methods to the address space. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
     discovery_util discovery_util_; /**< the discovery utility. */
@@ -276,13 +289,13 @@ private:
     std::thread worker_thread_; /**< the worker thread for assigning placed orders to remote robots. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
+    std::queue<recipe_id_t> order_queue_; /**< the order queue. */
     /* remote robot related member variables. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
     std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
     object_type_node_inserter remote_robot_type_inserter_; /**< the remote robot type inserter for adding the robot's attributes to the address space. */
     std::thread cyclic_remote_robot_discovery_thread_; /**< the remote robot thread discovering robots periodically. */
     std::mutex remote_robot_discovery_mutex_; /**< the remote robot discovery mutex for synchronizing remote robot map operations. */
-    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
     uint32_t robot_count_; /**< the total robot count in the kitchen. */
     std::condition_variable remote_robot_discovery_cv; /**< the condition variable to make the discovery thread wait when all robots are discovered. */
     /* controller related member variables. */
@@ -355,6 +368,30 @@ private:
     handle_random_order_request();
 
     /**
+     * @brief Receives the next suitable robot for a requested recipe.
+     * 
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
+     */
+    static UA_StatusCode
+    receive_next_robot(UA_Server* _server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
+
+    /**
      * @brief Extracts the returned robot state parameters.
      * 
      * @param _output_size the count of returned output values.
@@ -370,9 +407,10 @@ private:
      * 
      * @param _output_size the count of returned output values.
      * @param _output the variant containing the output values.
-     * @return remote_robot* the pointer of the remote robot extracted by the returned parameters.
+     * @return true if call was successful.
+     * @return false if call failed.
      */
-    remote_robot*
+    bool
     choose_next_robot_called(size_t _output_size, UA_Variant *_output);
 
     /**
