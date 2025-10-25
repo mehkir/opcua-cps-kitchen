@@ -71,4 +71,8 @@
 #define DROPPED_ORDERS "DroppedOrders"
 #define COMPLETED_ORDERS "CompletedOrders"
 
+/* NEXT ROBOT RECEIVER */
+// mehtod nodes
+#define RECEIVE_NEXT_ROBOT "ReceiveNextRobot"
+
 #endif // NODE_IDS_HPP
