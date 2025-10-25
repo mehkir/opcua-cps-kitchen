@@ -84,77 +84,77 @@ struct remote_robot {
                     running_(true), adaptivity_is_pending_(false), mark_robot_for_removal_callback_(_mark_robot_for_removal_callback),
                     position_swapped_callback_(_position_swapped_callback), capabilities_reconfigured_callback_(_capabilities_reconfigured_callback),
                     initial_position_subscription_(true), initial_capabilities_subscription_(true) {
+        }
+
+        /**
+         * @brief Initializes and starts this remote robot.
+         * 
+         * @return UA_StatusCode the status code.
+         */
+        UA_StatusCode
+        initialize_and_start() {
+            if (client_ != nullptr) {
+                return running_.load() ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BAD;
+            }
             client_connection_establisher robot_connection_establisher;
             bool connected = robot_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d (async)", position_.load());
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session for position %d", position_.load());
+                return UA_STATUSCODE_BAD;
             }
             attribute_id_map_[AVAILABILITY] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, AVAILABILITY);
             if (UA_NodeId_equal(&attribute_id_map_[AVAILABILITY], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, AVAILABILITY);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;;
             }
             attribute_id_map_[POSITION] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, POSITION);
             if (UA_NodeId_equal(&attribute_id_map_[POSITION], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, POSITION);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             nv_subscriber_ = std::make_unique<node_value_subscriber>(client_);
             UA_StatusCode status = nv_subscriber_->subscribe_node_value(attribute_id_map_[POSITION], position_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, POSITION, position_.load());
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             attribute_id_map_[CAPABILITIES] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, CAPABILITIES);
             if (UA_NodeId_equal(&attribute_id_map_[CAPABILITIES], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, CAPABILITIES);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             status = nv_subscriber_->subscribe_node_value(attribute_id_map_[CAPABILITIES], capabilities_reconfigured, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, CAPABILITIES, position_.load());
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             attribute_id_map_[OVERALL_TIME] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, OVERALL_TIME);
             if (UA_NodeId_equal(&attribute_id_map_[OVERALL_TIME], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, OVERALL_TIME);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             status = nv_subscriber_->subscribe_node_value(attribute_id_map_[OVERALL_TIME], overall_time_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, OVERALL_TIME, position_.load());
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             attribute_id_map_[LAST_EQUIPPED_TOOL] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, LAST_EQUIPPED_TOOL);
             if (UA_NodeId_equal(&attribute_id_map_[LAST_EQUIPPED_TOOL], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, LAST_EQUIPPED_TOOL);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             status = nv_subscriber_->subscribe_node_value(attribute_id_map_[LAST_EQUIPPED_TOOL], last_equipped_tool_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, LAST_EQUIPPED_TOOL, position_.load());
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             if ((method_id_map_[SWITCH_POSITION] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, SWITCH_POSITION)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, SWITCH_POSITION);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             if ((method_id_map_[RECONFIGURE] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECONFIGURE)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECONFIGURE);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             try {
                 client_iterate_thread_ = std::thread([this]() {
@@ -164,26 +164,27 @@ struct remote_robot {
                             UA_StatusCode status = UA_Client_run_iterate(client_, 1);
                             if (status != UA_STATUSCODE_GOOD) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_.load(), UA_StatusCode_name(status));
-                                running_ = false;
+                                running_.store(false);
                                 mark_robot_for_removal_callback_(position_.load());
-                                return;
+                                return UA_STATUSCODE_BAD;
                             }
                         }
                         if (usleep(1*1000)) {
                             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at robot client iterate sleep", __FUNCTION__);
-                            running_ = false;
+                            running_.store(false);
                             mark_robot_for_removal_callback_(position_.load());
-                            return;
+                            return UA_STATUSCODE_BAD;
                         }
                         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
                 });
             } catch (...) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the robot client iterate thread at position %d", __FUNCTION__, position_.load());
-                running_ = false;
+                running_.store(false);
                 mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
+            return UA_STATUSCODE_GOOD;
         }
 
         /**
@@ -191,7 +192,7 @@ struct remote_robot {
          * 
          */
         ~remote_robot() {
-            running_ = false;
+            running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
             UA_Client_delete(client_);
@@ -218,7 +219,7 @@ struct remote_robot {
                 status = switch_robot_position_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, SWITCH_POSITION, UA_StatusCode_name(status));
-                    running_ = false;
+                    running_.store(false);
                     mark_robot_for_removal_callback_(position_.load());
                     return UA_STATUSCODE_BAD;
                 }
@@ -249,7 +250,7 @@ struct remote_robot {
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECONFIGURE, UA_StatusCode_name(status));
                     UA_String_clear(&new_capabilities_profile);
-                    running_ = false;
+                    running_.store(false);
                     mark_robot_for_removal_callback_(position_.load());
                     return UA_STATUSCODE_BAD;
                 }
@@ -488,12 +489,129 @@ struct next_robot_receiver {
         UA_Client* client_; /**< the OPC UA remote robot client pointer. */
         std::string endpoint_; /**< the endpoint address. */
         std::string type_; /**< the agent type. */
-        std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
         std::thread client_iterate_thread_; /**< the client iteration thread. */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
     public:
+        next_robot_receiver(std::string _endpoint, std::string _type) :
+        client_(nullptr), endpoint_(_endpoint), type_(_type), running_(true) {
+        }
+
+        /**
+         * @brief Initializes and starts this next robot receiver.
+         * 
+         * @return UA_StatusCode the status code.
+         */
+        UA_StatusCode
+        initialize_and_start() {
+            if (client_ != nullptr) {
+                return running_.load() ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BAD;
+            }
+            client_connection_establisher connection_establisher;
+            bool connected = connection_establisher.establish_connection(client_, endpoint_);
+            if (!connected) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing next robot receiver client session (%s,%s)", endpoint_.c_str(), type_.c_str());
+                return UA_STATUSCODE_BAD;
+            }
+            if ((method_id_map_[RECEIVE_NEXT_ROBOT] = node_browser_helper().get_method_id(client_, type_, RECEIVE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_NEXT_ROBOT);
+                return UA_STATUSCODE_BAD;
+            }
+
+            try {
+                client_iterate_thread_ = std::thread([this]() {
+                    while(running_) {
+                        {
+                            std::lock_guard<std::mutex> lock(client_mutex_);
+                            UA_StatusCode status = UA_Client_run_iterate(client_, 1);
+                            if (status != UA_STATUSCODE_GOOD) {
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running next robot receiver client at position (%s,%s) (%s)", __FUNCTION__, endpoint_.c_str(), type_.c_str(), UA_StatusCode_name(status));
+                                running_.store(false);
+                                return UA_STATUSCODE_BAD;
+                            }
+                        }
+                        if (usleep(1*1000)) {
+                            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at robot client iterate sleep", __FUNCTION__);
+                            running_.store(false);
+                            return UA_STATUSCODE_BAD;
+                        }
+                        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                    }
+                });
+            } catch (...) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running next robot receiver client at position (%s,%s)", __FUNCTION__, endpoint_.c_str(), type_.c_str());
+                running_.store(false);
+                return UA_STATUSCODE_BAD;
+            }
+            return UA_STATUSCODE_GOOD;
+        }
+
+        /**
+         * @brief Get the agent type.
+         * 
+         * @return std::string the type name.
+         */
+        std::string
+        get_type() {
+            return type_;
+        }
+
+        /**
+         * @brief Get the endpoint.
+         * 
+         * @return std::string the endpoint string.
+         */
+        std::string
+        get_endpoint() {
+            return endpoint_;
+        }
+
+        /**
+         * @brief Sends the next robot for a request for a recipe id.
+         * 
+         * @param _robot_position the robot position.
+         * @param _robot_endpoint the robot endpoint.
+         * @param _recipe_id the recipe id the response is for.
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
+         * @return UA_StatusCode the status whether method call was successful.
+         */
+        UA_StatusCode
+        receive_next_robot(position_t _robot_position, std::string _robot_endpoint, recipe_id_t _recipe_id, size_t* _output_size, UA_Variant** _output) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RECEIVE NEXT ROBOT: Respond to next robot receiver (%s,%s) with robot position %d for recipe id %d", endpoint_.c_str(), type_.c_str(), _robot_position, _recipe_id);
+            method_node_caller receive_next_robot_caller;
+            receive_next_robot_caller.add_scalar_input_argument(&_robot_position, UA_TYPES_UINT32);
+            UA_String robot_endpoint = UA_STRING_ALLOC(_robot_endpoint.c_str());
+            receive_next_robot_caller.add_scalar_input_argument(&robot_endpoint, UA_TYPES_UINT32);
+            receive_next_robot_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
+            object_method_info omi = method_id_map_[RECEIVE_NEXT_ROBOT];
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = receive_next_robot_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECEIVE_NEXT_ROBOT, UA_StatusCode_name(status));
+                    running_.store(false);
+                    UA_String_clear(&robot_endpoint);
+                    return UA_STATUSCODE_BAD;
+                }
+                UA_String_clear(&robot_endpoint);
+            }
+            return status;
+        }
+
+        /**
+         * @brief Destroys the next robot receiver object.
+         * 
+         */
+        ~next_robot_receiver() {
+            running_.store(false);
+            if (client_iterate_thread_.joinable())
+                client_iterate_thread_.join();
+            UA_Client_delete(client_);
+        }
 };
 
 /**
@@ -531,7 +649,7 @@ private:
     std::thread worker_thread_; /**< the worker thread. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
-    std::map<std::string, next_robot_receiver> next_robot_receiver_map_; /**< the map holding the next robot receivers. */
+    std::map<std::pair<std::string,std::string>, std::unique_ptr<next_robot_receiver>> next_robot_receiver_map_; /**< the map holding the next robot receivers. */
     /* robot related member variables. */
     std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
     std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
@@ -620,7 +738,18 @@ private:
      * @param _type the requester's type.
      */
     void
-    handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_String _endpoint, UA_String _type);
+    handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, std::string _endpoint, std::string _type);
+
+    /**
+     * @brief Extracts return values of receive next robot call.
+     * 
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
+     * @return true if the response is received successfully.
+     * @return false if the response is not received successfully.
+     */
+    bool
+    receive_next_robot_called(size_t _output_size, UA_Variant* _output);
 
     /**
      * @brief Returns a suitable robot for the given recipe ID starting from the next step to be processed.

@@ -155,18 +155,19 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
     remove_marked_robots();
     erase_stale_pending_swap_entries();
-    bool robot_registration_success = false;
     swap_key sk = std::make_tuple(0,0);
     if (is_robot_position_swapping(_position, sk)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Position is currently involved in a swap (%d,%d)", __FUNCTION__, get<0>(sk), get<1>(sk));
     }
     else if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
-        position_remote_robot_map_[_position] = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities,
-                                                                                std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1),
-                                                                                std::bind(&controller::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2),
-                                                                                std::bind(&controller::capabilities_reconfigured_callback, this, std::placeholders::_1));
-        increment_or_decrement_counter_node(REGISTERED_ROBOTS);
-        robot_registration_success = true;
+        std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities,
+                                                                            std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1),
+                                                                            std::bind(&controller::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2),
+                                                                            std::bind(&controller::capabilities_reconfigured_callback, this, std::placeholders::_1));
+        if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
+            position_remote_robot_map_[_position] = std::move(robot);
+            increment_or_decrement_counter_node(REGISTERED_ROBOTS);
+        }
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is already a registered robot at position %d", __FUNCTION__, _position);
     }
@@ -223,22 +224,30 @@ controller::choose_next_robot(UA_Server* _server,
         self->stop();
         return UA_STATUSCODE_BAD;
     }
-    self->io_context_.post([self, recipe_id, processed_steps, endpoint, type] {
-        self->handle_next_robot_request(recipe_id, processed_steps, endpoint, type);
+    std::string endpoint_str((char*) endpoint.data, endpoint.length);
+    std::string type_str((char*) type.data, type.length);
+    self->io_context_.post([self, recipe_id, processed_steps, endpoint_str, type_str] {
+        self->handle_next_robot_request(recipe_id, processed_steps, endpoint_str, type_str);
     });
     return UA_STATUSCODE_GOOD;
 }
 
 void
-controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, UA_String _endpoint, UA_String _type) {
+controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, std::string _endpoint, std::string _type) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Conveyor requests next robot for recipe id %d processed with %d steps already", _recipe_id, _processed_steps);
     remove_marked_robots();
     erase_stale_pending_swap_entries();
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot receiver (%s,%s) requests suitable robot for recipe id %d processed with %d steps already", _endpoint.c_str(), _type.c_str(), _recipe_id, _processed_steps);
+    std::pair nrr_key = std::make_pair(_endpoint, _type);
+    if (next_robot_receiver_map_.find(nrr_key) == next_robot_receiver_map_.end()) {
+        std::unique_ptr<next_robot_receiver> nrr = std::make_unique<next_robot_receiver>(_endpoint, _type);
+        if (nrr->initialize_and_start() == UA_STATUSCODE_GOOD) 
+            next_robot_receiver_map_[nrr_key] = std::move(nrr);
+    }
     remote_robot* next_suitable_robot = find_suitable_robot(_recipe_id, _processed_steps);
     UA_String next_suitable_robot_endpoint = UA_STRING_ALLOC("");
     position_t next_suitable_robot_position = 0;
-    if (next_suitable_robot != NULL && !next_suitable_robot->is_adaptivity_pending()) {
+    if (next_suitable_robot != nullptr && !next_suitable_robot->is_adaptivity_pending()) {
         UA_String_clear(&next_suitable_robot_endpoint);
         next_suitable_robot_endpoint = UA_STRING_ALLOC(next_suitable_robot->get_endpoint().c_str());
         next_suitable_robot_position = next_suitable_robot->get_position();
@@ -246,8 +255,40 @@ controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _process
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: No next suitable robot found");
     }
-    // TODO call requesters receive method
+    if (next_suitable_robot != nullptr && next_robot_receiver_map_.find(nrr_key) != next_robot_receiver_map_.end()) {
+        size_t output_size = 0;
+        UA_Variant* output = nullptr;
+        UA_StatusCode status = next_robot_receiver_map_[nrr_key]->receive_next_robot(next_suitable_robot->get_position(), next_suitable_robot->get_endpoint(), _recipe_id, &output_size, &output);
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method for remote robot (%s)", __FUNCTION__, RECEIVE_NEXT_ROBOT, UA_StatusCode_name(status));
+            if (output != nullptr)
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        }
+        bool result = receive_next_robot_called(output_size, output);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Next robot receiver returned %s", __FUNCTION__, result ? "true" : "false");
+    }
     UA_String_clear(&next_suitable_robot_endpoint);
+}
+
+bool
+controller::receive_next_robot_called(size_t _output_size, UA_Variant* _output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (_output_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        return false;
+    }
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        return false;
+    }
+    UA_Boolean next_robot_received = *(UA_Boolean*) _output[0].data;
+    if (_output != nullptr)
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+    return next_robot_received;
 }
 
 remote_robot*
