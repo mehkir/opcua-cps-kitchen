@@ -39,6 +39,7 @@
 #include "object_type_node_inserter.hpp"
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
+#include "information_node_reader.hpp"
 
 using namespace cps_kitchen;
 
@@ -56,6 +57,7 @@ struct remote_robot {
         std::atomic<position_t> position_; /**< the position on the conveyor belt. */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
+        std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
         std::unordered_map<std::string, UA_NodeId> attribute_id_map_; /**< the map holding the ids of remote robot attributes. */
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
@@ -85,16 +87,21 @@ struct remote_robot {
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
-            /* Get the position attribute id. */
+
+            attribute_id_map_[AVAILABILITY] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, AVAILABILITY);
+            if (UA_NodeId_equal(&attribute_id_map_[AVAILABILITY], &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, AVAILABILITY);
+                mark_robot_for_removal_callback_(position_.load());
+                return;
+            }
             attribute_id_map_[POSITION] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, POSITION);
             if (UA_NodeId_equal(&attribute_id_map_[POSITION], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, POSITION);
                 mark_robot_for_removal_callback_(position_.load());
                 return;
             }
-            /* Subscribe to position changes. */
-            node_value_subscriber nv_subscriber;
-            UA_StatusCode status = nv_subscriber.subscribe_node_value(client_, attribute_id_map_[POSITION], position_changed, this);
+            nv_subscriber_ = std::make_unique<node_value_subscriber>(client_);
+            UA_StatusCode status = nv_subscriber_->subscribe_node_value(attribute_id_map_[POSITION], position_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s", __FUNCTION__, POSITION);
                 mark_robot_for_removal_callback_(position_.load());
@@ -201,6 +208,24 @@ struct remote_robot {
             }
             self->position_swapped_callback_(old_position, self->position_.load());
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->position_);
+        }
+
+        /**
+         * @brief Returns whether the robot is available.
+         * 
+         * @return true if robot is available.
+         * @return false of robot is not available.
+         */
+        UA_Boolean
+        is_available() {
+            std::lock_guard<std::mutex> lock(client_mutex_);
+            information_node_reader inr;
+            if (inr.read_information_node(client_, attribute_id_map_[AVAILABILITY]) != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, AVAILABILITY);
+                mark_robot_for_removal_callback_(position_.load());
+                return false;
+            }
+            return *(UA_Boolean*)inr.get_variant()->data;
         }
 
         /**

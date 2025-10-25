@@ -22,7 +22,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     }
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC("urn:kitchen:conveyor");
-    // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add conveyor attribute nodes */
     conveyor_type_inserter_.add_attribute(CONVEYOR_TYPE, TOTAL_PLATES);
     conveyor_type_inserter_.add_attribute(CONVEYOR_TYPE, OCCUPIED_PLATES);
@@ -161,7 +161,8 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
     remove_marked_robots();
     {
         std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
-        if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
+        if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || !_robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
+            position_remote_robot_map_.erase(_robot_position);
             position_remote_robot_map_[_robot_position] = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1),
                                                                                         std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         }
@@ -338,7 +339,8 @@ conveyor::request_next_robot(plate& _plate) {
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Controller returned robot at position %d with endpoint %s", target_position, target_endpoint_std_str.c_str());
     {
         std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
-        if (position_remote_robot_map_.find(target_position) == position_remote_robot_map_.end()) {
+        if (position_remote_robot_map_.find(target_position) == position_remote_robot_map_.end() || !target_endpoint_std_str.compare(position_remote_robot_map_[target_position]->get_endpoint())) {
+            position_remote_robot_map_.erase(target_position);
             position_remote_robot_map_[target_position] = std::make_unique<remote_robot>(target_endpoint_std_str, target_position, std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1),
                                                                                         std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         }
@@ -455,6 +457,12 @@ conveyor::deliver_finished_order() {
                 UA_UInt32 occupied_plates_count = occupied_plates_.size();
                 conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
                 continue;
+            } else if (target_robot->is_available()) {
+                request_next_robot(p);
+                if (p.get_target_position() == p.get_position()) {
+                    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "DELIVERY: Dish at position %d can be delivered after all. The map wasn't updated correctly", p.get_position());
+                    // stop(); // To notice this for possible redelivery improvement. This happened!
+                }
             }
         }
         occupied_plate_id++;
@@ -549,6 +557,7 @@ void
 conveyor::position_swapped_callback(position_t _old_position, position_t _new_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::lock_guard<std::mutex> lock(position_remote_robot_map_mutex_);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Reflecting position swap/switch from %d to %d", _old_position, _new_position);
     remote_robot* first = nullptr;
     remote_robot* second = nullptr;
     if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {
