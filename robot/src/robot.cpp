@@ -976,6 +976,7 @@ robot::start() {
         stop();
         return;
     }
+    /* Lookup own endpoint */
     std::vector<std::string> endpoints;
     while (endpoints.empty()) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Looking up own endpoint", __FUNCTION__);
@@ -991,6 +992,7 @@ robot::start() {
     }
     UA_String_init(&server_endpoint_);
     server_endpoint_ = UA_STRING_ALLOC(const_cast<char*>(endpoints[0].c_str()));
+    /* Register robot at controller */
     method_node_caller register_robot_caller;
     register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
     register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
@@ -1000,12 +1002,6 @@ robot::start() {
     register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
     UA_Variant_clear(&capabilities);
     object_method_info omi = method_id_map_[REGISTER_ROBOT];
-
-    worker_thread_ = std::thread([this]() {
-        io_context_.run();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
-    });
-
     size_t output_size = 0;
     UA_Variant* output = nullptr;
     UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
@@ -1034,6 +1030,11 @@ robot::start() {
         }
     }
     register_robot_called(output_size, output);
+    /* Setup worker thread */
+    worker_thread_ = std::thread([this]() {
+        io_context_.run();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
+    });
     /* Run the client iterate thread */
     try {
         client_iterate_thread_ = std::thread([this]() {
