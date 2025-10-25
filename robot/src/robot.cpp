@@ -1030,11 +1030,6 @@ robot::start() {
         }
     }
     register_robot_called(output_size, output);
-    /* Setup worker thread */
-    worker_thread_ = std::thread([this]() {
-        io_context_.run();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
-    });
     /* Run the client iterate thread */
     try {
         client_iterate_thread_ = std::thread([this]() {
@@ -1126,6 +1121,11 @@ robot::start() {
         stop();
         return;
     }
+    /* Setup worker thread */
+    worker_thread_ = std::thread([this]() {
+        io_context_.run();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
+    });
     join_threads();
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
