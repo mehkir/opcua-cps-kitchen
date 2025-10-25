@@ -381,7 +381,6 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
             if (position_remote_robot_map_.find(_new_position) != position_remote_robot_map_.end()) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Second robot failed at swap call but is still registered ... Robot at position %d will be removed anyway", __FUNCTION__, _new_position);
                 position_remote_robot_map_.erase(_new_position);
-                robots_to_be_removed_.erase(_new_position);
                 increment_or_decrement_counter_node(REGISTERED_ROBOTS, false);
                 UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", _new_position);
             }
