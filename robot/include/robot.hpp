@@ -136,7 +136,7 @@ private:
     std::thread worker_thread_; /**< the worker thread for preparing dishes. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
-    boost::asio::steady_timer steady_timer_; /**< the steady timer for simulation action time. */
+    boost::asio::steady_timer steady_timer_; /**< the steady timer for action time simulation. */
     std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
     std::thread client_iterate_thread_; /**< the client iteration thread. */
     /* controller related member variables. */
