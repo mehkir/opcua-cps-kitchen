@@ -458,9 +458,10 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
             }
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: UNCOORDINATED HANDOVER: Passed zero response", __FUNCTION__);
             return;
+        } else {
+            pending_pickup_.store(false);
         }
     }
-    pending_pickup_.store(false);
     /* Get recipe id in process */
     UA_Variant recipe_id_in_process_var;
     UA_Variant_init(&recipe_id_in_process_var);
@@ -690,6 +691,7 @@ robot::receive_finished_order_notification_called(size_t _output_size, UA_Varian
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s result is %d", __FUNCTION__, finished_order_notification_received);
     if (!finished_order_notification_received) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Conveyor returned false", __FUNCTION__);
+        stop();
     }
     if (_output != nullptr)
         UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
