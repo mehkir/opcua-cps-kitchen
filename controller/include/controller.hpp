@@ -177,6 +177,7 @@ struct remote_robot {
                         }
                         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
+                    return UA_STATUSCODE_BAD;
                 });
             } catch (...) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error running the robot client iterate thread at position %d", __FUNCTION__, position_.load());
@@ -526,7 +527,7 @@ struct next_robot_receiver {
                             std::lock_guard<std::mutex> lock(client_mutex_);
                             UA_StatusCode status = UA_Client_run_iterate(client_, 1);
                             if (status != UA_STATUSCODE_GOOD) {
-                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running next robot receiver client at position (%s,%s) (%s)", __FUNCTION__, endpoint_.c_str(), type_.c_str(), UA_StatusCode_name(status));
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running next robot receiver client (%s,%s) (%s)", __FUNCTION__, endpoint_.c_str(), type_.c_str(), UA_StatusCode_name(status));
                                 running_.store(false);
                                 return UA_STATUSCODE_BAD;
                             }
@@ -538,9 +539,10 @@ struct next_robot_receiver {
                         }
                         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
+                    return UA_STATUSCODE_BAD;
                 });
             } catch (...) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running next robot receiver client at position (%s,%s)", __FUNCTION__, endpoint_.c_str(), type_.c_str());
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running next robot receiver client (%s,%s)", __FUNCTION__, endpoint_.c_str(), type_.c_str());
                 running_.store(false);
                 return UA_STATUSCODE_BAD;
             }
@@ -584,7 +586,7 @@ struct next_robot_receiver {
             method_node_caller receive_next_robot_caller;
             receive_next_robot_caller.add_scalar_input_argument(&_robot_position, UA_TYPES_UINT32);
             UA_String robot_endpoint = UA_STRING_ALLOC(_robot_endpoint.c_str());
-            receive_next_robot_caller.add_scalar_input_argument(&robot_endpoint, UA_TYPES_UINT32);
+            receive_next_robot_caller.add_scalar_input_argument(&robot_endpoint, UA_TYPES_STRING);
             receive_next_robot_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             object_method_info omi = method_id_map_[RECEIVE_NEXT_ROBOT];
             UA_StatusCode status = UA_STATUSCODE_GOOD;
