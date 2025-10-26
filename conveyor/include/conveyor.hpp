@@ -163,6 +163,7 @@ struct remote_robot {
             running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
+            nv_subscriber_.reset();
             UA_Client_delete(client_);
         }
 
@@ -630,6 +631,13 @@ private:
     handle_handover_finished_order(std::string _remote_robot_endpoint, position_t _remote_robot_position, recipe_id_t _finished_recipe, UA_UInt32 _processed_steps, UA_Boolean _is_dish_finished);
 
     /**
+     * @brief Initiates next robot requests for occupied plates.
+     * 
+     */
+    void
+    request_next_robots();
+
+    /**
      * @brief Requests next robot.
      * 
      */
@@ -675,11 +683,12 @@ private:
      * 
      * @param _output_size the count of returned output values.
      * @param _output the variant containing the output values.
+     * @param _plate the plate aligned with the robot.
      * @return true if delivery succeedes.
      * @return false if delivery fails.
      */
     bool
-    receive_robot_task_called(size_t _output_size, UA_Variant* _output);
+    receive_robot_task_called(size_t _output_size, UA_Variant* _output, plate& _plate);
 
     /**
      * @brief Called when robot switched to its new position.

@@ -238,6 +238,29 @@ conveyor::handle_retrieve_finished_orders() {
         }
     }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: All retrievable dishes passed by robots.");
+    request_next_robots();
+}
+
+void
+conveyor::request_next_robots() {
+    for (plate_id_t plate_id : occupied_plates_) {
+        plate& p = plates_[plate_id];
+        if (!p.is_dish_finished() && p.get_target_position() == 0) {
+            request_next_robot(p);
+        }
+    }
+    if (next_robot_request_queue_.empty()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: No next robots requested. ");
+        steady_timer_.expires_from_now(std::chrono::milliseconds(MOVE_TIME * TIME_UNIT));
+        steady_timer_.async_wait([this](const boost::system::error_code& _error) {
+            if (_error) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling conveyor movement", __FUNCTION__);
+                stop();
+                return;
+            }
+            move_conveyor(1);
+        });
+    }
 }
 
 void
@@ -290,9 +313,6 @@ conveyor::handle_handover_finished_order(std::string _remote_robot_endpoint, pos
     occupied_plates_.insert(p.get_plate_id());
     UA_UInt32 occupied_plates_count = occupied_plates_.size();
     conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
-    if (_is_dish_finished)
-        return;
-    request_next_robot(p);
 }
 
 void
@@ -393,7 +413,15 @@ conveyor::receive_next_robot(UA_Server* _server,
 void
 conveyor::handle_receive_next_robot(position_t _robot_position, std::string _robot_endpoint, recipe_id_t _recipe_id) {
     remove_marked_robots();
-    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || !_robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
+    if (next_robot_request_queue_.empty()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Unexpected response with no outstanding requests (recipe id %d). Ignoring.", _recipe_id);
+        return;
+    }
+    if (_robot_position != 0
+        && !_robot_endpoint.empty()
+        && (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()
+            || !_robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())
+    )) {
         position_remote_robot_map_.erase(_robot_position);
         robots_to_be_removed_.erase(_robot_position);
         std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_robot_endpoint, _robot_position,
@@ -407,25 +435,31 @@ conveyor::handle_receive_next_robot(position_t _robot_position, std::string _rob
     }
     // Sanity check
     position_t position_requested_from = next_robot_request_queue_.front();
-    next_robot_request_queue_.pop();
     plate& p = plates_[position_plate_id_map_[position_requested_from]];
     if (p.get_placed_recipe_id() != _recipe_id) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on request mapping", __FUNCTION__);
-        stop();
         return;
     }
-    p.set_target_position(_robot_position);
-    if (next_robot_request_queue_.empty()) {
-        steady_timer_.expires_from_now(std::chrono::milliseconds(MOVE_TIME * TIME_UNIT));
-        steady_timer_.async_wait([this](const boost::system::error_code& _error) {
-            if (_error) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling conveyor movement", __FUNCTION__);
-                stop();
-                return;
-            }
-            move_conveyor(1);
-        });
+    next_robot_request_queue_.pop();
+    if (_robot_position != 0 && !_robot_endpoint.empty())
+        p.set_target_position(_robot_position);
+    else
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller couldn't return a suitable robot for recipe id %d", _recipe_id);
+
+    if (!next_robot_request_queue_.empty()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: %d next robot responses outstanding", next_robot_request_queue_.size());
+        return;
     }
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Received all next robot responses");
+    steady_timer_.expires_from_now(std::chrono::milliseconds(MOVE_TIME * TIME_UNIT));
+    steady_timer_.async_wait([this](const boost::system::error_code& _error) {
+        if (_error) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling conveyor movement", __FUNCTION__);
+            stop();
+            return;
+        }
+        move_conveyor(1);
+    });
 }
 
 void
@@ -490,6 +524,7 @@ conveyor::deliver_finished_order() {
             UA_Variant* output = nullptr;
             if (position_remote_robot_map_.find(p.get_position()) == position_remote_robot_map_.end()) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "PREPARE DELIVERY: Robot at position %d is not known", p.get_position());
+                p.set_target_position(0);
                 occupied_plate_id++;
                 continue;
             }
@@ -499,14 +534,18 @@ conveyor::deliver_finished_order() {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "DELIVERY: Failed to deliver dish at position %d", p.get_position());
                 if (output != nullptr)
                     UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                p.set_target_position(0);
                 occupied_plate_id++;
                 continue;
             }
-            if (receive_robot_task_called(output_size, output)) {
+            if (receive_robot_task_called(output_size, output, p)) {
+                reset_plate(p);
                 occupied_plate_id = occupied_plates_.erase(occupied_plate_id);
                 UA_UInt32 occupied_plates_count = occupied_plates_.size();
                 conveyor_type_inserter_.set_scalar_attribute(CONVEYOR_INSTANCE_NAME, OCCUPIED_PLATES, &occupied_plates_count, UA_TYPES_UINT32);
                 continue;
+            } else {
+                p.set_target_position(0);
             }
         }
         occupied_plate_id++;
@@ -542,17 +581,20 @@ conveyor::receive_completed_order_called(size_t _output_size, UA_Variant* _outpu
 void
 conveyor::determine_next_movement() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (occupied_plates_.empty() && notifications_map_.empty()) {
-        state_status_ = conveyor::state::IDLING;
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: No occupied plates or notifications, idling now");
-    } else {
+    if (!notifications_map_.empty()) {
         handle_retrieve_finished_orders();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: There are still finished orders to deliver or retrieve");
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: There are finished orders to retrieve");
+    } else if (!occupied_plates_.empty()) {
+        request_next_robots();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: There are occupied plates with orders to deliver");
+    } else {
+        state_status_ = conveyor::state::IDLING;
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: No occupied plates or orders to retrieve, idling now");   
     }
 }
 
 bool
-conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
+conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output, plate& _plate) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
@@ -581,16 +623,14 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
         return result;
     }
 
-    plate& p = plates_[position_plate_id_map_[remote_robot_position]];
     // Sanity check
-    if (!p.is_occupied() || p.get_target_position() == 0 || p.get_position() != remote_robot_position) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", p.get_position(), remote_robot_position);
+    if (_plate.get_position() != remote_robot_position) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", _plate.get_position(), remote_robot_position);
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         stop();
         return false;
     }
-    reset_plate(p);
     if (_output != nullptr)
         UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SUCCESSFUL DELIVERY: Delivered dish at position %d successfully", remote_robot_position);
@@ -712,6 +752,12 @@ conveyor::start() {
                         std::string controller_endpoint;
                         if (discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) == UA_STATUSCODE_GOOD) {
                             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Re-established connection to controller", __FUNCTION__);
+                            io_context_.post([this] {
+                                if (state_status_ == conveyor::state::MOVING && !next_robot_request_queue_.empty()) {
+                                    std::queue<position_t>().swap(next_robot_request_queue_);
+                                    determine_next_movement();
+                                }
+                            });
                         }
                     }
                     /* Handle kitchen client iterate */
