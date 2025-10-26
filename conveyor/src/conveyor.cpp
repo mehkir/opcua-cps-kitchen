@@ -192,11 +192,12 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
                                                                             std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
             position_remote_robot_map_[_robot_position] = std::move(robot);
-            notifications_map_[_robot_position] = _robot_endpoint;
         } else {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot client initialitation/start failed", __FUNCTION__);
+            return;
         }
     }
+    notifications_map_[_robot_position] = _robot_endpoint;
     if (state_status_ == conveyor::state::IDLING) {
         state_status_ = conveyor::state::MOVING;
         steady_timer_.expires_from_now(std::chrono::milliseconds(DEBOUNCE_TIME * TIME_UNIT));
@@ -217,7 +218,7 @@ conveyor::handle_retrieve_finished_orders() {
     remove_marked_robots();
     for (auto notification = notifications_map_.begin(); notification != notifications_map_.end();) {
         if (!plates_[position_plate_id_map_[notification->first]].is_occupied()) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: Dish at position %d is retrievable", notification->first);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: Dish at position %d(%s) is retrievable", notification->first, notification->second.c_str());
             size_t output_size = 0;
             UA_Variant* output = nullptr;
             UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
@@ -225,7 +226,7 @@ conveyor::handle_retrieve_finished_orders() {
                 status = position_remote_robot_map_[notification->first]->handover_finished_order(&output_size, &output);
             }
             if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: RETRIEVAL: Retrieving for dish at position %d failed (%s)", __FUNCTION__, notification->first, UA_StatusCode_name(status));
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: Retrieving for dish at position %d(%s) failed (%s)", notification->first, notification->second.c_str(), UA_StatusCode_name(status));
                 if (output != nullptr)
                     UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                 notification = notifications_map_.erase(notification);
