@@ -37,8 +37,8 @@ int main(int argc, char* argv[]) {
 
     UA_UInt32 sample_data = 12345;
 
-    node_value_subscriber string_subscriber;
-    string_subscriber.subscribe_node_value(client, UA_NODEID_STRING(1, const_cast<char*>("ingredients")), string_changed, &sample_data);
+    node_value_subscriber string_subscriber(client);
+    string_subscriber.subscribe_node_value(UA_NODEID_STRING(1, const_cast<char*>("ingredients")), string_changed, &sample_data);
 
     while(running) {
         if (UA_Client_run_iterate(client, 1000) != UA_STATUSCODE_GOOD) {

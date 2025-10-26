@@ -92,8 +92,8 @@ int main(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    node_value_subscriber clock_tick_subscriber;
-    clock_tick_subscriber.subscribe_node_value(clock_client, UA_NODEID_STRING(1, const_cast<char*>("clock_tick")), clock_tick_notification_callback, NULL);
+    node_value_subscriber clock_tick_subscriber(clock_client);
+    clock_tick_subscriber.subscribe_node_value(UA_NODEID_STRING(1, const_cast<char*>("clock_tick")), clock_tick_notification_callback, NULL);
 
     srand(time(NULL));
     next_clock_tick_ = rand() % 1000;
