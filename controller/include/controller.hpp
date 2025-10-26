@@ -196,6 +196,7 @@ struct remote_robot {
             running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
+            nv_subscriber_.reset();
             UA_Client_delete(client_);
         }
 

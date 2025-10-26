@@ -246,31 +246,28 @@ controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _process
             next_robot_receiver_map_[nrr_key] = std::move(nrr);
     }
     remote_robot* next_suitable_robot = find_suitable_robot(_recipe_id, _processed_steps);
-    UA_String next_suitable_robot_endpoint = UA_STRING_ALLOC("");
+    std::string next_suitable_robot_endpoint = "";
     position_t next_suitable_robot_position = 0;
     if (next_suitable_robot != nullptr && !next_suitable_robot->is_adaptivity_pending()) {
-        UA_String_clear(&next_suitable_robot_endpoint);
-        next_suitable_robot_endpoint = UA_STRING_ALLOC(next_suitable_robot->get_endpoint().c_str());
         next_suitable_robot_position = next_suitable_robot->get_position();
+        next_suitable_robot_endpoint = next_suitable_robot->get_endpoint();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d (%s)", next_suitable_robot_position, next_suitable_robot->get_endpoint().c_str());
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: No next suitable robot found");
     }
-    if (next_suitable_robot != nullptr && next_robot_receiver_map_.find(nrr_key) != next_robot_receiver_map_.end()) {
+    if (next_robot_receiver_map_.find(nrr_key) != next_robot_receiver_map_.end()) {
         size_t output_size = 0;
         UA_Variant* output = nullptr;
-        UA_StatusCode status = next_robot_receiver_map_[nrr_key]->receive_next_robot(next_suitable_robot->get_position(), next_suitable_robot->get_endpoint(), _recipe_id, &output_size, &output);
+        UA_StatusCode status = next_robot_receiver_map_[nrr_key]->receive_next_robot(next_suitable_robot_position, next_suitable_robot_endpoint, _recipe_id, &output_size, &output);
         if (status != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method for remote robot (%s)", __FUNCTION__, RECEIVE_NEXT_ROBOT, UA_StatusCode_name(status));
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Failed calling %s method for remote robot (%s)", RECEIVE_NEXT_ROBOT, UA_StatusCode_name(status));
             if (output != nullptr)
                 UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-            UA_String_clear(&next_suitable_robot_endpoint);
             return;
         }
         bool result = receive_next_robot_called(output_size, output);
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Next robot receiver returned %s", __FUNCTION__, result ? "true" : "false");
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot receiver returned %s", result ? "true" : "false");
     }
-    UA_String_clear(&next_suitable_robot_endpoint);
 }
 
 bool
