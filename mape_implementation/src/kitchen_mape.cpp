@@ -19,27 +19,35 @@
 // Simple rearranging if suitable robot after next is positioned before next suitable robot
 remote_robot*
 kitchen_mape::on_new_order(const std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) {
+    if (_recipe_action_queue.empty()) {
+        return nullptr;
+    }
     remote_robot* suitable_robot = nullptr;
     std::string next_action = _recipe_action_queue.front().get_name();
     std::queue<robot_action> action_queue_copy = _recipe_action_queue;
     // Determine capable robot
     for (auto position_remote_robot = _position_remote_robot_map.begin(); position_remote_robot != _position_remote_robot_map.end(); position_remote_robot++) {
         remote_robot* robot = position_remote_robot->second.get();
-        if (robot->is_capable_to(next_action)) {
+        if (!robot->is_adaptivity_pending() && robot->is_capable_to(next_action)) {
             suitable_robot = robot;
             break;
         }
     }
+    
+    if (suitable_robot == nullptr) {
+        return nullptr;
+    }
+
     // Filter out all actions the suitable robot can do
     do {
         action_queue_copy.pop();
     } while (!action_queue_copy.empty() && suitable_robot->is_capable_to(action_queue_copy.front().get_name()));
     // Determine suitable robot after next
     remote_robot* suitable_robot_after_next = nullptr;
-    if (!action_queue_copy.empty()) {
+    if (suitable_robot != nullptr && !action_queue_copy.empty()) {
         for (auto position_remote_robot = _position_remote_robot_map.begin(); position_remote_robot != _position_remote_robot_map.end(); position_remote_robot++) {
             remote_robot* robot = position_remote_robot->second.get();
-            if (robot->is_capable_to(action_queue_copy.front().get_name())) {
+            if (!robot->is_adaptivity_pending() && robot->is_capable_to(action_queue_copy.front().get_name())) {
                 suitable_robot_after_next = robot;
                 break;
             }
