@@ -272,6 +272,7 @@ struct remote_robot {
             running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
+            nv_subscriber_.reset();
             UA_Client_delete(client_);
             UA_Boolean connectivity = false;
             remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(position_.load()), CONNECTIVITY, &connectivity, UA_TYPES_BOOLEAN);
@@ -374,6 +375,17 @@ private:
     handle_random_order_request();
 
     /**
+     * @brief Extracts the returned remote robot parameters.
+     * 
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
+     * @return true if call was successful.
+     * @return false if call failed.
+     */
+    bool
+    choose_next_robot_called(size_t _output_size, UA_Variant *_output);
+
+    /**
      * @brief Receives the next suitable robot for a requested recipe.
      * 
      * @param _server the server instance from which this method is called.
@@ -417,17 +429,6 @@ private:
      */
     bool
     receive_robot_task_called(size_t _output_size, UA_Variant* _output);
-
-    /**
-     * @brief Extracts the returned remote robot parameters.
-     * 
-     * @param _output_size the count of returned output values.
-     * @param _output the variant containing the output values.
-     * @return true if call was successful.
-     * @return false if call failed.
-     */
-    bool
-    choose_next_robot_called(size_t _output_size, UA_Variant *_output);
 
     /**
      * @brief Called when robot switched to its new position.

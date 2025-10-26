@@ -275,8 +275,29 @@ kitchen::handle_random_order_request() {
         }
     }
     bool result = choose_next_robot_called(output_size, output);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Controller returned %s for next robot request.", __FUNCTION__, result ? "true" : "false");
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Controller returned %s for next robot request.", result ? "true" : "false");
     order_queue_.push(recipe_id);
+}
+
+bool
+kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_output_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        stop();
+        return false;
+    }
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        stop();
+        return false;
+    }
+    UA_Boolean result = *(UA_Boolean*) _output[0].data;
+    return result;
 }
 
 UA_StatusCode
@@ -328,6 +349,11 @@ kitchen::receive_next_robot(UA_Server* _server,
 void
 kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robot_endpoint, recipe_id_t _recipe_id) {
     remove_marked_robots();
+    if (_robot_position == 0 || _robot_endpoint.empty()) {
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller couldn't return a suitable robot. Dropping order with recipe id %d", _recipe_id);
+        increment_orders_counter(DROPPED_ORDERS);
+        return;
+    }
     std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
     if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || !_robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
         position_remote_robot_map_.erase(_robot_position);
@@ -346,15 +372,17 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller returned the robot at position %d (%s) for recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
     UA_StatusCode status = position_remote_robot_map_[_robot_position]->instruct(_recipe_id, 0, &output_size, &output);
     if (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method", __FUNCTION__, RECEIVE_TASK);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Failed calling %s method", RECEIVE_TASK);
         if (output != nullptr)
             UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return;
     }
     if (receive_robot_task_called(output_size, output)) {
         increment_orders_counter(ASSIGNED_ORDERS);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Assigned the next robot at position %d (%s) with recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
     } else {
         increment_orders_counter(DROPPED_ORDERS);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Dropped order for the next robot at position %d (%s) with recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
     }
 }
 
@@ -402,27 +430,6 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     if (_output != nullptr)
         UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
     return true;
-}
-
-bool
-kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_output_size != 1) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        if (_output != nullptr)
-            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        stop();
-        return false;
-    }
-    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        if (_output != nullptr)
-            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        stop();
-        return false;
-    }
-    UA_Boolean result = *(UA_Boolean*) _output[0].data;
-    return result;
 }
 
 void
