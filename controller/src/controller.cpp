@@ -264,6 +264,8 @@ controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _process
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method for remote robot (%s)", __FUNCTION__, RECEIVE_NEXT_ROBOT, UA_StatusCode_name(status));
             if (output != nullptr)
                 UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+            UA_String_clear(&next_suitable_robot_endpoint);
+            return;
         }
         bool result = receive_next_robot_called(output_size, output);
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Next robot receiver returned %s", __FUNCTION__, result ? "true" : "false");
