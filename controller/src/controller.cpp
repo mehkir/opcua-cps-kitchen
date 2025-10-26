@@ -6,7 +6,8 @@
 
 #define INSTANCE_NAME "KitchenController"
 
-controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), work_guard_(boost::asio::make_work_guard(io_context_)), recipe_parser_(), kitchen_mape_(std::move(_kitchen_mape)) {
+controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true),
+                                                            work_guard_(boost::asio::make_work_guard(io_context_)), recipe_parser_(), kitchen_mape_(std::move(_kitchen_mape)) {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
@@ -593,6 +594,7 @@ controller::start() {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
     join_threads();
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
 
 void
