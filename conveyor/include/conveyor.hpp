@@ -25,11 +25,13 @@
 #include <string>
 #include <unordered_set>
 #include <unordered_map>
+#include <queue>
 #include <memory>
 #include <condition_variable>
 #include <atomic>
 #include <functional>
 #include <unistd.h>
+#include <boost/asio.hpp>
 #include "method_node_caller.hpp"
 #include "client_connection_establisher.hpp"
 #include "types.hpp"
@@ -80,42 +82,49 @@ struct remote_robot {
                     mark_robot_for_removal_callback_(_mark_robot_for_removal_callback),
                     position_swapped_callback_(_position_swapped_callback), initial_subscription_(true) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+        }
+
+        /**
+         * @brief Initializes and starts this remote robot.
+         * 
+         * @return UA_StatusCode the status code.
+         */
+        UA_StatusCode
+        initialize_and_start() {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            if (client_ != nullptr) {
+                return running_.load() ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BAD;
+            }
             client_connection_establisher robot_client_connection_establisher;
             bool connected = robot_client_connection_establisher.establish_connection(client_, endpoint_);
             if (!connected) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Error establishing robot client session");
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
-
+            
             attribute_id_map_[AVAILABILITY] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, AVAILABILITY);
             if (UA_NodeId_equal(&attribute_id_map_[AVAILABILITY], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, AVAILABILITY);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             attribute_id_map_[POSITION] = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, POSITION);
             if (UA_NodeId_equal(&attribute_id_map_[POSITION], &UA_NODEID_NULL)) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, POSITION);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             nv_subscriber_ = std::make_unique<node_value_subscriber>(client_);
             UA_StatusCode status = nv_subscriber_->subscribe_node_value(attribute_id_map_[POSITION], position_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s", __FUNCTION__, POSITION);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             if ((method_id_map_[HANDOVER_FINISHED_ORDER] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, HANDOVER_FINISHED_ORDER)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, HANDOVER_FINISHED_ORDER);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             if ((method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
             try {
                 client_iterate_thread_ = std::thread([this]() {
@@ -126,25 +135,24 @@ struct remote_robot {
                             if (status != UA_STATUSCODE_GOOD) {
                                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_.load(), UA_StatusCode_name(status));
                                 running_.store(false);
-                                mark_robot_for_removal_callback_(position_.load());
-                                return;
+                                return UA_STATUSCODE_BAD;
                             }
                         }
                         if (usleep(1*1000)) {
                             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error at robot client iterate sleep", __FUNCTION__);
                             running_.store(false);
-                            mark_robot_for_removal_callback_(position_.load());
-                            return;
+                            return UA_STATUSCODE_BAD;
                         }
                         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
+                    return UA_STATUSCODE_BAD;
                 });
             } catch (...) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the robot client iterate thread at position %d", __FUNCTION__, position_.load());
                 running_.store(false);
-                mark_robot_for_removal_callback_(position_.load());
-                return;
+                return UA_STATUSCODE_BAD;
             }
+            return UA_STATUSCODE_GOOD;
         }
 
         /**
@@ -499,6 +507,9 @@ enum state {
 private:
     /* conveyor related member variables. */
     UA_Server* server_; /**< the OPC UA conveyor server pointer. */
+    std::string conveyor_uri_; /**< the conveyor's uniform resource identifier. */
+    UA_String server_endpoint_; /**< the conveyor's endpoint address. */
+    UA_String type_; /**< the conveyor's agent type. */
     object_type_node_inserter conveyor_type_inserter_; /**< the conveyor type inserter for adding the conveyor's attributes and methods to the address space. */
     object_type_node_inserter plate_type_inserter_; /**< the plate type inserter for adding the plate's attributes to the address space. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
@@ -506,19 +517,21 @@ private:
     std::vector<plate> plates_; /**< the plates on the conveyor. */
     std::thread server_iterate_thread_; /**< the server iteration thread. */
     discovery_util discovery_util_; /**< the discovery utility. */
+    std::thread worker_thread_; /**< the worker thread. */
+    boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
+    boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
+    boost::asio::steady_timer steady_timer_; /**< the steady timer for action time simulation. */
     std::unordered_set<plate_id_t> occupied_plates_; /**< the currently occupied plates. */
     std::unordered_map<position_t, plate_id_t> position_plate_id_map_; /**< the map tracking the current positions of the plates. */
     std::unordered_map<position_t, std::string> notifications_map_; /**< the notifications received by the robots. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map tracking the current positions of robots. */
     std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
     std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
+    std::queue<position_t> next_robot_request_queue_; /**< the queue holding the order of next robot requests. */
     /* controller related member variables. */
     std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
     std::thread client_iterate_thread_; /**< the client iteration thread. */
     UA_Client* controller_client_; /**< the OPC UA controller client pointer. */
-    /* robot related member variables. */
-    std::mutex mark_for_removal_mutex_; /**< the mark for removal mutex for synchronizing the to be removed set. */
-    std::mutex position_remote_robot_map_mutex_; /**< the position_remote_robot_map mutex for synchronizing map access. */
     /* kitchen related member variables. */
     UA_Client* kitchen_client_; /**< the OPC UA kitchen client pointer. */
 
@@ -552,19 +565,9 @@ private:
      * 
      * @param _robot_endpoint the endpoint from which the finished order notification is sent.
      * @param _robot_position the position on which the finished order is ready to be retrieved.
-     * @param _output the output pointer to store return parameters.
      */
     void
-    handle_finished_order_notification(std::string _robot_endpoint, position_t _robot_position, UA_Variant* _output);
-
-    /**
-     * @brief Timed callback to call handle_retrieve_finished_orders.
-     * 
-     * @param _server the server instance from which this method is called.
-     * @param _data the conveyor instance passed to the scheduling call.
-     */
-    static void
-    retrieve_finished_orders(UA_Server* _server, void* _data);
+    handle_finished_order_notification(std::string _robot_endpoint, position_t _robot_position);
 
     /**
      * @brief Retrieves finished dishes if possible or keeps moving if there occupied plates.
@@ -633,14 +636,39 @@ private:
     void
     request_next_robot(plate& _plate);
 
-    /**
-     * @brief Timed callback to call move_conveyor, deliver_finished_order and determine_next_movement.
+   /**
+     * @brief Receives the next suitable robot for a requested recipe.
      * 
      * @param _server the server instance from which this method is called.
-     * @param _data the conveyor instance passed to the scheduling call.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
      */
-    static void
-    perform_movement(UA_Server* _server, void* _data);
+    static UA_StatusCode
+    receive_next_robot(UA_Server* _server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Handles the received next robot response.
+     * 
+     * @param _robot_position the robot position.
+     * @param _robot_endpoint the robot endpoint.
+     * @param _recipe_id the recipe id.
+     */
+    void
+    handle_receive_next_robot(position_t _robot_position, std::string _robot_endpoint, recipe_id_t _recipe_id);
 
     /**
      * @brief Extracts the returned robot state parameters and updates plates.
