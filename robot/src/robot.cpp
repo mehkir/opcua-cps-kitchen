@@ -543,6 +543,8 @@ robot::determine_next_action() {
             is_dish_finished_ = false;
             /* Notify conveyor about finished order */
             method_node_caller receive_finished_order_notification_caller;
+            receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+            receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
             object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
             size_t output_size = 0;
             UA_Variant* output = nullptr;
@@ -623,6 +625,8 @@ robot::determine_next_action() {
         is_dish_finished_ = true;
         /* Notify conveyor about finished order */
         method_node_caller receive_finished_order_notification_caller;
+        receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+        receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
         object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
         size_t output_size = 0;
         UA_Variant* output = nullptr;
@@ -1083,6 +1087,8 @@ robot::start() {
                         if (discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE) == UA_STATUSCODE_GOOD) {
                             if (pending_pickup_.load()) {
                                 method_node_caller receive_finished_order_notification_caller;
+                                receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+                                receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
                                 object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
                                 size_t output_size = 0;
                                 UA_Variant* output = nullptr;
