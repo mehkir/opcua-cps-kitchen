@@ -343,6 +343,7 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
     }
     size_t output_size = 0;
     UA_Variant* output = nullptr;
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller returned the robot at position %d (%s) for recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
     UA_StatusCode status = position_remote_robot_map_[_robot_position]->instruct(_recipe_id, 0, &output_size, &output);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method", __FUNCTION__, RECEIVE_TASK);
