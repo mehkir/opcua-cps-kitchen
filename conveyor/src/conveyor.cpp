@@ -184,7 +184,7 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "FINISHED_ORDER_NOTIFICATION: Received notification from robot at position %d with endpoint %s", _robot_position, _robot_endpoint.c_str());
     remove_marked_robots();
-    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || !_robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
+    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || _robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
         position_remote_robot_map_.erase(_robot_position);
         robots_to_be_removed_.erase(_robot_position);
         std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_robot_endpoint, _robot_position,
@@ -420,7 +420,7 @@ conveyor::handle_receive_next_robot(position_t _robot_position, std::string _rob
     if (_robot_position != 0
         && !_robot_endpoint.empty()
         && (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()
-            || !_robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())
+            || _robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())
     )) {
         position_remote_robot_map_.erase(_robot_position);
         robots_to_be_removed_.erase(_robot_position);

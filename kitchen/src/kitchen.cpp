@@ -355,7 +355,7 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
         return;
     }
     std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
-    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || !_robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
+    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || _robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
         position_remote_robot_map_.erase(_robot_position);
         robots_to_be_removed_.erase(_robot_position);
         std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, remote_robot_type_inserter_,
@@ -658,7 +658,7 @@ kitchen::start() {
                                 continue;
                             }
                             UA_Boolean available = *(UA_Boolean*)inr.get_variant()->data;
-                            if (available && (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end() || !endpoint.compare(position_remote_robot_map_[remote_robot_position]->get_endpoint()))) {
+                            if (available && (position_remote_robot_map_.find(remote_robot_position) == position_remote_robot_map_.end() || endpoint.compare(position_remote_robot_map_[remote_robot_position]->get_endpoint()))) {
                                 position_remote_robot_map_.erase(remote_robot_position);
                                 robots_to_be_removed_.erase(remote_robot_position);
                                 std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(endpoint, remote_robot_position, remote_robot_type_inserter_,
