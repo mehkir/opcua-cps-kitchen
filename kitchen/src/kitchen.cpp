@@ -15,7 +15,8 @@
 
 kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
                                         robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
-                                        mersenne_twister_(random_device_()), uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr), work_guard_(boost::asio::make_work_guard(io_context_)) {
+                                        mersenne_twister_(random_device_()), uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr),
+                                        work_guard_(boost::asio::make_work_guard(io_context_)), placing_timer_(io_context_), placing_gate_open_(true) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -238,47 +239,75 @@ kitchen::place_random_order(UA_Server* _server,
 void
 kitchen::handle_random_order_request() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    increment_orders_counter(RECEIVED_ORDERS);
-    bool instructed = false;
-    recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
-    object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
-    UA_Variant* output = nullptr;
-    size_t output_size = 0;
-    {
-        std::unique_lock<std::mutex> lock(client_mutex_);
-        method_node_caller choose_next_robot_caller;
-        UA_UInt32 processed_steps = 0;
-        choose_next_robot_caller.add_scalar_input_argument(&recipe_id, UA_TYPES_UINT32);
-        choose_next_robot_caller.add_scalar_input_argument(&processed_steps, UA_TYPES_UINT32);
-        choose_next_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
-        choose_next_robot_caller.add_scalar_input_argument(&type_, UA_TYPES_STRING);
-        UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
-        while (status != UA_STATUSCODE_GOOD) {
-            if (controller_client_ != nullptr)
-                status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-            if (running_.load() && status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                if (output != nullptr ) {
-                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                    output = nullptr;
-                    output_size = 0;
+    auto do_place = [this] {
+        increment_orders_counter(RECEIVED_ORDERS);
+        bool instructed = false;
+        recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
+        object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
+        UA_Variant* output = nullptr;
+        size_t output_size = 0;
+        {
+            std::unique_lock<std::mutex> lock(client_mutex_);
+            method_node_caller choose_next_robot_caller;
+            UA_UInt32 processed_steps = 0;
+            choose_next_robot_caller.add_scalar_input_argument(&recipe_id, UA_TYPES_UINT32);
+            choose_next_robot_caller.add_scalar_input_argument(&processed_steps, UA_TYPES_UINT32);
+            choose_next_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+            choose_next_robot_caller.add_scalar_input_argument(&type_, UA_TYPES_STRING);
+            UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+            while (status != UA_STATUSCODE_GOOD) {
+                if (controller_client_ != nullptr)
+                    status = choose_next_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+                if (running_.load() && status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                    if (output != nullptr ) {
+                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                        output = nullptr;
+                        output_size = 0;
+                    }
+                    UA_Client_delete(controller_client_);
+                    controller_client_ = nullptr;
+                    remote_controller_connected_cv_.wait(lock);
                 }
-                UA_Client_delete(controller_client_);
-                controller_client_ = nullptr;
-                remote_controller_connected_cv_.wait(lock);
-            }
-            if (!running_.load()) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to call choose next robot", __FUNCTION__);
-                if (output != nullptr )
-                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                return;
+                if (!running_.load()) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to call choose next robot", __FUNCTION__);
+                    if (output != nullptr )
+                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                    return;
+                }
             }
         }
+        bool result = choose_next_robot_called(output_size, output);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Controller returned %s for next robot request.", result ? "true" : "false");
+    };
+
+    if (placing_gate_open_) {
+        placing_gate_open_ = false;
+        do_place();
+        arm_placing_gate();
+    } else {
+        placing_queue_.push(std::move(do_place));
     }
-    bool result = choose_next_robot_called(output_size, output);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Controller returned %s for next robot request.", result ? "true" : "false");
-    // std::this_thread::sleep_for(std::chrono::milliseconds(PlACING_RATE * TIME_UNIT));
+}
+
+void
+kitchen::arm_placing_gate() {
+    placing_timer_.expires_after(std::chrono::milliseconds(PlACING_RATE * TIME_UNIT));
+    placing_timer_.async_wait([this](const boost::system::error_code& ec){
+        if (ec) {
+            // timer cancelled on shutdown; ignore
+            return;
+        }
+        if (!placing_queue_.empty()) {
+            auto task = std::move(placing_queue_.front());
+            placing_queue_.pop();
+            task();
+            arm_placing_gate();
+        } else {
+            placing_gate_open_ = true;
+        }
+    });
 }
 
 bool
@@ -377,6 +406,7 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Failed calling %s method", RECEIVE_TASK);
         if (output != nullptr)
             UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        increment_orders_counter(DROPPED_ORDERS);
         return;
     }
     if (receive_robot_task_called(output_size, output)) {
@@ -411,18 +441,13 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     remote_robot* robot = nullptr;
     if (position_remote_robot_map_.find(remote_robot_position) != position_remote_robot_map_.end())
         robot = position_remote_robot_map_[remote_robot_position].get();
-    // Sanity check
+
     if (robot == nullptr) {
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return false;
     }
-    if (robot->get_position() != remote_robot_position) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Mismatch on position. Received position %d, actually %d", __FUNCTION__, remote_robot_position, robot->get_position());
-        if (_output != nullptr)
-            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        return false;
-    }
+
     if (!result) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, robot->get_position());
         if (_output != nullptr)
@@ -431,7 +456,7 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
     }
     if (_output != nullptr)
         UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-    return true;
+    return result;
 }
 
 void

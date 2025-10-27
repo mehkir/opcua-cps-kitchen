@@ -296,6 +296,9 @@ private:
     std::thread worker_thread_; /**< the worker thread for assigning placed orders to remote robots. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
+    boost::asio::steady_timer placing_timer_; /**< the placing timer. */
+    bool placing_gate_open_; /**< the placing gate. */
+    std::queue<std::function<void()>> placing_queue_ /**< the placing queue. */;
     /* remote robot related member variables. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
     std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
@@ -365,6 +368,13 @@ private:
             const UA_NodeId* _object_id, void* _object_context,
             size_t _input_size, const UA_Variant* _input,
             size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Arms the placing gate.
+     * 
+     */
+    void
+    arm_placing_gate();
 
     /**
      * @brief Handles the random order request.
