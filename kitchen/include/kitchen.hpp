@@ -296,7 +296,6 @@ private:
     std::thread worker_thread_; /**< the worker thread for assigning placed orders to remote robots. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
-    std::queue<recipe_id_t> order_queue_; /**< the order queue. */
     /* remote robot related member variables. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
     std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */

@@ -642,7 +642,7 @@ void
 conveyor::position_swapped_callback(position_t _old_position, position_t _new_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     io_context_.post([this, _old_position, _new_position] {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Reflecting position swap/switch from %d to %d", _old_position, _new_position);
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING(Conveyor): Reflecting position swap/switch from %d to %d", _old_position, _new_position);
         remote_robot* first = nullptr;
         remote_robot* second = nullptr;
         if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {

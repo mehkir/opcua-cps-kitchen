@@ -6,10 +6,12 @@
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
 #include "information_node_reader.hpp"
+#include "time_unit.hpp"
 
 #define INSTANCE_NAME "CpsKitchen"
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
+#define PlACING_RATE 5LL
 
 kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
                                         robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
@@ -276,7 +278,7 @@ kitchen::handle_random_order_request() {
     }
     bool result = choose_next_robot_called(output_size, output);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Controller returned %s for next robot request.", result ? "true" : "false");
-    order_queue_.push(recipe_id);
+    // std::this_thread::sleep_for(std::chrono::milliseconds(PlACING_RATE * TIME_UNIT));
 }
 
 bool
@@ -436,7 +438,7 @@ void
 kitchen::position_swapped_callback(position_t _old_position, position_t _new_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::lock_guard<std::mutex> lock(remote_robot_discovery_mutex_);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Reflecting position swap/switch from %d to %d", _old_position, _new_position);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING(Kitchen): Reflecting position swap/switch from %d to %d", _old_position, _new_position);
     remote_robot* first = nullptr;
     remote_robot* second = nullptr;
     if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {
@@ -449,15 +451,20 @@ kitchen::position_swapped_callback(position_t _old_position, position_t _new_pos
         || (second != nullptr && second->get_position() != _new_position) ) {
             std::swap(position_remote_robot_map_[_old_position], position_remote_robot_map_[_new_position]);
     }
-    UA_Boolean connected = false;
+    UA_Boolean disconnected = false;
+    UA_Boolean connected = true;
     if (position_remote_robot_map_[_old_position] == nullptr) {
         position_remote_robot_map_.erase(_old_position);
         robots_to_be_removed_.erase(_old_position);
+        remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_old_position), CONNECTIVITY, &disconnected, UA_TYPES_BOOLEAN);
+    } else {
         remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_old_position), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
-    } 
+    }
     if (position_remote_robot_map_[_new_position] == nullptr) {
         position_remote_robot_map_.erase(_new_position);
         robots_to_be_removed_.erase(_new_position);
+        remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_new_position), CONNECTIVITY, &disconnected, UA_TYPES_BOOLEAN);
+    } else {
         remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_new_position), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
     }
 }
