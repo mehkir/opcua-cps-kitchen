@@ -19,6 +19,19 @@ $PROJECT_DIRECTORY/build.bash
 ROBOTS_COUNT=$1
 CONVEYOR_SIZE=$(( ROBOTS_COUNT + 1 ))
 
+# Define a cleanup function
+kill_kitchen() {
+    echo "Waiting 7 seconds for agents to shutdown. The rest will be killed after."
+    sleep 7
+    for p in start_r start_c discov start_k; do
+        pkill -SIGKILL "$p"
+    done
+    exit 0
+}
+
+# Trap SIGINT (Ctrl+C)
+trap kill_kitchen SIGINT
+
 $PROJECT_DIRECTORY/build/demos/discovery_server &
 sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_controller.bash &
