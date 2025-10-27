@@ -52,6 +52,7 @@ struct remote_robot {
         std::string endpoint_; /**< the endpoint address. */
         std::atomic<position_t> position_; /**< the position on the conveyor belt. */
         std::unordered_set<std::string> capabilities_; /**< the capabilites. */
+        std::string capabilities_str_; /**< the string representation of the capabilites. */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
         capabilities_reconfigured_callback_t capabilities_reconfigured_callback_; /**< the callback to notify about capabilitiy reconfgurations. */
@@ -156,6 +157,12 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECONFIGURE);
                 return UA_STATUSCODE_BAD;
             }
+            capabilities_str_ = "[";
+            for (auto capability : capabilities_) {
+                capabilities_str_ += capability + ", ";
+            }
+            capabilities_str_.erase(capabilities_str_.end()-2, capabilities_str_.end());
+            capabilities_str_ += "]";
             try {
                 client_iterate_thread_ = std::thread([this]() {
                     while(running_) {
@@ -279,6 +286,16 @@ struct remote_robot {
         position_t
         get_position() const {
             return position_.load();
+        }
+
+        /**
+         * @brief Returns the capabilites string representation.
+         * 
+         * @return std::string the string representation.
+         */
+        std::string
+        get_capabilites_string() const {
+            return capabilities_str_;
         }
 
         /**

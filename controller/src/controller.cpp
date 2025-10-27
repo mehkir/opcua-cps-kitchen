@@ -411,6 +411,7 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", func_name);
         remove_marked_robots();
         erase_stale_pending_swap_entries();
+        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Robot from its old position %d acknowledged swap to the new position %d", _old_position, _new_position);
         swap_key sk = (_old_position < _new_position) ? std::make_tuple(_old_position, _new_position) : std::make_tuple(_new_position, _old_position);
         if (pending_swaps_.find(sk) == pending_swaps_.end()) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no pending swap entry for position %d", __FUNCTION__, _new_position);
