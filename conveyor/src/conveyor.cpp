@@ -629,7 +629,6 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output, pl
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", _plate.get_position(), remote_robot_position);
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        // stop();
         return false;
     }
     if (_output != nullptr)
