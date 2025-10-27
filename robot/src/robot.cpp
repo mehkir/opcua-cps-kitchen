@@ -54,6 +54,7 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     method_arguments receive_task_method_arguments;
     receive_task_method_arguments.add_input_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
     receive_task_method_arguments.add_input_argument("the processed steps", "processed_steps", UA_TYPES_UINT32);
+    receive_task_method_arguments.add_input_argument("the position the client adresses", "addressed_position", UA_TYPES_UINT32);
     receive_task_method_arguments.add_output_argument("the robot position", "robot_position", UA_TYPES_UINT32);
     receive_task_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
     status = robot_type_inserter_.add_method(ROBOT_TYPE, RECEIVE_TASK, receive_task, receive_task_method_arguments, this);
@@ -256,18 +257,20 @@ robot::receive_task(UA_Server *_server,
             size_t _input_size, const UA_Variant *_input,
             size_t _output_size, UA_Variant *_output) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_input_size != 2) {
+    if(_input_size != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
 
     if (!UA_Variant_hasScalarType(&_input[0], &UA_TYPES[UA_TYPES_UINT32])
-      ||!UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32])) {
+      ||!UA_Variant_hasScalarType(&_input[1], &UA_TYPES[UA_TYPES_UINT32])
+      ||!UA_Variant_hasScalarType(&_input[2], &UA_TYPES[UA_TYPES_UINT32])) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input argument type", __FUNCTION__);
         return UA_STATUSCODE_BAD;
     }
     recipe_id_t recipe_id = *(recipe_id_t*)_input[0].data;
     UA_UInt32 overall_processed_steps = *(UA_UInt32*)_input[1].data;
+    position_t addressed_position = *(position_t*)_input[2].data;
 
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
@@ -277,7 +280,7 @@ robot::receive_task(UA_Server *_server,
     UA_Boolean task_received = true;
     {
         std::lock_guard<std::mutex> lock(self->state_mutex_);
-        if (self->robot_state_ != robot_state::AVAILABLE) {
+        if (self->robot_state_ != robot_state::AVAILABLE || addressed_position != self->position_) {
             task_received = false;
         }
     }
