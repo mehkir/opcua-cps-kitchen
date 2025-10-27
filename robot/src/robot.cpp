@@ -290,11 +290,6 @@ robot::receive_task(UA_Server *_server,
         }
         if (!self->capability_parser_.is_capable_to(action_queue.front().get_name()))
             task_received = false;
-        else {
-            self->io_context_.post([self, recipe_id, overall_processed_steps] {
-                self->handle_receive_task(recipe_id, overall_processed_steps);
-            });
-        }
     }
     // Set output parameters
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &self->position_, &UA_TYPES[UA_TYPES_UINT32]);
@@ -304,6 +299,10 @@ robot::receive_task(UA_Server *_server,
         self->stop();
         return UA_STATUSCODE_BAD;
     }
+    if (task_received)
+        self->io_context_.post([self, recipe_id, overall_processed_steps] {
+            self->handle_receive_task(recipe_id, overall_processed_steps);
+        });
     return UA_STATUSCODE_GOOD;
 }
 
