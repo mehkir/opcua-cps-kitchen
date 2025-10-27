@@ -529,7 +529,13 @@ conveyor::deliver_finished_order() {
                 occupied_plate_id++;
                 continue;
             }
+
             remote_robot* target_robot = position_remote_robot_map_[p.get_position()].get();
+            if (target_robot->get_position() != p.get_position() || !target_robot->is_available()) {
+                p.set_target_position(0);
+                occupied_plate_id++;
+                continue;
+            }
             UA_StatusCode status = target_robot->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), &output_size, &output);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "DELIVERY: Failed to deliver dish at position %d", p.get_position());
@@ -624,11 +630,11 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output, pl
         return result;
     }
 
-    // Sanity check
     if (_plate.get_position() != remote_robot_position) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", _plate.get_position(), remote_robot_position);
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        stop();
         return false;
     }
     if (_output != nullptr)

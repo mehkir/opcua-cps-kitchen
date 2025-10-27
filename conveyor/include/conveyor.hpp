@@ -56,7 +56,7 @@ struct remote_robot {
     private:
         UA_Client* client_; /**< the OPC UA remote robot client pointer. */
         std::string endpoint_; /**< the endpoint address. */
-        std::atomic<position_t> position_; /**< the position on the conveyor belt. */
+        std::atomic<position_t> cached_position_; /**< the position on the conveyor belt. */
         mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
         std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
@@ -78,7 +78,7 @@ struct remote_robot {
          */
         remote_robot(std::string _endpoint, position_t _position,
                     mark_robot_for_removal_callback_t _mark_robot_for_removal_callback, position_swapped_callback_t _position_swapped_callback) :
-                    endpoint_(_endpoint), position_(_position), client_(nullptr), running_(true),
+                    endpoint_(_endpoint), cached_position_(_position), client_(nullptr), running_(true),
                     mark_robot_for_removal_callback_(_mark_robot_for_removal_callback),
                     position_swapped_callback_(_position_swapped_callback), initial_subscription_(true) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
@@ -133,7 +133,7 @@ struct remote_robot {
                             std::lock_guard<std::mutex> lock(client_mutex_);
                             UA_StatusCode status = UA_Client_run_iterate(client_, 1);
                             if (status != UA_STATUSCODE_GOOD) {
-                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, position_.load(), UA_StatusCode_name(status));
+                                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running robot client at position %d (%s)", __FUNCTION__, cached_position_.load(), UA_StatusCode_name(status));
                                 running_.store(false);
                                 return UA_STATUSCODE_BAD;
                             }
@@ -148,7 +148,7 @@ struct remote_robot {
                     return UA_STATUSCODE_BAD;
                 });
             } catch (...) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the robot client iterate thread at position %d", __FUNCTION__, position_.load());
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error running the robot client iterate thread at position %d", __FUNCTION__, cached_position_.load());
                 running_.store(false);
                 return UA_STATUSCODE_BAD;
             }
@@ -182,8 +182,16 @@ struct remote_robot {
          * 
          * @return position_t the robot's position at the conveyor.
          */
-        position_t get_position() const {
-            return position_.load();
+        position_t get_position() {
+            std::lock_guard<std::mutex> lock(client_mutex_);
+            information_node_reader inr;
+            if (inr.read_information_node(client_, attribute_id_map_[POSITION]) != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, POSITION);
+                running_.store(false);
+                mark_robot_for_removal_callback_(cached_position_.load());
+                return 0;
+            }
+            return *(position_t*)inr.get_variant()->data;
         }
 
         /**
@@ -206,17 +214,17 @@ struct remote_robot {
             remote_robot* self = static_cast<remote_robot*>(_mon_context);
             if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-                self->mark_robot_for_removal_callback_(self->position_.load());
+                self->mark_robot_for_removal_callback_(self->cached_position_.load());
                 return;
             }
-            UA_UInt32 old_position = self->position_.load();
-            self->position_.store(*(position_t*)_value->value.data);
+            UA_UInt32 old_position = self->cached_position_.load();
+            self->cached_position_.store(*(position_t*)_value->value.data);
             if (self->initial_subscription_) {
                 self->initial_subscription_ = false;
                 return;
             }
-            self->position_swapped_callback_(old_position, self->position_.load());
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->position_);
+            self->position_swapped_callback_(old_position, self->cached_position_.load());
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->cached_position_);
         }
 
         /**
@@ -231,7 +239,7 @@ struct remote_robot {
             information_node_reader inr;
             if (inr.read_information_node(client_, attribute_id_map_[AVAILABILITY]) != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, AVAILABILITY);
-                mark_robot_for_removal_callback_(position_.load());
+                mark_robot_for_removal_callback_(cached_position_.load());
                 return false;
             }
             return *(UA_Boolean*)inr.get_variant()->data;
@@ -247,7 +255,7 @@ struct remote_robot {
          */
         UA_StatusCode handover_finished_order(size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d", position_.load());
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d", cached_position_.load());
             method_node_caller handover_finished_order_caller;
             object_method_info omi = method_id_map_[HANDOVER_FINISHED_ORDER];
             UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -257,7 +265,7 @@ struct remote_robot {
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, HANDOVER_FINISHED_ORDER, UA_StatusCode_name(status));
                     running_.store(false);
-                    mark_robot_for_removal_callback_(position_.load());
+                    mark_robot_for_removal_callback_(cached_position_.load());
                     return UA_STATUSCODE_BAD;
                 }
             }
@@ -276,7 +284,7 @@ struct remote_robot {
          */
         UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", position_.load(), _recipe_id, _processed_steps);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", cached_position_.load(), _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
@@ -288,7 +296,7 @@ struct remote_robot {
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECEIVE_TASK, UA_StatusCode_name(status));
                     running_.store(false);
-                    mark_robot_for_removal_callback_(position_.load());
+                    mark_robot_for_removal_callback_(cached_position_.load());
                     return UA_STATUSCODE_BAD;
                 }
             }
