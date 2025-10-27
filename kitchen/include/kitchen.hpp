@@ -43,6 +43,7 @@
 #include "types.hpp"
 #include "recipe_parser.hpp"
 #include "robot_state.hpp"
+#include "information_node_reader.hpp"
 
 using namespace cps_kitchen;
 
