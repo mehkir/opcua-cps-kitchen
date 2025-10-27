@@ -205,7 +205,9 @@ kitchen::receive_completed_order(UA_Server* _server,
         return UA_STATUSCODE_BAD;
     }
     kitchen* self = static_cast<kitchen*>(_method_context);
-    self->increment_orders_counter(COMPLETED_ORDERS);
+    self->io_context_.post([self] {
+        self->increment_orders_counter(COMPLETED_ORDERS);
+    });
     UA_Boolean result = true;
     UA_Variant_setScalarCopy(_output, &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
     return UA_STATUSCODE_GOOD;
