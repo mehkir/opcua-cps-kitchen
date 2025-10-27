@@ -536,7 +536,7 @@ conveyor::deliver_finished_order() {
                 occupied_plate_id++;
                 continue;
             }
-            UA_StatusCode status = target_robot->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), &output_size, &output);
+            UA_StatusCode status = target_robot->instruct(p.get_placed_recipe_id(), p.get_processed_steps(), p.get_position(), &output_size, &output);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "DELIVERY: Failed to deliver dish at position %d", p.get_position());
                 if (output != nullptr)

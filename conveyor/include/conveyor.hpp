@@ -277,17 +277,19 @@ struct remote_robot {
          * 
          * @param _recipe_id the recipe ID of the dish.
          * @param _processed_steps the processed steps of the recipe ID so far.
+         * @param _addressed_position the addressed position.
          * @param _output_size the count of returned output values.
          * @param _output the variant containing the output values.
          * 
          * @return UA_StatusCode the status whether the method call was successful.
          */
-        UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, size_t* _output_size, UA_Variant** _output) {
+        UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, position_t _addressed_position, size_t* _output_size, UA_Variant** _output) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", cached_position_.load(), _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
+            receive_robot_task_caller.add_scalar_input_argument(&_addressed_position, UA_TYPES_UINT32);
             object_method_info omi = method_id_map_[RECEIVE_TASK];
             UA_StatusCode status = UA_STATUSCODE_GOOD;
             {
