@@ -1,4 +1,5 @@
 #include "../include/kitchen_mape.hpp"
+#include <open62541/plugin/log_stdout.h>
 #include "controller.hpp"
 
 // Simple capability check
@@ -30,6 +31,7 @@ kitchen_mape::on_new_order(const std::map<position_t, std::unique_ptr<remote_rob
         remote_robot* robot = position_remote_robot->second.get();
         if (!robot->is_adaptivity_pending() && robot->is_capable_to(next_action)) {
             suitable_robot = robot;
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot at position %d %s", suitable_robot->get_position(), suitable_robot->get_capabilites_string().c_str());
             break;
         }
     }
@@ -49,12 +51,14 @@ kitchen_mape::on_new_order(const std::map<position_t, std::unique_ptr<remote_rob
             remote_robot* robot = position_remote_robot->second.get();
             if (!robot->is_adaptivity_pending() && robot->is_capable_to(action_queue_copy.front().get_name())) {
                 suitable_robot_after_next = robot;
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot after next at position %d %s", suitable_robot_after_next->get_position(), suitable_robot_after_next->get_capabilites_string().c_str());
                 break;
             }
         }
     }
     if (suitable_robot != nullptr && suitable_robot_after_next != nullptr
         && (suitable_robot->get_position() > suitable_robot_after_next->get_position())) {
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Swap robots at position %d and %d", suitable_robot->get_position(), suitable_robot_after_next->get_position());
             swap_robot_positions_callback_(suitable_robot->get_position(), suitable_robot_after_next->get_position());
     }
     return suitable_robot;
