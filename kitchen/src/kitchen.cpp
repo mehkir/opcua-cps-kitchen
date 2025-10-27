@@ -395,6 +395,8 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
                                                                             std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1),
                                                                             std::bind(&kitchen::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         if (robot->initialize_and_start() != UA_STATUSCODE_GOOD) {
+            position_remote_robot_map_.erase(_robot_position);
+            robots_to_be_removed_.erase(_robot_position);
             increment_orders_counter(DROPPED_ORDERS);
             return;
         }
@@ -403,7 +405,12 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
     size_t output_size = 0;
     UA_Variant* output = nullptr;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller returned the robot at position %d (%s) for recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
-    UA_StatusCode status = position_remote_robot_map_[_robot_position]->instruct(_recipe_id, 0, &output_size, &output);
+    remote_robot* target_robot = position_remote_robot_map_[_robot_position].get();
+    if (target_robot->get_position() != _robot_position || !target_robot->is_available()) {
+        increment_orders_counter(DROPPED_ORDERS);
+        return;
+    }
+    UA_StatusCode status = target_robot->instruct(_recipe_id, 0, _robot_position, &output_size, &output);
     if (status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Failed calling %s method", RECEIVE_TASK);
         if (output != nullptr)
@@ -440,18 +447,9 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
 
     position_t remote_robot_position = *(position_t*) _output[0].data;
     UA_Boolean result = *(UA_Boolean*) _output[1].data;
-    remote_robot* robot = nullptr;
-    if (position_remote_robot_map_.find(remote_robot_position) != position_remote_robot_map_.end())
-        robot = position_remote_robot_map_[remote_robot_position].get();
-
-    if (robot == nullptr) {
-        if (_output != nullptr)
-            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        return false;
-    }
 
     if (!result) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, robot->get_position());
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d returned false", __FUNCTION__, remote_robot_position);
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
         return false;
