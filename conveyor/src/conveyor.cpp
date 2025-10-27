@@ -583,14 +583,14 @@ void
 conveyor::determine_next_movement() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (!notifications_map_.empty()) {
-        handle_retrieve_finished_orders();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: There are finished orders to retrieve");
+        handle_retrieve_finished_orders();
     } else if (!occupied_plates_.empty()) {
-        request_next_robots();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: There are occupied plates with orders to deliver");
+        request_next_robots();
     } else {
-        state_status_ = conveyor::state::IDLING;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT MOVEMENT: No occupied plates or orders to retrieve, idling now");   
+        state_status_ = conveyor::state::IDLING;
     }
 }
 
@@ -626,10 +626,10 @@ conveyor::receive_robot_task_called(size_t _output_size, UA_Variant* _output, pl
 
     // Sanity check
     if (_plate.get_position() != remote_robot_position) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", _plate.get_position(), remote_robot_position);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CORRUPTED DELIVERY: Delivery is not valid for plate at position %d for robot at position %d", _plate.get_position(), remote_robot_position);
         if (_output != nullptr)
             UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        stop();
+        // stop();
         return false;
     }
     if (_output != nullptr)
