@@ -1,8 +1,4 @@
 #!/usr/bin/bash
-if (( $# < 1 )); then
-  echo "Usage: $0 <robots_count>"
-  exit 1
-fi
 if (( $# < 2 )); then
     echo "Usage: $0 <number_of_robots> <conveyor_size>"
     exit 1
