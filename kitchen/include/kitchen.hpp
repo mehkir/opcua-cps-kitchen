@@ -331,13 +331,11 @@ private:
     bool placing_gate_open_; /**< the placing gate. */
     std::queue<std::function<void()>> placing_queue_ /**< the placing queue. */;
     /* remote robot related member variables. */
+    std::thread cyclic_remote_robot_discovery_thread_; /**< the thread updating the connectivity status of remote robots in the address space. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
     std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
     object_type_node_inserter remote_robot_type_inserter_; /**< the remote robot type inserter for adding the robot's attributes to the address space. */
-    std::thread cyclic_remote_robot_discovery_thread_; /**< the remote robot thread discovering robots periodically. */
-    std::mutex remote_robot_discovery_mutex_; /**< the remote robot discovery mutex for synchronizing remote robot map operations. */
     uint32_t robot_count_; /**< the total robot count in the kitchen. */
-    std::condition_variable remote_robot_discovery_cv; /**< the condition variable to make the discovery thread wait when all robots are discovered. */
     /* controller related member variables. */
     UA_Client* controller_client_; /**< the OPC UA controller client pointer. */
     object_type_node_inserter remote_controller_type_inserter_; /**< the remote controller type inserter for adding the controller's attributes to the address space. */
