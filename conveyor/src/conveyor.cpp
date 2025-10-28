@@ -24,7 +24,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     }
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(conveyor_uri_.c_str());
-    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+    // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
     /* Add conveyor attribute nodes */
     conveyor_type_inserter_.add_attribute(CONVEYOR_TYPE, TOTAL_PLATES);
     conveyor_type_inserter_.add_attribute(CONVEYOR_TYPE, OCCUPIED_PLATES);
