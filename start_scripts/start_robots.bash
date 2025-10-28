@@ -12,7 +12,7 @@ if (( $1 < 1)); then
     exit 1
 fi
 ROBOTS=$1
-if (( $CONVEYOR_SIZE < 2 )); then
+if (( $2 < 2 )); then
     echo "Coveyor size must be >= 2"
     exit 1
 fi
