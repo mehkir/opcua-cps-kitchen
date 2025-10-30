@@ -39,14 +39,18 @@ public:
      * 
      * @param _swap_robot_positions_callback the swap robot position callback.
      */
-    virtual void set_swap_robot_positions_callback(swap_robot_positions_callback_t _swap_robot_positions_callback) = 0;
+    virtual void set_swap_robot_positions_callback(swap_robot_positions_callback_t _swap_robot_positions_callback) {
+        swap_robot_positions_callback_ = _swap_robot_positions_callback;
+    }
 
     /**
      * @brief Sets the reconfigure robot callback.
      * 
      * @param _reconfigure_robot_callback the reconfigure robot callback.
      */
-    virtual void set_reconfigure_robot_callback(reconfigure_robot_callback_t _reconfigure_robot_callback) = 0;
+    virtual void set_reconfigure_robot_callback(reconfigure_robot_callback_t _reconfigure_robot_callback) {
+        reconfigure_robot_callback_ = _reconfigure_robot_callback;
+    }
 };
 
 #endif // MAPE_HPP

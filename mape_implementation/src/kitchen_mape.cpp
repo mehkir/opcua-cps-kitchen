@@ -63,13 +63,3 @@ kitchen_mape::on_new_order(const std::map<position_t, std::unique_ptr<remote_rob
     }
     return suitable_robot;
 }
-
-void
-kitchen_mape::set_swap_robot_positions_callback(swap_robot_positions_callback_t _swap_robot_positions_callback) {
-    swap_robot_positions_callback_ = _swap_robot_positions_callback;
-}
-
-void
-kitchen_mape::set_reconfigure_robot_callback(reconfigure_robot_callback_t _reconfigure_robot_callback) {
-    reconfigure_robot_callback_ = _reconfigure_robot_callback;
-}
