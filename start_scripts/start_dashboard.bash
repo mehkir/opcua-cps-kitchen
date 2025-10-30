@@ -18,8 +18,15 @@ ROBOTS_COUNT=$1
 
 # Define a cleanup function
 kill_http_server_and_backend() {
-    kill $(lsof -t -iTCP:8000 -sTCP:LISTEN)
-    kill $(lsof -t -iTCP:8080 -sTCP:LISTEN)
+    # for port in 8000 8080; do
+    for port in 8000; do
+        pids="$(lsof -t -iTCP:$port -sTCP:LISTEN)"
+        if [ -n "$pids" ]; then
+            kill $pids 2>/dev/null || true
+        else
+            echo "No process found using port $port"
+        fi
+    done
     exit 0
 }
 

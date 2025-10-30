@@ -30,6 +30,7 @@
 #include "object_type_node_inserter.hpp"
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
+#include "robot_state.hpp"
 
 using namespace cps_kitchen;
 
@@ -45,6 +46,15 @@ struct order {
         UA_UInt32 processable_steps_; /**< the processable steps on the current robot. */
         std::queue<robot_action> action_queue_; /**< the open actions for the dish to be finished w/o the actions already performed. */
     public:
+        /**
+         * @brief Constructs a new order object.
+         * 
+         * @param _recipe_id the recipe id of the order.
+         * @param _overall_processed_steps the already processed steps on the recipe.
+         * @param _overall_processing_steps the total processing steps to complete the recipe.
+         * @param _processable_steps the steps count this robot is able to do.
+         * @param _action_queue the action queue containing the remaining steps.
+         */
         order(recipe_id_t _recipe_id, UA_UInt32 _overall_processed_steps, UA_UInt32 _overall_processing_steps, UA_UInt32 _processable_steps, std::queue<robot_action> _action_queue) :
             recipe_id_(_recipe_id), overall_processed_steps_(_overall_processed_steps), overall_processing_steps_(_overall_processing_steps), processable_steps_(_processable_steps), action_queue_(_action_queue) {
         }
@@ -109,9 +119,15 @@ private:
     duration_t current_action_duration_; /**< the current action duration. */
     std::queue<robot_action> action_queue_in_process_; /**< the current actions in process. */
     bool preparing_dish_; /**< flag to indicate whether the robot is busy preparing a dish. */
+    bool already_rearranging_; /**< flag to indicate whether the worker thread is already rearranging the robot. */
+    bool already_reconfiguring_; /**< flag to indicate whether the worker thread is already reconfiguring the robot. */
     bool is_dish_finished_; /**< flag to indicate whether the robot is holding a completed dish or partially finished dish. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
     std::atomic<bool> pending_pickup_; /**< flag to indicate whether there is a pending pickup for an sucessfully sent notifcation to the conveyor. */
+    robot_state robot_state_; /**< state to indicate if robot is either available or performing an adaptive action */
+    std::mutex state_mutex_; /**< the mutex to synchronize robot state checks. */
+    position_t new_target_position_; /**< new target position requested by the controller. */
+    std::string new_capabilities_profile_; /**< new capabilities profile requested by the controller */
     discovery_util discovery_util_; /**< the discovery utility. */
     std::thread server_iterate_thread_; /**< the server iteration thread. */
     recipe_parser recipe_parser_; /**< the recipe parser. */
@@ -120,7 +136,7 @@ private:
     std::thread worker_thread_; /**< the worker thread for preparing dishes. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
-    boost::asio::steady_timer steady_timer_; /**< the steady timer for simulation action time. */
+    boost::asio::steady_timer steady_timer_; /**< the steady timer for action time simulation. */
     std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
     std::thread client_iterate_thread_; /**< the client iteration thread. */
     /* controller related member variables. */
@@ -128,19 +144,27 @@ private:
     /* conveyor related member variables. */
     UA_Client* conveyor_client_; /**< the OPC UA conveyor client pointer. */
     std::condition_variable conveyor_connected_condition_; /**< the condition variable to wait for the conveyor connection to be restored. */
+    position_t conveyor_size_; /**< the total count of conveyor positions. */
     /* random distribution. */
     std::random_device random_device_; /**< the random number generator device. */
     std::mt19937 mersenne_twister_; /**< the mersenne twister for uniform pseudo-random number generation. */
     std::uniform_int_distribution<std::uint32_t> uniform_int_distribution_; /**< uniform discrete distribution for random numbers. */
 
     /**
-     * @brief Callback called after controller received robot registration. Extracts the controller output values and idicates whether the regeistration was successful.
+     * @brief Callback called after controller received robot registration. Extracts the controller output values and idicates whether the registration was successful.
      * 
      * @param _output_size the count of returned output values.
      * @param _output the variant containing the output values.
      */
     void
     register_robot_called(size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Sets the capabilities node in the address space.
+     * 
+     */
+    void
+    set_capabilities_node();
 
     /**
      * @brief Extracts the instruction parameters.
@@ -268,6 +292,83 @@ private:
      */
     void
     retool();
+    
+    /**
+     * @brief Extracts the new position parameter.
+     * 
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
+     */
+    static UA_StatusCode
+    switch_position(UA_Server *_server,
+            const UA_NodeId *_session_id, void *_session_context,
+            const UA_NodeId *_method_id, void *_method_context,
+            const UA_NodeId *_object_id, void *_object_context,
+            size_t _input_size, const UA_Variant *_input,
+            size_t _output_size, UA_Variant *_output);
+    
+    /**
+     * @brief Handles the extracted new position parameter from the switch_position method and performs the position switch.
+     * 
+     */
+    void
+    handle_switch_position();
+
+
+    /**
+     * @brief Timed callback to indicate position change completion.
+     * 
+     */
+    void
+    complete_position_change();
+
+    /**
+     * @brief Extracts the new capabilities profile parameter.
+     * 
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
+     */
+    static UA_StatusCode
+    reconfigure(UA_Server *_server,
+            const UA_NodeId *_session_id, void *_session_context,
+            const UA_NodeId *_method_id, void *_method_context,
+            const UA_NodeId *_object_id, void *_object_context,
+            size_t _input_size, const UA_Variant *_input,
+            size_t _output_size, UA_Variant *_output);
+
+    /**
+     * @brief Handles the extracted new capabilities profile parameter from the reconfigure method and performs the reconfiguration.
+     * 
+     */
+    void
+    handle_reconfiguration();
+
+    /**
+     * @brief Timed callback to indicate reconfiguration completion.
+     * 
+     */
+    void
+    complete_reconfiguration();
 
     /**
      * @brief Joins all started threads.
@@ -282,8 +383,9 @@ public:
      * 
      * @param _position the position of the robot at the conveyor.
      * @param _capabilities_file_name the capabilities file name.
+     * @param _conveyor_size the total count of conveyor positions. 
      */
-    robot(position_t _position, std::string _capabilities_file_name);
+    robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size);
 
     /**
      * @brief Destroys the robot object.

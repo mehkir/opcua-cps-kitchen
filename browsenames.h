@@ -14,6 +14,8 @@
 // method nodes
 #define RECEIVE_TASK "ReceiveTask"
 #define HANDOVER_FINISHED_ORDER "HandoverFinishedOrder"
+#define SWITCH_POSITION "SwitchPosition"
+#define RECONFIGURE "Reconfigure"
 // attribute nodes
 #define POSITION "Position"
 #define RECIPE_ID "RecipeId"
@@ -28,6 +30,7 @@
 #define PROCESSABLE_STEPS "ProcessableSteps"
 #define OVERALL_PROCESSED_STEPS "OverallProcessedSteps"
 #define OVERALL_PROCESSING_STEPS "OverallProcessingSteps"
+#define AVAILABILITY "Availability"
 
 /* CONVEYOR */
 // object type node
@@ -67,5 +70,9 @@
 #define ASSIGNED_ORDERS "AssignedOrders"
 #define DROPPED_ORDERS "DroppedOrders"
 #define COMPLETED_ORDERS "CompletedOrders"
+
+/* NEXT ROBOT RECEIVER */
+// mehtod nodes
+#define RECEIVE_NEXT_ROBOT "ReceiveNextRobot"
 
 #endif // NODE_IDS_HPP

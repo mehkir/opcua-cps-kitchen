@@ -14,7 +14,11 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, stop_handler);
     signal(SIGTERM, stop_handler);
     
-    // _robot_count
+    if (argc < 2) {
+        std::cout << "Usage: " << argv[0] << "<robots_count>" << std::endl;
+        return 0;
+    }
+
     conveyor conveyor_instance(atoi(argv[1]));
     conveyor_instance_ = &conveyor_instance;
     conveyor_instance.start();

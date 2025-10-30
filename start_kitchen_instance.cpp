@@ -14,9 +14,8 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, stop_handler);
     signal(SIGTERM, stop_handler);
     
-    // _robot_count
     if (argc < 2) {
-        std::cout << "Provide robot count" << std::endl;
+        std::cout << "Usage: " << argv[0] << "<robots_count>" << std::endl;
         return 0;
     }
     kitchen kitchen_instance(atoi(argv[1]));
