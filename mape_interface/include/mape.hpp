@@ -43,7 +43,7 @@ protected:
                 if (!entry.is_regular_file()) continue;
                 const auto& p = entry.path();
                 if (p.has_extension() && p.extension() == ".json") {
-                    capabilites_map_.emplace(p.stem().string(), capability_parser(p.filename().string()));
+                    capabilites_map_.emplace(p.filename().string(), capability_parser(p.filename().string()));
                 }
             }
         } catch (const std::filesystem::filesystem_error& e) {
