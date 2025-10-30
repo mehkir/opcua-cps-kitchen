@@ -4,7 +4,7 @@
 
 remote_robot*
 kitchen_mape::on_new_order(const std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) {
-    simple_reconfiguration(_position_remote_robot_map, _recipe_action_queue);
+    return simple_reconfiguration(_position_remote_robot_map, _recipe_action_queue);
 }
 
 // Simple capability check
