@@ -164,41 +164,20 @@ For the number of time units consider the following files:
 - Conveyor Movement: The time unit count for the conveyor movement can be set via the *MOVE_TIME* define in [conveyor.cpp](conveyor/src/conveyor.cpp). In addtion, the *DEBOUNCE_TIME* define sets the time unit count before the conveyor starts to move, after the first notification from a Robot-Agent is received.
 
 ## Implement Your Own Scheduling Algorithm
-The Controller-Agent responds to "next robot" requests with a suitable robot for the next preparation steps of a recipe.
-It chooses the next Robot-Agent in the *find_suitable_robot* method, as shown in the following code snippet:
-- Lines 5-8 filter out the already processed steps of the recipe.
-- Lines 11-18 iterate through the *position_remote_robot_map_*, which stores all Robot-Agents known to the controller, and select the first agent found that is capable of performing the next preparation step.
-
-```cpp
-1:  remote_robot*
-2:  controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps) {
-3:      // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-4:      remove_marked_robots();
-5:      std::queue<robot_action> recipe_action_queue = recipe_parser_.get_recipe(_recipe_id).get_action_queue();
-6:      for (size_t i = 0; i < _processed_steps; i++) {
-7:          recipe_action_queue.pop();
-8:      }
-9:      remote_robot* suitable_robot = NULL;
-10:     std::string next_action = recipe_action_queue.front().get_name();
-11:     for (auto position_remote_robot = position_remote_robot_map_.begin();
-12:         position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
-13:         remote_robot* robot = position_remote_robot->second.get();
-14:         if (robot->is_capable_to(next_action)) {
-15:             suitable_robot = robot;
-16:             break;
-17:         }
-18:     }
-19:     return suitable_robot;
-20: }
-```
+The Controller-Agent responds to "choose_next_robot" requests with a suitable robot for the next preparation steps of a recipe.
+You can implement your own scheduling algorithm by deriving the MAPE-interface([mape.hpp](mape_interface/include/mape.hpp)).
+The *kitchen_mape* class in the directory [mape_implementation](mape_implementation) gives an example for a simple rearrangement approach of robots.
 More sophisticated scheduling algorithms can be implemented by considering the load/utilization of Robot-Agents and their last equipped tool, which is equipped after the preparation of previously assigned tasks.
 For this purpose call the following methods on *remote_robot*:
 - *get_last_equipped_tool()* returns the last equipped tool.
 - *get_overall_time()* returns the load/utilization.
 
+To rearrange or reconfigure robots use the callbacks:
+- *swap_robot_positions_callback_(position_t from, position_t to)*
+- *reconfigure_robot_callback_(position_t position, string new_capabilites_profile)*
+
+Note: When a robot is rearranging or reconfiguring, its adaptivity flag is set. Use *is_adaptivity_pending()* in your mape_implementation to rule out unavailable robots.
+
 ## Open Tasks
-Currently there are no mechanisms implemented to take impact on the environment like rearranging or reconfiguring Robot-Agents.
 The following list shows upcoming features:
-- [ ] Rearranging Robot-Agents
-- [ ] Reconfiguring Robot-Agents
-- [ ] MAPE-K interface
+- [ ] Example code for reconfiguring Robot-Agents
