@@ -208,6 +208,92 @@ struct remote_robot {
         }
 
         /**
+         * @brief Returns the robot's endpoint.
+         * 
+         * @return std::string the endpoint url.
+         */
+        std::string
+        get_endpoint() const {
+            return endpoint_;
+        }
+
+        /**
+         * @brief Returns the remote robot's position.
+         * 
+         * @return position_t the remote robot position.
+         */
+        position_t
+        get_position() const {
+            return position_.load();
+        }
+
+        /**
+         * @brief Returns the capabilities set.
+         * 
+         * @return std::unordered_set<std::string> the capabilites.
+         */
+        std::unordered_set<std::string>
+        get_capabilities() const {
+            return capabilities_;
+        }
+
+        /**
+         * @brief Returns the capabilites string representation.
+         * 
+         * @return std::string the string representation.
+         */
+        std::string
+        get_capabilites_string() const {
+            return capabilities_str_;
+        }
+
+        /**
+         * @brief Indicates if a robot is capable to perform the given action.
+         * 
+         * @param _capability the action to check whether it can be performed.
+         * @return true if the remote is capable to perform the action.
+         * @return false if the remote is not capable to perform the action.
+         */
+        bool
+        is_capable_to(std::string _capability) const {
+            return capabilities_.find(_capability) != capabilities_.end();
+        }
+
+        /**
+         * @brief Returns the remote robot's last equipped tool.
+         * 
+         * @return robot_tool the last equipped tool.
+         */
+        robot_tool
+        get_last_equipped_tool() const {
+            return last_equipped_tool_.load();
+        }
+
+        /**
+         * @brief Returns the remote robot's overall time.
+         * 
+         * @return duration_t the remote robot's overall time.
+         */
+        duration_t
+        get_overall_time() const {
+            return overall_time_.load();
+        }
+
+        /**
+         * @brief Returns the adaptivity flag value.
+         * 
+         * @return true if adaptivity is still pending.
+         * @return false if there is no adaptivity running.
+         */
+        bool
+        is_adaptivity_pending() {
+            return adaptivity_is_pending_.load();
+        }
+
+    private:
+        friend class controller;
+        
+        /**
          * @brief Instructs the remote robot to switch its position to the given one.
          * 
          * @param _new_position the new position to switch to.
@@ -266,68 +352,6 @@ struct remote_robot {
                 UA_String_clear(&new_capabilities_profile);
             }
             return status;
-        }
-
-        /**
-         * @brief Returns the robot's endpoint.
-         * 
-         * @return std::string the endpoint url.
-         */
-        std::string
-        get_endpoint() const {
-            return endpoint_;
-        }
-
-        /**
-         * @brief Returns the remote robot's position.
-         * 
-         * @return position_t the remote robot position.
-         */
-        position_t
-        get_position() const {
-            return position_.load();
-        }
-
-        /**
-         * @brief Returns the capabilites string representation.
-         * 
-         * @return std::string the string representation.
-         */
-        std::string
-        get_capabilites_string() const {
-            return capabilities_str_;
-        }
-
-        /**
-         * @brief Indicates if a robot is capable to perform the given action.
-         * 
-         * @param _capability the action to check whether it can be performed.
-         * @return true if the remote is capable to perform the action.
-         * @return false if the remote is not capable to perform the action.
-         */
-        bool
-        is_capable_to(std::string _capability) const {
-            return capabilities_.find(_capability) != capabilities_.end();
-        }
-
-        /**
-         * @brief Returns the remote robot's last equipped tool.
-         * 
-         * @return robot_tool the last equipped tool.
-         */
-        robot_tool
-        get_last_equipped_tool() const {
-            return last_equipped_tool_.load();
-        }
-
-        /**
-         * @brief Returns the remote robot's overall time.
-         * 
-         * @return duration_t the remote robot's overall time.
-         */
-        duration_t
-        get_overall_time() const {
-            return overall_time_.load();
         }
 
         /**
@@ -485,17 +509,6 @@ struct remote_robot {
         void
         reset_adaptivity_flag() {
             adaptivity_is_pending_.store(false);
-        }
-
-        /**
-         * @brief Returns the adaptivity flag value.
-         * 
-         * @return true if adaptivity is still pending.
-         * @return false if there is no adaptivity running.
-         */
-        bool
-        is_adaptivity_pending() {
-            return adaptivity_is_pending_.load();
         }
 };
 

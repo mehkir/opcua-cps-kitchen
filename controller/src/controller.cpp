@@ -502,7 +502,6 @@ controller::reconfigure_robot_capability(position_t _robot_position, std::string
     if (!robot_will_reconfigure) {
         // Inconsistency check: This branch should actually never be entered, since availability check above would return early
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d will not reconfigure", __FUNCTION__, _robot_position);
-        stop();
         return;
     }
     position_remote_robot_map_[_robot_position]->set_adaptivity_flag();
