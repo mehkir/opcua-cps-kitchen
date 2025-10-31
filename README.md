@@ -166,7 +166,7 @@ For the number of time units consider the following files:
 ## Implement Your Own Scheduling Algorithm
 The Controller-Agent responds to "choose_next_robot" requests with a suitable robot for the next preparation steps of a recipe.
 You can implement your own scheduling algorithm by deriving the MAPE-interface([mape.hpp](mape_interface/include/mape.hpp)).
-The *kitchen_mape* class in the directory [mape_implementation](mape_implementation) gives an example for a simple rearrangement approach of robots.
+The *kitchen_mape* class in the directory [mape_implementation](mape_implementation) provides examples for simple capability checks, successive rearrangements and reconfigurations of robots.
 More sophisticated scheduling algorithms can be implemented by considering the load/utilization of Robot-Agents and their last equipped tool, which is equipped after the preparation of previously assigned tasks.
 For this purpose call the following methods on *remote_robot*:
 - *get_last_equipped_tool()* returns the last equipped tool.
@@ -176,8 +176,4 @@ To rearrange or reconfigure robots use the callbacks:
 - *swap_robot_positions_callback_(position_t from, position_t to)*
 - *reconfigure_robot_callback_(position_t position, string new_capabilites_profile)*
 
-Note: When a robot is rearranging or reconfiguring, its adaptivity flag is set. Use *is_adaptivity_pending()* in your mape_implementation to rule out unavailable robots.
-
-## Open Tasks
-The following list shows upcoming features:
-- [ ] Example code for reconfiguring Robot-Agents
+Note: When a robot performs a rearrangement or reconfiguration, its adaptation flag is set. Use *is_adaptivity_pending()* in your mape_implementation to exclude unavailable robots early on.
