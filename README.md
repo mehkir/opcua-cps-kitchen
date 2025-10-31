@@ -87,7 +87,12 @@ It may also work with older versions.
 - OS: Ubuntu 22.04.5 LTS
 - gcc/g++ 15.1.0
 - cmake 4.1.2
-- open62541 1.4.7 (Installation may not be necessary, as precompiled dependencies are already included in the repository.)
+- open62541 1.4.7, which may not need to be installed as precompiled dependencies are already included in the repository. If the precompiled dependencies don't work, note the following for your manual build or installation:
+    - When building from source, pull git submodules.
+    - Build options: UA_MULTITHREADING>=100, UA_ENABLE_DISCOVERY=ON, UA_ENABLE_DISCOVERY_MULTICAST=ON.
+    - Set -DUSE_CUSTOM_VERSION=OFF in [build.bash](build.bash), [build_debug.bash](build_debug.bash) or [build_for_sanitizer.bash](build_for_sanitizer.bash) for a system-wide installation.
+
+    For additional help see also chapter 3 in the [manual](https://www.open62541.org/doc/open62541-v1.4.7.pdf).
 - boost 1.83
 - jsoncpp 1.9.5
 - python 3.10
@@ -109,6 +114,14 @@ Compile the project with the [build.bash](build.bash) script in the project root
 Optionally compile the code documentation with the [build_doc.bash](build_doc.bash) script in the project root directory.
 
 ## Starting the Environment and Dashboard
+If you have not yet cloned the project, proceed as follows:
+```bash
+git clone --recurse-submodules git@github.com:mehkir/opcua-cps-kitchen
+```
+If you already cloned the project without the `--recurse-submodules` parameter, run the following command in the project directory:
+```bash
+git submodule update --init --recursive
+```
 The kitchen environment is started with the [startup_kitchen.bash](start_scripts/startup_kitchen.bash) script and expects the robot count as a parameter.
 For example, when you are in the project root directory:
 ```bash
@@ -151,41 +164,16 @@ For the number of time units consider the following files:
 - Conveyor Movement: The time unit count for the conveyor movement can be set via the *MOVE_TIME* define in [conveyor.cpp](conveyor/src/conveyor.cpp). In addtion, the *DEBOUNCE_TIME* define sets the time unit count before the conveyor starts to move, after the first notification from a Robot-Agent is received.
 
 ## Implement Your Own Scheduling Algorithm
-The Controller-Agent responds to "next robot" requests with a suitable robot for the next preparation steps of a recipe.
-It chooses the next Robot-Agent in the *find_suitable_robot* method, as shown in the following code snippet:
-- Lines 5-8 filter out the already processed steps of the recipe.
-- Lines 11-18 iterate through the *position_remote_robot_map_*, which stores all Robot-Agents known to the controller, and select the first agent found that is capable of performing the next preparation step.
-
-```cpp
-1:  remote_robot*
-2:  controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps) {
-3:      // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-4:      remove_marked_robots();
-5:      std::queue<robot_action> recipe_action_queue = recipe_parser_.get_recipe(_recipe_id).get_action_queue();
-6:      for (size_t i = 0; i < _processed_steps; i++) {
-7:          recipe_action_queue.pop();
-8:      }
-9:      remote_robot* suitable_robot = NULL;
-10:     std::string next_action = recipe_action_queue.front().get_name();
-11:     for (auto position_remote_robot = position_remote_robot_map_.begin();
-12:         position_remote_robot != position_remote_robot_map_.end(); position_remote_robot++) {
-13:         remote_robot* robot = position_remote_robot->second.get();
-14:         if (robot->is_capable_to(next_action)) {
-15:             suitable_robot = robot;
-16:             break;
-17:         }
-18:     }
-19:     return suitable_robot;
-20: }
-```
+The Controller-Agent responds to "choose_next_robot" requests with a suitable robot for the next preparation steps of a recipe.
+You can implement your own scheduling algorithm by deriving the MAPE-interface([mape.hpp](mape_interface/include/mape.hpp)).
+The *kitchen_mape* class in the directory [mape_implementation](mape_implementation) provides examples for simple capability checks, successive rearrangements and reconfigurations of robots.
 More sophisticated scheduling algorithms can be implemented by considering the load/utilization of Robot-Agents and their last equipped tool, which is equipped after the preparation of previously assigned tasks.
 For this purpose call the following methods on *remote_robot*:
 - *get_last_equipped_tool()* returns the last equipped tool.
 - *get_overall_time()* returns the load/utilization.
 
-## Open Tasks
-Currently there are no mechanisms implemented to take impact on the environment like rearranging or reconfiguring Robot-Agents.
-The following list shows upcoming features:
-- [ ] Rearranging Robot-Agents
-- [ ] Reconfiguring Robot-Agents
-- [ ] MAPE-K interface
+To rearrange or reconfigure robots use the callbacks:
+- *swap_robot_positions_callback_(position_t from, position_t to)*
+- *reconfigure_robot_callback_(position_t position, string new_capabilites_profile)*
+
+Note: When a robot performs a rearrangement or reconfiguration, its adaptation flag is set. Use *is_adaptivity_pending()* in your mape_implementation to exclude unavailable robots early on.
