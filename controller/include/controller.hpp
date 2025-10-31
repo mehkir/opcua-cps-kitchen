@@ -77,6 +77,7 @@ struct remote_robot {
          * @param _capabilities the capabilities.
          * @param _mark_robot_for_removal_callback the mark for removal callback.
          * @param _position_swapped_callback the position swapped callback.
+         * @param _capabilities_reconfigured_callback the reconfigured callback.
          */
         remote_robot(std::string _endpoint, position_t _position, std::unordered_set<std::string> _capabilities,
                     mark_robot_for_removal_callback_t _mark_robot_for_removal_callback,
