@@ -195,6 +195,8 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
 
 void
 robot::set_current_and_last_equipped_tool() {
+    if (uniform_int_distribution_.max() != capability_parser_.get_capabilities().size()-1)
+        uniform_int_distribution_.param(std::uniform_int_distribution<uint32_t>::param_type(0, capability_parser_.get_capabilities().size()-1));
     /* Set current tool */
     std::unordered_set<std::string> capabilities_uset = capability_parser_.get_capabilities();
     std::set<std::string> capabilities_set(capabilities_uset.begin(), capabilities_uset.end());
