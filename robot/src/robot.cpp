@@ -913,6 +913,18 @@ robot::reconfigure(UA_Server *_server,
 
     UA_Boolean result = true;
     robot* self = static_cast<robot*>(_method_context);
+    capability_parser cp(std::string((char*) new_capabilities_profile.data, new_capabilities_profile.length));
+    if(cp.get_capabilities() == self->capability_parser_.get_capabilities()) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Requested capabilities profile is already is set. Will not reconfigure", __FUNCTION__);
+        result = false;
+        UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
+        if(status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+            self->stop();
+            return status;
+        }
+        return UA_STATUSCODE_GOOD;
+    }
     {
         bool availability = false;
         std::lock_guard<std::mutex> lock(self->state_mutex_);

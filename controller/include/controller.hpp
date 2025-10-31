@@ -289,6 +289,16 @@ struct remote_robot {
         }
 
         /**
+         * @brief Returns the capabilities set.
+         * 
+         * @return std::unordered_set<std::string> the capabilites.
+         */
+        std::unordered_set<std::string>
+        get_capabilities() const {
+            return capabilities_;
+        }
+
+        /**
          * @brief Returns the capabilites string representation.
          * 
          * @return std::string the string representation.
