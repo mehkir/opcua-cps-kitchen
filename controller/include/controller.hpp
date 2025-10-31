@@ -208,67 +208,6 @@ struct remote_robot {
         }
 
         /**
-         * @brief Instructs the remote robot to switch its position to the given one.
-         * 
-         * @param _new_position the new position to switch to.
-         * @param _output_size the count of returned output values.
-         * @param _output the variant containing the output values.
-         * @return UA_StatusCode the status whether method call was successful.
-         */
-        UA_StatusCode
-        switch_position_to(position_t _new_position, size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SWITCH POSTION: Instruct robot on position %d to switch to position %d", position_.load(), _new_position);
-            method_node_caller switch_robot_position_caller;
-            switch_robot_position_caller.add_scalar_input_argument(&_new_position, UA_TYPES_UINT32);
-            object_method_info omi = method_id_map_[SWITCH_POSITION];
-            UA_StatusCode status = UA_STATUSCODE_GOOD;
-            {
-                std::lock_guard<std::mutex> lock(client_mutex_);
-                status = switch_robot_position_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, SWITCH_POSITION, UA_StatusCode_name(status));
-                    running_.store(false);
-                    mark_robot_for_removal_callback_(position_.load());
-                    return UA_STATUSCODE_BAD;
-                }
-            }
-            return status;
-        }
-
-        /**
-         * @brief Instructs the remote robot to reconfigure its capabilities according to the given profile.
-         * 
-         * @param _new_capabilities_profile the new capabilities profile.
-         * @param _output_size the count of returned output values.
-         * @param _output the variant containing the output values.
-         * @return UA_StatusCode the status whether method call was successful.
-         */
-        UA_StatusCode
-        reconfigure_capabilities(std::string _new_capabilities_profile, size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RECONFIGURE CAPABILITIES: Instruct robot on position %d to reconfigure capabilities to profile %s", position_.load(), _new_capabilities_profile.c_str());
-            method_node_caller reconfigure_robot_caller;
-            UA_String new_capabilities_profile = UA_STRING_ALLOC(_new_capabilities_profile.c_str());
-            reconfigure_robot_caller.add_scalar_input_argument(&new_capabilities_profile, UA_TYPES_STRING);
-            object_method_info omi = method_id_map_[RECONFIGURE];
-            UA_StatusCode status = UA_STATUSCODE_GOOD;
-            {
-                std::lock_guard<std::mutex> lock(client_mutex_);
-                status = reconfigure_robot_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECONFIGURE, UA_StatusCode_name(status));
-                    UA_String_clear(&new_capabilities_profile);
-                    running_.store(false);
-                    mark_robot_for_removal_callback_(position_.load());
-                    return UA_STATUSCODE_BAD;
-                }
-                UA_String_clear(&new_capabilities_profile);
-            }
-            return status;
-        }
-
-        /**
          * @brief Returns the robot's endpoint.
          * 
          * @return std::string the endpoint url.
@@ -338,6 +277,81 @@ struct remote_robot {
         duration_t
         get_overall_time() const {
             return overall_time_.load();
+        }
+
+        /**
+         * @brief Returns the adaptivity flag value.
+         * 
+         * @return true if adaptivity is still pending.
+         * @return false if there is no adaptivity running.
+         */
+        bool
+        is_adaptivity_pending() {
+            return adaptivity_is_pending_.load();
+        }
+
+    private:
+        friend class controller;
+        
+        /**
+         * @brief Instructs the remote robot to switch its position to the given one.
+         * 
+         * @param _new_position the new position to switch to.
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
+         * @return UA_StatusCode the status whether method call was successful.
+         */
+        UA_StatusCode
+        switch_position_to(position_t _new_position, size_t* _output_size, UA_Variant** _output) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SWITCH POSTION: Instruct robot on position %d to switch to position %d", position_.load(), _new_position);
+            method_node_caller switch_robot_position_caller;
+            switch_robot_position_caller.add_scalar_input_argument(&_new_position, UA_TYPES_UINT32);
+            object_method_info omi = method_id_map_[SWITCH_POSITION];
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = switch_robot_position_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, SWITCH_POSITION, UA_StatusCode_name(status));
+                    running_.store(false);
+                    mark_robot_for_removal_callback_(position_.load());
+                    return UA_STATUSCODE_BAD;
+                }
+            }
+            return status;
+        }
+
+        /**
+         * @brief Instructs the remote robot to reconfigure its capabilities according to the given profile.
+         * 
+         * @param _new_capabilities_profile the new capabilities profile.
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
+         * @return UA_StatusCode the status whether method call was successful.
+         */
+        UA_StatusCode
+        reconfigure_capabilities(std::string _new_capabilities_profile, size_t* _output_size, UA_Variant** _output) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RECONFIGURE CAPABILITIES: Instruct robot on position %d to reconfigure capabilities to profile %s", position_.load(), _new_capabilities_profile.c_str());
+            method_node_caller reconfigure_robot_caller;
+            UA_String new_capabilities_profile = UA_STRING_ALLOC(_new_capabilities_profile.c_str());
+            reconfigure_robot_caller.add_scalar_input_argument(&new_capabilities_profile, UA_TYPES_STRING);
+            object_method_info omi = method_id_map_[RECONFIGURE];
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = reconfigure_robot_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECONFIGURE, UA_StatusCode_name(status));
+                    UA_String_clear(&new_capabilities_profile);
+                    running_.store(false);
+                    mark_robot_for_removal_callback_(position_.load());
+                    return UA_STATUSCODE_BAD;
+                }
+                UA_String_clear(&new_capabilities_profile);
+            }
+            return status;
         }
 
         /**
@@ -495,17 +509,6 @@ struct remote_robot {
         void
         reset_adaptivity_flag() {
             adaptivity_is_pending_.store(false);
-        }
-
-        /**
-         * @brief Returns the adaptivity flag value.
-         * 
-         * @return true if adaptivity is still pending.
-         * @return false if there is no adaptivity running.
-         */
-        bool
-        is_adaptivity_pending() {
-            return adaptivity_is_pending_.load();
         }
 };
 
