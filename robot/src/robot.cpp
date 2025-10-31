@@ -118,24 +118,8 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     /* Set overall time */
     UA_UInt32 overall_time = 0;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
-    /* Set current tool */
-    std::unordered_set<std::string> capabilities_uset = capability_parser_.get_capabilities();
-    std::set<std::string> capabilities_set(capabilities_uset.begin(), capabilities_uset.end());
-    auto it = std::next(capabilities_set.begin(), uniform_int_distribution_(mersenne_twister_));
-    std::shared_ptr<action> act = robot_actions::get_instance()->get_robot_action(*it);
-    if (std::dynamic_pointer_cast<autonomous_action>(act) != nullptr) {
-        current_tool_ = std::dynamic_pointer_cast<autonomous_action>(act)->get_required_tool();
-    } else if (std::dynamic_pointer_cast<recipe_timed_action>(act)) {
-        current_tool_ = std::dynamic_pointer_cast<recipe_timed_action>(act)->get_required_tool();
-    } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting initial tool randomly", __FUNCTION__);
-        running_.store(false);
-        return;
-    }
-    UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(current_tool_)));
-    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
-    /* Set last equipped tool */
-    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, LAST_EQUIPPED_TOOL, &current_tool_, UA_TYPES_UINT32);
+    /* Set current and last equipped tool */
+    set_current_and_last_equipped_tool();
     /* Set capabilities */
     set_capabilities_node();
     /* Set processed steps */
@@ -207,6 +191,28 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
         stop();
         return;        
     }
+}
+
+void
+robot::set_current_and_last_equipped_tool() {
+    /* Set current tool */
+    std::unordered_set<std::string> capabilities_uset = capability_parser_.get_capabilities();
+    std::set<std::string> capabilities_set(capabilities_uset.begin(), capabilities_uset.end());
+    auto it = std::next(capabilities_set.begin(), uniform_int_distribution_(mersenne_twister_));
+    std::shared_ptr<action> act = robot_actions::get_instance()->get_robot_action(*it);
+    if (std::dynamic_pointer_cast<autonomous_action>(act) != nullptr) {
+        current_tool_ = std::dynamic_pointer_cast<autonomous_action>(act)->get_required_tool();
+    } else if (std::dynamic_pointer_cast<recipe_timed_action>(act)) {
+        current_tool_ = std::dynamic_pointer_cast<recipe_timed_action>(act)->get_required_tool();
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting initial tool randomly", __FUNCTION__);
+        running_.store(false);
+        return;
+    }
+    UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(current_tool_)));
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
+    /* Set last equipped tool */
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, LAST_EQUIPPED_TOOL, &current_tool_, UA_TYPES_UINT32);
 }
 
 void
@@ -955,6 +961,20 @@ robot::complete_reconfiguration() {
         capability_parser_ = capability_parser(new_capabilities_profile_);
         new_capabilities_profile_ = "";
         set_capabilities_node();
+        set_current_and_last_equipped_tool();
+        /* Reset overall time */
+        UA_UInt32 overall_time = 0;
+        robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
+        /* Recalculate order queue */
+        std::queue<order> pending_orders; 
+        std::swap(pending_orders, order_queue_);
+        while (!pending_orders.empty()) {
+            order o = pending_orders.front();
+            recipe_id_t recipe_id = o.get_recipe_id();
+            UA_UInt32 overall_processed_steps = o.get_overall_processed_steps();
+            pending_orders.pop();
+            handle_receive_task(recipe_id, overall_processed_steps);
+        }
         already_reconfiguring_ = false;
         robot_state_ = robot_state::AVAILABLE;
         bool availability = true;

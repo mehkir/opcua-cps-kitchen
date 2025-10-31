@@ -159,6 +159,14 @@ private:
     void
     register_robot_called(size_t _output_size, UA_Variant* _output);
 
+
+    /**
+     * @brief Sets randomly the current tool(= last equipped tool). Used when initialized or reconfigured.
+     * 
+     */
+    void
+    set_current_and_last_equipped_tool();
+
     /**
      * @brief Sets the capabilities node in the address space.
      * 
