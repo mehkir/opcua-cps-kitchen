@@ -858,7 +858,7 @@ robot::handle_switch_position() {
     uint32_t cw  = (new_target_position_ - position_ + conveyor_size_) % conveyor_size_;
     uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
     uint32_t distance = std::min(cw, ccw);
-    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * MOVE_TIME));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * MOVE_TIME * TIME_UNIT));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling switch position (%s)", __FUNCTION__, _error.what().c_str());
@@ -956,7 +956,7 @@ robot::handle_reconfiguration() {
     if (already_reconfiguring_)
         return;
     already_reconfiguring_ = true;
-    steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME * TIME_UNIT));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling reconfiguration (%s)", __FUNCTION__, _error.what().c_str());
