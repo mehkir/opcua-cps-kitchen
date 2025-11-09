@@ -158,7 +158,7 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
     erase_stale_pending_swap_entries();
     swap_key sk = std::make_tuple(0,0);
     if (is_robot_position_swapping(_position, sk)) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Position is currently involved in a swap (%d,%d)", __FUNCTION__, get<0>(sk), get<1>(sk));
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Position is currently involved in a swap (%d,%d)", __FUNCTION__, std::get<0>(sk), std::get<1>(sk));
     }
     else if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities,
@@ -178,7 +178,7 @@ bool
 controller::is_robot_position_swapping(position_t _position, swap_key& _out_key) {
     for (auto entry : pending_swaps_) {
         swap_key key = entry.first;
-        if (get<0>(key) == _position || get<1>(key) == _position) {
+        if (std::get<0>(key) == _position || std::get<1>(key) == _position) {
             _out_key = key;
             return true;
         }
@@ -469,8 +469,8 @@ controller::erase_stale_pending_swap_entries() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for (auto pending_entry = pending_swaps_.begin(); pending_entry != pending_swaps_.end();) {
         swap_key key = pending_entry->first;
-        if (position_remote_robot_map_.find(get<0>(key)) == position_remote_robot_map_.end()
-            && position_remote_robot_map_.find(get<1>(key)) == position_remote_robot_map_.end()) {
+        if (position_remote_robot_map_.find(std::get<0>(key)) == position_remote_robot_map_.end()
+            && position_remote_robot_map_.find(std::get<1>(key)) == position_remote_robot_map_.end()) {
             pending_entry = pending_swaps_.erase(pending_entry);
         } else {
             pending_entry++;
