@@ -16,6 +16,7 @@
 #define HANDOVER_FINISHED_ORDER "HandoverFinishedOrder"
 #define SWITCH_POSITION "SwitchPosition"
 #define RECONFIGURE "Reconfigure"
+#define COMMIT_NEW_POSITION "CommitNewPosition"
 // attribute nodes
 #define POSITION "Position"
 #define RECIPE_ID "RecipeId"
@@ -31,6 +32,7 @@
 #define OVERALL_PROCESSED_STEPS "OverallProcessedSteps"
 #define OVERALL_PROCESSING_STEPS "OverallProcessingSteps"
 #define AVAILABILITY "Availability"
+#define NEW_POSITION_COMMIT_IS_PENDING "NewPositionCommitIsPending"
 
 /* CONVEYOR */
 // object type node

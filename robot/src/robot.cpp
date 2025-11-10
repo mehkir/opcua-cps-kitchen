@@ -50,6 +50,7 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     robot_type_inserter_.add_attribute(ROBOT_TYPE, OVERALL_PROCESSED_STEPS);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, OVERALL_PROCESSING_STEPS);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, AVAILABILITY);
+    robot_type_inserter_.add_attribute(ROBOT_TYPE, NEW_POSITION_COMMIT_IS_PENDING);
     /* Add receive task method node */
     method_arguments receive_task_method_arguments;
     receive_task_method_arguments.add_input_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
@@ -86,6 +87,10 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
         running_.store(false);
         return;
     }
+    /* Add commit new position method node */
+    method_arguments commit_new_position_method_arguments;
+    commit_new_position_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
+    status = robot_type_inserter_.add_method(ROBOT_TYPE, COMMIT_NEW_POSITION, commit_new_position, commit_new_position_method_arguments, this);
     /* Add reconfigure method node */
     method_arguments reconfigure_method_arguments;
     reconfigure_method_arguments.add_input_argument("the new capabilities profile", "capabilities_profile", UA_TYPES_STRING);
@@ -134,6 +139,9 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     /* Set availability */
     bool initial_availability = true;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &initial_availability, UA_TYPES_BOOLEAN);
+    /* Set new position commit is pending */
+    bool initial_new_position_commit_is_pending = false;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, &initial_new_position_commit_is_pending, UA_TYPES_BOOLEAN);
     /* Run the robot server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -829,9 +837,9 @@ robot::switch_position(UA_Server *_server,
         if (self->robot_state_ == robot_state::AVAILABLE
             && self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN) == UA_STATUSCODE_GOOD) {
             self->robot_state_ = robot_state::REARRANGING;
-            self->new_target_position_ = new_position;
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Robot at position %d will switch to its new position %d", self->position_, self->new_target_position_);
-            self->io_context_.post([self] {
+            self->io_context_.post([self, new_position] {
+                self->new_target_position_ = new_position;
                 if (!self->preparing_dish_) {
                     self->handle_switch_position();
                 }
@@ -865,20 +873,81 @@ robot::handle_switch_position() {
             stop();
             return;
         }
-        complete_position_change();
+        move_to_new_position();
     });
 }
 
 void
-robot::complete_position_change() {
+robot::move_to_new_position() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Robot at position %d moved to its new position %d. Commit is pending now.", position_, new_target_position_);
+    bool new_position_commit_is_pending = true;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, &new_position_commit_is_pending, UA_TYPES_BOOLEAN);
+    position_ = new_target_position_;
+    new_target_position_ = 0;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, POSITION, &position_, UA_TYPES_UINT32);
+}
+
+UA_StatusCode
+robot::commit_new_position(UA_Server *_server,
+        const UA_NodeId *_session_id, void *_session_context,
+        const UA_NodeId *_method_id, void *_method_context,
+        const UA_NodeId *_object_id, void *_object_context,
+        size_t _input_size, const UA_Variant *_input,
+        size_t _output_size, UA_Variant *_output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_input_size != 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+
+    UA_Boolean result = true;
+    robot* self = static_cast<robot*>(_method_context);
+    UA_Variant new_commit_is_pending_var;
+    UA_Variant_init(&new_commit_is_pending_var);
+    self->robot_type_inserter_.get_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, new_commit_is_pending_var);
+    UA_Boolean new_commit_is_pending = *(UA_Boolean*) new_commit_is_pending_var.data;
+    UA_Variant_clear(&new_commit_is_pending_var);
+    {
+        std::lock_guard<std::mutex> lock(self->state_mutex_);
+        if (self->robot_state_ != robot_state::REARRANGING || !new_commit_is_pending) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: The robot is not rearranging or there is no new position commit pending", __FUNCTION__);
+            result = false;
+            UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+                self->stop();
+                return status;
+            }
+            return UA_STATUSCODE_GOOD;
+        }
+    }
+    self->io_context_.post([self] {
+        self->handle_new_position_commit();
+    });
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+        self->stop();
+        return status;
+    }
+    return UA_STATUSCODE_GOOD;
+}
+
+void
+robot::handle_new_position_commit() {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Robot committed its new position %d.", position_);
+    already_rearranging_ = false;
+    bool new_position_commit_is_pending = false;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, &new_position_commit_is_pending, UA_TYPES_BOOLEAN);
     {
         std::lock_guard<std::mutex> lock(state_mutex_);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Robot at position %d switched to its new position %d", position_, new_target_position_);
-        position_ = new_target_position_;
-        new_target_position_ = 0;
-        robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, POSITION, &position_, UA_TYPES_UINT32);
-        already_rearranging_ = false;
         robot_state_ = robot_state::AVAILABLE;
         bool availability = true;
         robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN);
