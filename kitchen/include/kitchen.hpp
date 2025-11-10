@@ -87,7 +87,6 @@ struct remote_robot {
          * @param _endpoint the remote robot's endpoint url.
          * @param _position the remote robot's position.
          * @param _remote_robot_type_inserter the remote robot type inserter.
-         * @param _mark_robot_for_removal_callback the mark robot for removal callback.
          * @param _position_swapped_callback the position swapped callback.
          */
         remote_robot(std::string _endpoint, UA_UInt32 _position, object_type_node_inserter& _remote_robot_type_inserter,

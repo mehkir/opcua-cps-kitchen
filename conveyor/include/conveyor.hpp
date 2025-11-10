@@ -71,7 +71,6 @@ struct remote_robot {
          * 
          * @param _endpoint the remote robot's endpoint.
          * @param _position the position of the remote robot.
-         * @param _mark_robot_for_removal_callback the mark for removal callback.
          * @param _position_swapped_callback the position swapped callback.
          */
         remote_robot(std::string _endpoint, position_t _position, position_swapped_callback_t _position_swapped_callback) :
