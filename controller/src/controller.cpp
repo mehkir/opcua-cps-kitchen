@@ -316,10 +316,12 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no robot at position %d", __FUNCTION__, _from);
         return;
     }
+    resolve_missed_new_position_commit(_from);
     if (position_remote_robot_map_[_from]->is_adaptivity_pending() || !position_remote_robot_map_[_from]->is_available()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _from);
         return;
     }
+    resolve_missed_new_position_commit(_to);
     if (position_remote_robot_map_.find(_to) != position_remote_robot_map_.end() && (position_remote_robot_map_[_to]->is_adaptivity_pending() || !position_remote_robot_map_[_to]->is_available())) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _to);
         return;
@@ -490,6 +492,7 @@ controller::reconfigure_robot_capability(position_t _robot_position, std::string
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no robot at position %d", __FUNCTION__, _robot_position);
         return;
     }
+    resolve_missed_new_position_commit(_robot_position);
     if ((position_remote_robot_map_[_robot_position]->is_adaptivity_pending() || !position_remote_robot_map_[_robot_position]->is_available())) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _robot_position);
         return;
@@ -522,6 +525,28 @@ controller::capabilities_reconfigured_callback(position_t _robot_position) {
             position_remote_robot_map_[_robot_position]->reset_adaptivity_flag();
         }
     });
+}
+
+void
+controller::resolve_missed_new_position_commit(position_t _robot_position) {
+    if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end())
+        return;
+    swap_key sk;
+    if (!position_remote_robot_map_[_robot_position]->is_adaptivity_pending()
+        && !is_robot_position_swapping(_robot_position, sk)
+        && position_remote_robot_map_[_robot_position]->has_pending_new_position_commit()) {
+        size_t output_size = 0;
+        UA_Variant* output = nullptr;
+        UA_StatusCode status = position_remote_robot_map_[_robot_position]->commit_new_position(&output_size, &output);
+        if (status != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method for remote robot at position %d (%s)", __FUNCTION__, COMMIT_NEW_POSITION, _robot_position, UA_StatusCode_name(status));
+            if (output != nullptr)
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+            return;
+        }
+        if (!adaptivity_action_called(output_size, output))
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Committing new position %d returned false.", __FUNCTION__, _robot_position);
+    }
 }
 
 void

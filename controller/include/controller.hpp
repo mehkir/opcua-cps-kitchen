@@ -902,6 +902,15 @@ private:
     capabilities_reconfigured_callback(position_t _robot_position);
 
     /**
+     * @brief Resolves stucked robots in new position commit due to premature controller failure/restart.
+     * 
+     * @param _robot_position the robot position.
+     * 
+     */
+    void
+    resolve_missed_new_position_commit(position_t _robot_position);
+
+    /**
      * @brief Removes all stopped robots from the controller.
      * 
      */
