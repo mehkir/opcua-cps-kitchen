@@ -471,8 +471,10 @@ kitchen::position_swapped_callback(position_t _old_position, position_t _new_pos
             second = position_remote_robot_map_[_new_position].get();
         }
         if (((first != nullptr && first->get_position() != _old_position) || first == nullptr)
-            || ((second != nullptr && second->get_position() != _new_position) || second == nullptr)) {
+            && ((second != nullptr && second->get_position() != _new_position) || second == nullptr)) {
                 std::swap(position_remote_robot_map_[_old_position], position_remote_robot_map_[_new_position]);
+        } else {
+            return;
         }
         UA_Boolean disconnected = false;
         UA_Boolean connected = true;
