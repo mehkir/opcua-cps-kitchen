@@ -12,7 +12,7 @@
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 #define PlACING_RATE 5LL
-#define REDISCOVER_INTERVAL 1LL
+#define REDISCOVER_INTERVAL 10LL
 
 kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
                                         robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
@@ -471,8 +471,10 @@ kitchen::position_swapped_callback(position_t _old_position, position_t _new_pos
             second = position_remote_robot_map_[_new_position].get();
         }
         if (((first != nullptr && first->get_position() != _old_position) || first == nullptr)
-            || ((second != nullptr && second->get_position() != _new_position) || second == nullptr)) {
+            && ((second != nullptr && second->get_position() != _new_position) || second == nullptr)) {
                 std::swap(position_remote_robot_map_[_old_position], position_remote_robot_map_[_new_position]);
+        } else {
+            return;
         }
         UA_Boolean disconnected = false;
         UA_Boolean connected = true;
