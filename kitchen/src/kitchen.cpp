@@ -12,7 +12,7 @@
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 #define PlACING_RATE 5LL
-#define REDISCOVER_INTERVAL 10LL
+#define REDISCOVER_INTERVAL 1LL
 
 kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
                                         robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
