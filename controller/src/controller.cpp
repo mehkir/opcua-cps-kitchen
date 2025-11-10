@@ -154,15 +154,13 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
     capabilites_str.erase(capabilites_str.end()-2, capabilites_str.end());
     capabilites_str += "]";
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
-    remove_marked_robots();
+    remove_stopped_robots();
     erase_stale_pending_swap_entries();
     swap_key sk = std::make_tuple(0,0);
     if (is_robot_position_swapping(_position, sk)) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Position is currently involved in a swap (%d,%d)", __FUNCTION__, std::get<0>(sk), std::get<1>(sk));
-    }
-    else if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
+    } else if (position_remote_robot_map_.find(_position) == position_remote_robot_map_.end()) {
         std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_endpoint, _position, _remote_robot_capabilities,
-                                                                            std::bind(&controller::mark_robot_for_removal, this, std::placeholders::_1),
                                                                             std::bind(&controller::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2),
                                                                             std::bind(&controller::capabilities_reconfigured_callback, this, std::placeholders::_1));
         if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
@@ -236,7 +234,7 @@ controller::choose_next_robot(UA_Server* _server,
 void
 controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, std::string _endpoint, std::string _type) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    remove_marked_robots();
+    remove_stopped_robots();
     erase_stale_pending_swap_entries();
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot receiver (%s,%s) requests suitable robot for recipe id %d processed with %d steps already", _endpoint.c_str(), _type.c_str(), _recipe_id, _processed_steps);
     std::pair nrr_key = std::make_pair(_endpoint, _type);
@@ -356,14 +354,16 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method for remote robot at position %d (%s)", __FUNCTION__, SWITCH_POSITION, _to, UA_StatusCode_name(status));
             if (output != nullptr) {
                 UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                swap_states.second_robot_failed = true;
             }
+            if (_to > _from)
+                swap_states.ack_from_greater_position = true;
+            else
+                swap_states.ack_from_lower_position = true;
         } else {
             UA_Boolean second_will_switch = adaptivity_action_called(output_size, output);
             if (!second_will_switch) {
                 // Inconsistency check: This branch should actually never be entered, since availability check above would return early
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d will not switch position", __FUNCTION__, _to);
-                swap_states.second_robot_failed = true;
                 stop();
                 return;
             }
@@ -409,36 +409,19 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
     constexpr const char* func_name = __FUNCTION__;
     io_context_.post([this, _old_position, _new_position, func_name] {
         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", func_name);
-        remove_marked_robots();
+        remove_stopped_robots();
         erase_stale_pending_swap_entries();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING(Controller): Robot from its old position %d acknowledged swap to the new position %d", _old_position, _new_position);
         swap_key sk = (_old_position < _new_position) ? std::make_tuple(_old_position, _new_position) : std::make_tuple(_new_position, _old_position);
         if (pending_swaps_.find(sk) == pending_swaps_.end()) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no pending swap entry for position %d", __FUNCTION__, _new_position);
-            stop();
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no pending swap entry for positions (%d,%d)", __FUNCTION__, std::get<0>(sk), std::get<1>(sk));
             return;
         }
         swap_state& swap_states = pending_swaps_.at(sk);
-        if (swap_states.second_robot_failed) {
-            if (position_remote_robot_map_.find(_new_position) != position_remote_robot_map_.end()) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Second robot failed at swap call but is still registered ... Robot at position %d will be removed anyway", __FUNCTION__, _new_position);
-                position_remote_robot_map_.erase(_new_position);
-                increment_or_decrement_counter_node(REGISTERED_ROBOTS, false);
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", _new_position);
-            }
-            swap_states.second_robot_failed = false;
-        }
         if (_old_position == std::get<1>(sk))
             swap_states.ack_from_greater_position = true;
         else
             swap_states.ack_from_lower_position = true;
-        // If there is no robot at the target position anymore, then set ack true
-        if (position_remote_robot_map_.find(_new_position) == position_remote_robot_map_.end()) {
-            if (_new_position == std::get<1>(sk))
-                swap_states.ack_from_greater_position = true;
-            else
-                swap_states.ack_from_lower_position = true;
-        }
         if (swap_states.ack_from_lower_position && swap_states.ack_from_greater_position) {
             std::unique_ptr<remote_robot> first = nullptr;
             std::unique_ptr<remote_robot> second = nullptr;
@@ -451,12 +434,34 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
                 position_remote_robot_map_.erase(std::get<1>(sk));
             }
             if (first != nullptr) {
+                position_t first_position = first->get_position();
                 first->reset_adaptivity_flag();
-                position_remote_robot_map_[first->get_position()] = std::move(first);
+                position_remote_robot_map_[first_position] = std::move(first);
+                size_t output_size = 0;
+                UA_Variant* output = nullptr;
+                UA_StatusCode status = position_remote_robot_map_[first_position]->commit_new_position(&output_size, &output);
+                if (status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method for remote robot at position %d (%s)", __FUNCTION__, COMMIT_NEW_POSITION, first_position, UA_StatusCode_name(status));
+                    if (output != nullptr)
+                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                } else if (!adaptivity_action_called(output_size, output)) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Committing new position %d returned false. This should not happen.", __FUNCTION__, first_position);
+                }
             }
             if (second != nullptr) {
+                position_t second_position = second->get_position();
                 second->reset_adaptivity_flag();
-                position_remote_robot_map_[second->get_position()] = std::move(second);
+                position_remote_robot_map_[second_position] = std::move(second);
+                size_t output_size = 0;
+                UA_Variant* output = nullptr;
+                UA_StatusCode status = position_remote_robot_map_[second_position]->commit_new_position(&output_size, &output);
+                if (status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed calling %s method for remote robot at position %d (%s)", __FUNCTION__, COMMIT_NEW_POSITION, second_position, UA_StatusCode_name(status));
+                    if (output != nullptr)
+                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                } else if (!adaptivity_action_called(output_size, output)) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Committing new position %d returned false. This should not happen.", __FUNCTION__, second_position);
+                }
             }
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Position swap successfully completed for (%d,%d)", std::get<0>(sk), std::get<1>(sk));
             pending_swaps_.erase(sk);
@@ -512,7 +517,7 @@ controller::capabilities_reconfigured_callback(position_t _robot_position) {
     constexpr const char* func_name = __FUNCTION__;
     io_context_.post([this, _robot_position, func_name] {
         // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", func_name);
-        remove_marked_robots();
+        remove_stopped_robots();
         if (position_remote_robot_map_.find(_robot_position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_[_robot_position]->reset_adaptivity_flag();
         }
@@ -520,27 +525,25 @@ controller::capabilities_reconfigured_callback(position_t _robot_position) {
 }
 
 void
-controller::mark_robot_for_removal(position_t _position) {
-    constexpr const char* func_name = __FUNCTION__;
-    io_context_.post([this, _position, func_name] {
-        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", func_name);
-        robots_to_be_removed_.insert(_position);
-    });
-}
-
-void
-controller::remove_marked_robots() {
+controller::remove_stopped_robots() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    for (position_t position : robots_to_be_removed_) {
-        if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
-            position_remote_robot_map_.erase(position);
+    for (auto it = position_remote_robot_map_.begin(); it != position_remote_robot_map_.end();) {
+        if (it->second->is_stopped()) {
+            position_t position = it->first;
+            it = position_remote_robot_map_.erase(it);
             increment_or_decrement_counter_node(REGISTERED_ROBOTS, false);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
+            swap_key sk;
+            if(is_robot_position_swapping(position, sk)) {
+                if (position == std::get<0>(sk))
+                    pending_swaps_.at(sk).ack_from_lower_position = true;
+                else
+                    pending_swaps_.at(sk).ack_from_greater_position = true;
+            }
         } else {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
+            it++;
         }
     }
-    robots_to_be_removed_.clear();
 }
 
 UA_StatusCode

@@ -239,7 +239,7 @@ kitchen::place_random_order(UA_Server* _server,
 void
 kitchen::handle_random_order_request() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    remove_marked_robots();
+    remove_stopped_robots();
     auto do_place = [this] {
         increment_orders_counter(RECEIVED_ORDERS);
         bool instructed = false;
@@ -384,7 +384,7 @@ kitchen::receive_next_robot(UA_Server* _server,
 
 void
 kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robot_endpoint, recipe_id_t _recipe_id) {
-    remove_marked_robots();
+    remove_stopped_robots();
     if (_robot_position == 0 || _robot_endpoint.empty()) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller couldn't return a suitable robot. Dropping order with recipe id %d", _recipe_id);
         increment_orders_counter(DROPPED_ORDERS);
@@ -392,13 +392,9 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
     }
     if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || _robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
         position_remote_robot_map_.erase(_robot_position);
-        robots_to_be_removed_.erase(_robot_position);
         std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, remote_robot_type_inserter_,
-                                                                            std::bind(&kitchen::mark_robot_for_removal, this, std::placeholders::_1),
                                                                             std::bind(&kitchen::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         if (robot->initialize_and_start() != UA_STATUSCODE_GOOD) {
-            position_remote_robot_map_.erase(_robot_position);
-            robots_to_be_removed_.erase(_robot_position);
             increment_orders_counter(DROPPED_ORDERS);
             return;
         }
@@ -474,22 +470,20 @@ kitchen::position_swapped_callback(position_t _old_position, position_t _new_pos
         if (position_remote_robot_map_.find(_new_position) != position_remote_robot_map_.end()) {
             second = position_remote_robot_map_[_new_position].get();
         }
-        if ((first != nullptr && first->get_position() != _old_position)
-            || (second != nullptr && second->get_position() != _new_position) ) {
+        if (((first != nullptr && first->get_position() != _old_position) || first == nullptr)
+            || ((second != nullptr && second->get_position() != _new_position) || second == nullptr)) {
                 std::swap(position_remote_robot_map_[_old_position], position_remote_robot_map_[_new_position]);
         }
         UA_Boolean disconnected = false;
         UA_Boolean connected = true;
         if (position_remote_robot_map_[_old_position] == nullptr) {
             position_remote_robot_map_.erase(_old_position);
-            robots_to_be_removed_.erase(_old_position);
             remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_old_position), CONNECTIVITY, &disconnected, UA_TYPES_BOOLEAN);
         } else {
             remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_old_position), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
         }
         if (position_remote_robot_map_[_new_position] == nullptr) {
             position_remote_robot_map_.erase(_new_position);
-            robots_to_be_removed_.erase(_new_position);
             remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_new_position), CONNECTIVITY, &disconnected, UA_TYPES_BOOLEAN);
         } else {
             remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_new_position), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
@@ -527,27 +521,17 @@ kitchen::increment_orders_counter(std::string _attribute_name) {
 }
 
 void
-kitchen::mark_robot_for_removal(position_t _position) {
+kitchen::remove_stopped_robots() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    io_context_.post([this, _position] {
-        robots_to_be_removed_.insert(_position);
-    });
-}
-
-void
-kitchen::remove_marked_robots() {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    for (position_t position : robots_to_be_removed_) {
-        if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
-            position_remote_robot_map_.erase(position);
+    for (auto it = position_remote_robot_map_.begin(); it != position_remote_robot_map_.end();) {
+        if (it->second->is_stopped()) {
+            position_t position = it->first;
+            it = position_remote_robot_map_.erase(it);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
         } else {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "No remote robot found at position %d", position);
+            it++;
         }
     }
-    robots_to_be_removed_.clear();
-    // if (position_remote_robot_map_.size() < robot_count_)
-    //     remote_robot_discovery_cv.notify_all();
 }
 
 void

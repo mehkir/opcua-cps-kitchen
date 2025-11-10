@@ -183,12 +183,10 @@ void
 conveyor::handle_finished_order_notification(std::string _robot_endpoint, position_t _robot_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "FINISHED_ORDER_NOTIFICATION: Received notification from robot at position %d with endpoint %s", _robot_position, _robot_endpoint.c_str());
-    remove_marked_robots();
+    remove_stopped_robots();
     if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || _robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
         position_remote_robot_map_.erase(_robot_position);
-        robots_to_be_removed_.erase(_robot_position);
         std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_robot_endpoint, _robot_position,
-                                                                            std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1),
                                                                             std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
             position_remote_robot_map_[_robot_position] = std::move(robot);
@@ -215,7 +213,7 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
 void
 conveyor::handle_retrieve_finished_orders() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    remove_marked_robots();
+    remove_stopped_robots();
     for (auto notification = notifications_map_.begin(); notification != notifications_map_.end();) {
         if (!plates_[position_plate_id_map_[notification->first]].is_occupied()) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETRIEVAL: Dish at position %d(%s) is retrievable", notification->first, notification->second.c_str());
@@ -413,7 +411,7 @@ conveyor::receive_next_robot(UA_Server* _server,
 
 void
 conveyor::handle_receive_next_robot(position_t _robot_position, std::string _robot_endpoint, recipe_id_t _recipe_id) {
-    remove_marked_robots();
+    remove_stopped_robots();
     if (next_robot_request_queue_.empty()) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Unexpected response with no outstanding requests (recipe id %d). Ignoring.", _recipe_id);
         return;
@@ -424,9 +422,7 @@ conveyor::handle_receive_next_robot(position_t _robot_position, std::string _rob
             || _robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())
     )) {
         position_remote_robot_map_.erase(_robot_position);
-        robots_to_be_removed_.erase(_robot_position);
         std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_robot_endpoint, _robot_position,
-                                                std::bind(&conveyor::mark_robot_for_removal, this, std::placeholders::_1),
                                                 std::bind(&conveyor::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
             position_remote_robot_map_[_robot_position] = std::move(robot);
@@ -478,7 +474,7 @@ conveyor::move_conveyor(steps_t _steps) {
 void
 conveyor::deliver_finished_order() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    remove_marked_robots();
+    remove_stopped_robots();
     for (auto occupied_plate_id = occupied_plates_.begin(); occupied_plate_id != occupied_plates_.end();) {
         plate& p = plates_[*occupied_plate_id];
         if (!p.is_dish_finished() && p.get_target_position() == 0) {
@@ -647,6 +643,7 @@ void
 conveyor::position_swapped_callback(position_t _old_position, position_t _new_position) {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     io_context_.post([this, _old_position, _new_position] {
+        remove_stopped_robots();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING(Conveyor): Reflecting position swap/switch from %d to %d", _old_position, _new_position);
         remote_robot* first = nullptr;
         remote_robot* second = nullptr;
@@ -656,43 +653,31 @@ conveyor::position_swapped_callback(position_t _old_position, position_t _new_po
         if (position_remote_robot_map_.find(_new_position) != position_remote_robot_map_.end()) {
             second = position_remote_robot_map_[_new_position].get();
         }
-        if ((first != nullptr && first->get_position() != _old_position)
-            || (second != nullptr && second->get_position() != _new_position) ) {
+        if (((first != nullptr && first->get_position() != _old_position) || first == nullptr)
+            && ((second != nullptr && second->get_position() != _new_position) || second == nullptr)) {
                 std::swap(position_remote_robot_map_[_old_position], position_remote_robot_map_[_new_position]);
         }
         if (position_remote_robot_map_[_old_position] == nullptr) {
             position_remote_robot_map_.erase(_old_position);
-            robots_to_be_removed_.erase(_old_position);
         }
         if (position_remote_robot_map_[_new_position] == nullptr) {
             position_remote_robot_map_.erase(_new_position);
-            robots_to_be_removed_.erase(_new_position);
         }
     });
 }
 
 void
-conveyor::mark_robot_for_removal(position_t _position) {
+conveyor::remove_stopped_robots() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    io_context_.post([this, _position] {
-        robots_to_be_removed_.insert(_position);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Marked robot at position %d for removal", __FUNCTION__, _position);
-    });
-
-}
-
-void
-conveyor::remove_marked_robots() {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    for (position_t position : robots_to_be_removed_) {
-        if (position_remote_robot_map_.find(position) != position_remote_robot_map_.end()) {
-            position_remote_robot_map_.erase(position);
+    for (auto it = position_remote_robot_map_.begin(); it != position_remote_robot_map_.end();) {
+        if (it->second->is_stopped()) {
+            position_t position = it->first;
+            it = position_remote_robot_map_.erase(it);
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Removed remote robot at position %d", __FUNCTION__, position);
         } else {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: No remote robot found at position %d", __FUNCTION__, position);
+           it++;
         }
     }
-    robots_to_be_removed_.clear();
 }
 
 void

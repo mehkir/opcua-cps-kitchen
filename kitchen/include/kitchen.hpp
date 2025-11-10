@@ -47,7 +47,6 @@
 
 using namespace cps_kitchen;
 
-typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal. */
 typedef std::function<void(position_t, position_t)> position_swapped_callback_t; /**< the callback declaration to notify about position change. */
 
 struct remote_robot {
@@ -57,7 +56,6 @@ struct remote_robot {
         std::atomic<position_t> cached_position_; /**< the remote robot's position on the conveyor belt. */
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
         object_type_node_inserter& remote_robot_type_inserter_; /**< the remote robot type inserter for adding the remote robot's attributes to the address space. */
-        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
         std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
         std::thread client_iterate_thread_; /**< the client iteration thread. */
@@ -93,11 +91,9 @@ struct remote_robot {
          * @param _position_swapped_callback the position swapped callback.
          */
         remote_robot(std::string _endpoint, UA_UInt32 _position, object_type_node_inserter& _remote_robot_type_inserter,
-                    mark_robot_for_removal_callback_t _mark_robot_for_removal_callback,
                     position_swapped_callback_t _position_swapped_callback) :
                     client_(nullptr), endpoint_(_endpoint), cached_position_(_position), running_(true),
                     remote_robot_type_inserter_(_remote_robot_type_inserter),
-                    mark_robot_for_removal_callback_(_mark_robot_for_removal_callback),
                     position_swapped_callback_(_position_swapped_callback), initial_subscription_(true) {
         }
 
@@ -203,7 +199,6 @@ struct remote_robot {
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling instruct method (%s)", __FUNCTION__, UA_StatusCode_name(status));
                     running_.store(false);
-                    mark_robot_for_removal_callback_(cached_position_.load());
                     return UA_STATUSCODE_BAD;
                 }
             }
@@ -232,7 +227,6 @@ struct remote_robot {
             if (inr.read_information_node(client_, attribute_id_map_[POSITION]) != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, POSITION);
                 running_.store(false);
-                mark_robot_for_removal_callback_(cached_position_.load());
                 return 0;
             }
             return *(position_t*)inr.get_variant()->data;
@@ -245,7 +239,6 @@ struct remote_robot {
             if (inr.read_information_node(client_, attribute_id_map_[AVAILABILITY]) != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, AVAILABILITY);
                 running_.store(false);
-                mark_robot_for_removal_callback_(cached_position_.load());
                 return false;
             }
             return *(UA_Boolean*)inr.get_variant()->data;
@@ -272,7 +265,6 @@ struct remote_robot {
             if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
                 self->running_.store(false);
-                self->mark_robot_for_removal_callback_(self->cached_position_.load());
                 return;
             }
             UA_UInt32 old_position = self->cached_position_.load();
@@ -293,6 +285,17 @@ struct remote_robot {
          */
         static std::string remote_robot_instance_name(position_t _position) {
             return REMOTE_ROBOT_INSTANCE_NAME_PREFIX + std::to_string(_position);
+        }
+
+        /**
+         * @brief Indicates whether the robot is stopped and not running anymore.
+         * 
+         * @return true if robot is stopped.
+         * @return false if robot is still running.
+         */
+        bool
+        is_stopped() {
+            return !running_.load();
         }
 
         /**
@@ -333,7 +336,6 @@ private:
     /* remote robot related member variables. */
     std::thread cyclic_remote_robot_discovery_thread_; /**< the thread updating the connectivity status of remote robots in the address space. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
-    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
     object_type_node_inserter remote_robot_type_inserter_; /**< the remote robot type inserter for adding the robot's attributes to the address space. */
     uint32_t robot_count_; /**< the total robot count in the kitchen. */
     /* controller related member variables. */
@@ -487,19 +489,11 @@ private:
     increment_orders_counter(std::string _attribute_name);
 
     /**
-     * @brief Marks a remote robot for removal.
-     * 
-     * @param _position the position of the remote robot to mark for removal.
-     */
-    void
-    mark_robot_for_removal(position_t _position); 
-
-    /**
-     * @brief Removes all marked robots from the kitchen.
+     * @brief Removes all stopped robots from the kitchen.
      * 
      */
     void
-    remove_marked_robots();
+    remove_stopped_robots();
 
     /**
      * @brief Joins all started threads.

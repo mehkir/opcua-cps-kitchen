@@ -45,7 +45,6 @@
 
 using namespace cps_kitchen;
 
-typedef std::function<void(position_t)> mark_robot_for_removal_callback_t; /**< the callback declaration to mark robots for removal. */
 typedef std::function<void(position_t, position_t)> position_swapped_callback_t; /**< the callback declaration to notify about position change. */
 
 /**
@@ -57,7 +56,6 @@ struct remote_robot {
         UA_Client* client_; /**< the OPC UA remote robot client pointer. */
         std::string endpoint_; /**< the endpoint address. */
         std::atomic<position_t> cached_position_; /**< the position on the conveyor belt. */
-        mark_robot_for_removal_callback_t mark_robot_for_removal_callback_; /**< the callback to mark robots for removal. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
         std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
         std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
@@ -76,10 +74,8 @@ struct remote_robot {
          * @param _mark_robot_for_removal_callback the mark for removal callback.
          * @param _position_swapped_callback the position swapped callback.
          */
-        remote_robot(std::string _endpoint, position_t _position,
-                    mark_robot_for_removal_callback_t _mark_robot_for_removal_callback, position_swapped_callback_t _position_swapped_callback) :
+        remote_robot(std::string _endpoint, position_t _position, position_swapped_callback_t _position_swapped_callback) :
                     endpoint_(_endpoint), cached_position_(_position), client_(nullptr), running_(true),
-                    mark_robot_for_removal_callback_(_mark_robot_for_removal_callback),
                     position_swapped_callback_(_position_swapped_callback), initial_subscription_(true) {
             // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
         }
@@ -188,7 +184,6 @@ struct remote_robot {
             if (inr.read_information_node(client_, attribute_id_map_[POSITION]) != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, POSITION);
                 running_.store(false);
-                mark_robot_for_removal_callback_(cached_position_.load());
                 return 0;
             }
             return *(position_t*)inr.get_variant()->data;
@@ -214,7 +209,7 @@ struct remote_robot {
             remote_robot* self = static_cast<remote_robot*>(_mon_context);
             if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-                self->mark_robot_for_removal_callback_(self->cached_position_.load());
+                self->running_.store(false);
                 return;
             }
             UA_UInt32 old_position = self->cached_position_.load();
@@ -239,7 +234,7 @@ struct remote_robot {
             information_node_reader inr;
             if (inr.read_information_node(client_, attribute_id_map_[AVAILABILITY]) != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, AVAILABILITY);
-                mark_robot_for_removal_callback_(cached_position_.load());
+                running_.store(false);
                 return false;
             }
             return *(UA_Boolean*)inr.get_variant()->data;
@@ -265,7 +260,6 @@ struct remote_robot {
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, HANDOVER_FINISHED_ORDER, UA_StatusCode_name(status));
                     running_.store(false);
-                    mark_robot_for_removal_callback_(cached_position_.load());
                     return UA_STATUSCODE_BAD;
                 }
             }
@@ -298,11 +292,21 @@ struct remote_robot {
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECEIVE_TASK, UA_StatusCode_name(status));
                     running_.store(false);
-                    mark_robot_for_removal_callback_(cached_position_.load());
                     return UA_STATUSCODE_BAD;
                 }
             }
             return status;
+        }
+
+        /**
+         * @brief Indicates whether the robot is stopped and not running anymore.
+         * 
+         * @return true if robot is stopped.
+         * @return false if robot is still running.
+         */
+        bool
+        is_stopped() {
+            return !running_.load();
         }
 };
 
@@ -536,7 +540,6 @@ private:
     std::unordered_map<position_t, plate_id_t> position_plate_id_map_; /**< the map tracking the current positions of the plates. */
     std::unordered_map<position_t, std::string> notifications_map_; /**< the notifications received by the robots. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map tracking the current positions of robots. */
-    std::unordered_set<position_t> robots_to_be_removed_; /**< the set holding robots to be removed. */
     std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
     std::queue<position_t> next_robot_request_queue_; /**< the queue holding the order of next robot requests. */
     /* controller related member variables. */
@@ -710,19 +713,11 @@ private:
     position_swapped_callback(position_t _old_position, position_t _new_position);
 
     /**
-     * @brief Marks a remote robot for removal.
-     * 
-     * @param _position the position of the remote robot to mark for removal.
-     */
-    void
-    mark_robot_for_removal(position_t _position); 
-
-    /**
-     * @brief Removes all marked robots from the conveyor.
+     * @brief Removes all stopped robots from the conveyor.
      * 
      */
     void
-    remove_marked_robots();
+    remove_stopped_robots();
 
     /**
      * @brief Resets the plate attributes to their default values.
