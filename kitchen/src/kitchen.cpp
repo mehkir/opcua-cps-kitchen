@@ -473,23 +473,12 @@ kitchen::position_swapped_callback(position_t _old_position, position_t _new_pos
         if (((first != nullptr && first->get_position() != _old_position) || first == nullptr)
             && ((second != nullptr && second->get_position() != _new_position) || second == nullptr)) {
                 std::swap(position_remote_robot_map_[_old_position], position_remote_robot_map_[_new_position]);
-        } else {
-            return;
         }
-        UA_Boolean disconnected = false;
-        UA_Boolean connected = true;
-        if (position_remote_robot_map_[_old_position] == nullptr) {
+        if (position_remote_robot_map_[_old_position] == nullptr)
             position_remote_robot_map_.erase(_old_position);
-            remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_old_position), CONNECTIVITY, &disconnected, UA_TYPES_BOOLEAN);
-        } else {
-            remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_old_position), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
-        }
-        if (position_remote_robot_map_[_new_position] == nullptr) {
+
+        if (position_remote_robot_map_[_new_position] == nullptr)
             position_remote_robot_map_.erase(_new_position);
-            remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_new_position), CONNECTIVITY, &disconnected, UA_TYPES_BOOLEAN);
-        } else {
-            remote_robot_type_inserter_.set_scalar_attribute(remote_robot::remote_robot_instance_name(_new_position), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
-        }
     });
 }
 
