@@ -445,7 +445,7 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
                     if (output != nullptr)
                         UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                 } else if (!adaptivity_action_called(output_size, output)) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Committing new position %d returned false. This should not happen.", __FUNCTION__, first_position);
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Committing new position %d returned false.", __FUNCTION__, first_position);
                 }
             }
             if (second != nullptr) {
@@ -460,7 +460,7 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
                     if (output != nullptr)
                         UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
                 } else if (!adaptivity_action_called(output_size, output)) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Committing new position %d returned false. This should not happen.", __FUNCTION__, second_position);
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Committing new position %d returned false.", __FUNCTION__, second_position);
                 }
             }
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Position swap successfully completed for (%d,%d)", std::get<0>(sk), std::get<1>(sk));
