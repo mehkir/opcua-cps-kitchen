@@ -131,12 +131,6 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s", __FUNCTION__, POSITION);
                 return UA_STATUSCODE_BAD;
             }
-            /* Set connectvitiy. */
-            status = remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(cached_position_.load()), CONNECTIVITY, &connected, UA_TYPES_BOOLEAN);
-            if (status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting remote robot connectivity attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                return UA_STATUSCODE_BAD;
-            }
             /* Get receive task method id. */
             if ((method_id_map_[RECEIVE_TASK] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, RECEIVE_TASK)) == OBJECT_METHOD_INFO_NULL) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
@@ -307,8 +301,6 @@ struct remote_robot {
                 client_iterate_thread_.join();
             nv_subscriber_.reset();
             UA_Client_delete(client_);
-            UA_Boolean connectivity = false;
-            remote_robot_type_inserter_.set_scalar_attribute(remote_robot_instance_name(cached_position_.load()), CONNECTIVITY, &connectivity, UA_TYPES_BOOLEAN);
         }
 };
 
