@@ -612,8 +612,9 @@ robot::determine_next_action() {
         /* Process the next action */
         } else {
             /* Update action in process */
-            UA_String action_in_process = UA_STRING(const_cast<char*>(robot_act.get_name().c_str()));
+            UA_String action_in_process = UA_STRING_ALLOC(const_cast<char*>(robot_act.get_name().c_str()));
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ACTION_NAME, &action_in_process, UA_TYPES_STRING);
+            UA_String_clear(&action_in_process);
             /* Update ingredients in process */
             UA_String ingredients_in_process = UA_STRING_ALLOC(robot_act.get_ingredients().c_str());
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
