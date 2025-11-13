@@ -7,6 +7,15 @@ option(USE_CUSTOM_VERSION "Use custom version" OFF)
 option(USE_ASAN "Enable Address Sanitizer" OFF)
 option(USE_TSAN "Enable Thread Sanitizer" OFF)
 
+# Apply sanitizers globally so all libs/exes are instrumented
+if (USE_ASAN AND NOT USE_TSAN)
+    add_compile_options(-fsanitize=address -fno-omit-frame-pointer)
+    add_link_options(-fsanitize=address)
+elseif (USE_TSAN AND NOT USE_ASAN)
+    add_compile_options(-fsanitize=thread)
+    add_link_options(-fsanitize=thread)
+endif()
+
 if (USE_CUSTOM_VERSION)
     # Choose your version with a variable
     set(OPEN62541_VERSION "1.4.7") # for possible versions see OPEN62541_DIR
@@ -51,28 +60,6 @@ target_include_directories(start_kitchen_instance PUBLIC ${PROJECT_BINARY_DIR} $
 add_executable(statistics-writer-main statistics-writer-main.cpp)
 target_link_libraries(statistics-writer-main PUBLIC statistics_lib)
 target_include_directories(statistics-writer-main PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/statistics/include)
-
-if (USE_ASAN)
-    target_compile_options(start_robot_instance PRIVATE -fsanitize=address)
-    target_link_options(start_robot_instance PRIVATE -fsanitize=address)
-    target_compile_options(start_controller_instance PRIVATE -fsanitize=address)
-    target_link_options(start_controller_instance PRIVATE -fsanitize=address)
-    target_compile_options(start_conveyor_instance PRIVATE -fsanitize=address)
-    target_link_options(start_conveyor_instance PRIVATE -fsanitize=address)
-    target_compile_options(start_kitchen_instance PRIVATE -fsanitize=address)
-    target_link_options(start_kitchen_instance PRIVATE -fsanitize=address)
-endif()
-
-if (USE_TSAN)
-    target_compile_options(start_robot_instance PRIVATE -fsanitize=thread)
-    target_link_options(start_robot_instance PRIVATE -fsanitize=thread)
-    target_compile_options(start_controller_instance PRIVATE -fsanitize=thread)
-    target_link_options(start_controller_instance PRIVATE -fsanitize=thread)
-    target_compile_options(start_conveyor_instance PRIVATE -fsanitize=thread)
-    target_link_options(start_conveyor_instance PRIVATE -fsanitize=thread)
-    target_compile_options(start_kitchen_instance PRIVATE -fsanitize=thread)
-    target_link_options(start_kitchen_instance PRIVATE -fsanitize=thread)
-endif()
 
 # Find Doxygen
 find_package(Doxygen QUIET)
