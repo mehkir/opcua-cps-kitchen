@@ -166,6 +166,7 @@ controller::handle_robot_registration(std::string _endpoint, position_t _positio
         if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
             position_remote_robot_map_[_position] = std::move(robot);
             increment_or_decrement_counter_node(REGISTERED_ROBOTS);
+            resolve_missed_new_position_commit(_position);
         }
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is already a registered robot at position %d", __FUNCTION__, _position);
@@ -316,12 +317,10 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no robot at position %d", __FUNCTION__, _from);
         return;
     }
-    resolve_missed_new_position_commit(_from);
     if (position_remote_robot_map_[_from]->is_adaptivity_pending() || !position_remote_robot_map_[_from]->is_available()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _from);
         return;
     }
-    resolve_missed_new_position_commit(_to);
     if (position_remote_robot_map_.find(_to) != position_remote_robot_map_.end() && (position_remote_robot_map_[_to]->is_adaptivity_pending() || !position_remote_robot_map_[_to]->is_available())) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _to);
         return;
@@ -492,7 +491,6 @@ controller::reconfigure_robot_capability(position_t _robot_position, std::string
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no robot at position %d", __FUNCTION__, _robot_position);
         return;
     }
-    resolve_missed_new_position_commit(_robot_position);
     if ((position_remote_robot_map_[_robot_position]->is_adaptivity_pending() || !position_remote_robot_map_[_robot_position]->is_available())) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d has a pending adaptivity", __FUNCTION__, _robot_position);
         return;
