@@ -1153,7 +1153,17 @@ robot::start() {
                         }
                     } else {
                         std::string controller_endpoint;
-                        if (discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) == UA_STATUSCODE_GOOD) {
+                        UA_Variant new_position_commit_is_pending_val;
+                        UA_Variant_init(&new_position_commit_is_pending_val);
+                        robot_type_inserter_.get_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, new_position_commit_is_pending_val);
+                        UA_Boolean new_position_commit_is_pending = *(UA_Boolean*) new_position_commit_is_pending_val.data;
+                        UA_Variant_clear(&new_position_commit_is_pending_val);
+                        robot_state rs;
+                        {
+                            std::lock_guard<std::mutex> lock(state_mutex_);
+                            rs = robot_state_;
+                        }
+                        if ((rs == robot_state::AVAILABLE || new_position_commit_is_pending) && discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) == UA_STATUSCODE_GOOD) {
                             method_node_caller register_robot_caller;
                             register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
                             register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
