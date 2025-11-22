@@ -16,7 +16,12 @@
 
 kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
                                         robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
-                                        mersenne_twister_(random_device_()), uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr),
+                                    #ifdef KITCHEN_SEED
+                                        mersenne_twister_(KITCHEN_SEED),
+                                    #else
+                                        mersenne_twister_(random_device_()),
+                                    #endif
+                                        uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr),
                                         work_guard_(boost::asio::make_work_guard(io_context_)), placing_timer_(io_context_), placing_gate_open_(true) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
