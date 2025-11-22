@@ -7,7 +7,7 @@
 
 std::mutex statistics_writer::mutex_;
 statistics_writer* statistics_writer::instance_;
-size_t statistics_writer::host_count_;
+size_t statistics_writer::robot_count_;
 std::string statistics_writer::absolute_results_directory_path_;
 std::string statistics_writer::result_filename_;
 
@@ -15,7 +15,7 @@ statistics_writer* statistics_writer::get_instance(size_t _host_count, std::stri
     std::lock_guard<std::mutex> lock_guard(mutex_);
     if(instance_ == nullptr) {
         instance_ = new statistics_writer();
-        host_count_ = _host_count;
+        robot_count_ = _host_count;
         absolute_results_directory_path_ = _absolute_results_directory_path;
         result_filename_ = _result_filename;
     }
@@ -77,10 +77,10 @@ void statistics_writer::write_statistics() {
 
 bool statistics_writer::entries_are_complete() {
     size_t utilization_entry_count = composite_utilization_statistics_->size();
-    // std::cout << __func__ << " " << host_entry_count << std::endl;
+    // std::cout << __func__ << " " << utilization_entry_count << std::endl;
     // boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
     // std::cout << __func__ << " free memory=" << segment.get_free_memory() << std::endl;
-    return utilization_entry_count == host_count_;
+    return utilization_entry_count == robot_count_;
 }
 
 void statistics_writer::print_statistics() {
