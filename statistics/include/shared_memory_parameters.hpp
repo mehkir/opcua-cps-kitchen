@@ -21,14 +21,12 @@
 #include <utility>
 
 //Typedefs of allocators and containers
-typedef boost::interprocess::managed_shared_memory::segment_manager                     segment_manager_t;
-typedef std::uint64_t                                                                   timestamp_key_t;
-typedef bool                                                                            utilized_value_t;
-typedef bool                                                                            retooled_value_t;
-typedef std::pair<utilized_value_t, retooled_value_t>                                   utilization_map_value_t;
-typedef std::pair<const timestamp_key_t, utilization_map_value_t>                       utilization_map_t;
-typedef boost::interprocess::allocator<utilization_map_t, segment_manager_t>            utilization_map_allocator;
-typedef boost::interprocess::map<timestamp_key_t, utilization_map_value_t, std::less<timestamp_key_t>, utilization_map_allocator>  utilization_map;
+typedef boost::interprocess::managed_shared_memory::segment_manager             segment_manager_t;
+typedef std::uint64_t                                                           timestamp_key_t;
+typedef bool                                                                    utilized_flag_t;
+typedef std::pair<const timestamp_key_t, utilized_flag_t>                       utilization_map_t;
+typedef boost::interprocess::allocator<utilization_map_t, segment_manager_t>    utilization_map_allocator;
+typedef boost::interprocess::map<timestamp_key_t, utilized_flag_t, std::less<timestamp_key_t>, utilization_map_allocator>  utilization_map;
 
 class utilization_map_data {
    public:
@@ -48,8 +46,7 @@ enum class metric_t {
     POSITION,
     TIMESTAMP,
     UTILIZED,
-    RETOOLED,
-    METRIC_COUNT = RETOOLED+1
+    METRIC_COUNT = UTILIZED+1
 };
 
 inline std::string metric_to_string(metric_t _metric) {
@@ -57,7 +54,6 @@ inline std::string metric_to_string(metric_t _metric) {
         case metric_t::POSITION: return "POSITION";
         case metric_t::TIMESTAMP: return "TIMESTAMP";
         case metric_t::UTILIZED: return "UTILIZED";
-        case metric_t::RETOOLED: return "RETOOLED";
         default: return "Unimplemented metric";
     }
 }

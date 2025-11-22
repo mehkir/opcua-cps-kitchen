@@ -69,7 +69,7 @@ void statistics_writer::write_statistics() {
     for(auto utilization_entry = composite_utilization_statistics_->begin(); utilization_entry != composite_utilization_statistics_->end(); utilization_entry++) {
         auto utilization_map = utilization_entry->second.utilization_map_;
         for(auto utilization_value = utilization_map.begin(); utilization_value != utilization_map.end(); utilization_value++) {
-            statistics_file << utilization_entry->first << "," << utilization_value->first << "," << utilization_value->second.first << "," << utilization_value->second.second << "\n";
+            statistics_file << utilization_entry->first << "," << utilization_value->first << "," << utilization_value->second << "\n";
         }
     }
     statistics_file.close();
@@ -99,7 +99,7 @@ void statistics_writer::print_statistics() {
     for(auto utilization_entry = composite_utilization_statistics_->begin(); utilization_entry != composite_utilization_statistics_->end(); utilization_entry++) {
         auto utilization_map = utilization_entry->second.utilization_map_;
         for(auto utilization_value = utilization_map.begin(); utilization_value != utilization_map.end(); utilization_value++) {
-            sstream << utilization_entry->first << "," << utilization_value->first << "," << utilization_value->second.first << "," << utilization_value->second.second << "\n";
+            sstream << utilization_entry->first << "," << utilization_value->first << "," << utilization_value->second << "\n";
         }
     }
     std::cout << sstream.str() << std::endl;
