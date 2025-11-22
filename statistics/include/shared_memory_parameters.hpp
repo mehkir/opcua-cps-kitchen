@@ -22,7 +22,6 @@
 
 //Typedefs of allocators and containers
 typedef boost::interprocess::managed_shared_memory::segment_manager                     segment_manager_t;
-typedef boost::interprocess::allocator<void, segment_manager_t>                         void_allocator;
 typedef std::uint64_t                                                                   timestamp_key_t;
 typedef bool                                                                            utilized_value_t;
 typedef bool                                                                            retooled_value_t;
@@ -34,8 +33,8 @@ typedef boost::interprocess::map<timestamp_key_t, utilization_map_value_t, std::
 class utilization_map_data {
    public:
       utilization_map utilization_map_;
-      utilization_map_data(const void_allocator& void_allocator_instance)
-         : utilization_map_(std::less<timestamp_key_t>(), utilization_map_allocator(void_allocator_instance.get_segment_manager()))
+      utilization_map_data(segment_manager_t* _segment_manager)
+         : utilization_map_(std::less<timestamp_key_t>(), utilization_map_allocator(_segment_manager))
       {}
 };
 
@@ -45,17 +44,21 @@ typedef std::pair<const position_key_t, utilization_map_data>                   
 typedef boost::interprocess::allocator<shared_utilization_map_value_t, segment_manager_t>                               shared_utilization_map_allocator;
 typedef boost::interprocess::map<position_key_t, utilization_map_data, std::less<position_key_t>, shared_utilization_map_allocator>  shared_utilization_map;
 
-enum class time_metric {
-    JOB_START,
-    JOB_END,
-    TIME_METRIC_COUNT = JOB_END+1
+enum class metric_t {
+    POSITION,
+    TIMESTAMP,
+    UTILIZED,
+    RETOOLED,
+    METRIC_COUNT = RETOOLED+1
 };
 
-inline std::string time_metric_to_string(time_metric _time_metric) {
-    switch (_time_metric) {
-        case time_metric::JOB_START: return "JOB_START";
-        case time_metric::JOB_END: return "JOB_END";
-        default: return "Unimplemented timepoint";
+inline std::string metric_to_string(metric_t _metric) {
+    switch (_metric) {
+        case metric_t::POSITION: return "POSITION";
+        case metric_t::TIMESTAMP: return "TIMESTAMP";
+        case metric_t::UTILIZED: return "UTILIZED";
+        case metric_t::RETOOLED: return "RETOOLED";
+        default: return "Unimplemented metric";
     }
 }
 

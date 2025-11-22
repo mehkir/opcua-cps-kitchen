@@ -31,12 +31,10 @@ void statistics_recorder::contribute_statistics() {
         try {
             boost::interprocess::named_condition condition(boost::interprocess::open_only, STATISTICS_CONDITION);
             boost::interprocess::named_mutex mutex(boost::interprocess::open_only, STATISTICS_MUTEX);
-            boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
-            void_allocator void_allocator_instance(segment.get_segment_manager());
-
+            boost::interprocess::managed_shared_memory msm(boost::interprocess::open_only, SEGMENT_NAME);
             {
                 boost::interprocess::scoped_lock<boost::interprocess::named_mutex> lock(mutex);
-                while (!(composite_utilization_statistics_ = segment.find<shared_utilization_map>(UTILIZATION_MAP_NAME).first)) {
+                while (!(composite_utilization_statistics_ = msm.find<shared_utilization_map>(UTILIZATION_MAP_NAME).first)) {
                     waited_for_shm = true;
                     condition.wait(lock);
                     std::cout << "[<statistics_recorder>] (" << __func__ << ") shared map not intialized yet" << std::endl;
@@ -53,7 +51,7 @@ void statistics_recorder::contribute_statistics() {
                     if(composite_utilization_statistics_->count(utilization_entry.first)) {
                         map_data = &composite_utilization_statistics_->at(utilization_entry.first);
                     } else {
-                        utilization_map_data utilization_map_data_var = utilization_map_data(void_allocator_instance);
+                        utilization_map_data utilization_map_data_var = utilization_map_data(msm.get_segment_manager());
                         map_data = &utilization_map_data_var;
                     }
                     for(auto value_entry : utilization_entry.second) {

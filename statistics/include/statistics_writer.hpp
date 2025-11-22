@@ -35,7 +35,7 @@ private:
     shm_remove shm_remover_;
     mutex_remove mutex_remover_;
     condition_remove condition_remover_;
-    shared_statistics_map* composite_time_statistics_;
+    shared_utilization_map* composite_utilization_statistics_;
     statistics_writer();
     bool entries_are_complete();
     void print_statistics();
