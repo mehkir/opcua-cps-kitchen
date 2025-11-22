@@ -12,6 +12,7 @@
 #include "filtered_logger.hpp"
 #include "browsenames.h"
 #include "discovery_and_connection.hpp"
+#include "statistics_recorder.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
 #define TIME_UNIT_UPDATE_RATE 1LL
@@ -369,9 +370,11 @@ robot::cook_next_order() {
         }
     }
     if (order_queue_.empty()) {
+        if (preparing_dish_) statistics_recorder::get_instance()->record_timestamp(position_, false);
         preparing_dish_ = false;
         return;
     }
+    if (!preparing_dish_) statistics_recorder::get_instance()->record_timestamp(position_, true);
     preparing_dish_ = true;
     order next_order = order_queue_.front();
     order_queue_.pop();
