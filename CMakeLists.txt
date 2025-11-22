@@ -29,6 +29,7 @@ endif()
 
 # add_compile_definitions(ROBOT_SEED=12345 KITCHEN_SEED=12345)
 
+add_subdirectory(timestamp)
 add_subdirectory(statistics)
 add_subdirectory(wrappers)
 add_subdirectory(demos)
