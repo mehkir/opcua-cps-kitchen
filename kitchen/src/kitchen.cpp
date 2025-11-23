@@ -227,7 +227,7 @@ kitchen::receive_completed_order(UA_Server* _server,
         UA_Variant_clear(&value);
         if (self->evaluate_orders_count_ > 0) {
             timestamp_recorder::get_instance()->record_timestamp(completed_orders);
-            if (completed_orders >= self->evaluate_orders_count_) {
+            if (completed_orders == self->evaluate_orders_count_) {
                 timestamp_recorder::get_instance()->write_timestamps();
                 // TODO call contribute statistics on robots
             }
