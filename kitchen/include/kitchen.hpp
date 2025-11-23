@@ -136,6 +136,11 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 return UA_STATUSCODE_BAD;
             }
+            /* Get contribute statistics method id. */
+            if ((method_id_map_[CONTRIBUTE_STATISTICS] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, CONTRIBUTE_STATISTICS)) == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CONTRIBUTE_STATISTICS);
+                return UA_STATUSCODE_BAD;
+            }
             try {
                 client_iterate_thread_ = std::thread([this]() {
                     while(running_.load()) {
@@ -190,7 +195,34 @@ struct remote_robot {
                 std::lock_guard<std::mutex> lock(client_mutex_);
                 status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
                 if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling instruct method (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECEIVE_TASK, UA_StatusCode_name(status));
+                    running_.store(false);
+                    return UA_STATUSCODE_BAD;
+                }
+            }
+            return status;
+        }
+
+        /**
+         * @brief Makes the remote robot contribute its statistics.
+         * 
+         * @param _output_size the count of returned output values.
+         * @param _output the variant containing the output values.
+         * 
+         * @return UA_StatusCode the status whether the method call was successful.
+         */
+        UA_StatusCode
+        contribute_statistics(size_t* _output_size, UA_Variant** _output) {
+            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CONTRIBUTE STATISTICS: Instruct robot on position %d to contribute its statistics", cached_position_.load());
+            method_node_caller contribute_statistics_caller;
+            object_method_info omi = method_id_map_[CONTRIBUTE_STATISTICS];
+            UA_StatusCode status = UA_STATUSCODE_GOOD;
+            {
+                std::lock_guard<std::mutex> lock(client_mutex_);
+                status = contribute_statistics_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
+                if(status != UA_STATUSCODE_GOOD) {
+                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, CONTRIBUTE_STATISTICS, UA_StatusCode_name(status));
                     running_.store(false);
                     return UA_STATUSCODE_BAD;
                 }
@@ -367,6 +399,17 @@ private:
             const UA_NodeId* _object_id, void* _object_context,
             size_t _input_size, const UA_Variant* _input,
             size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Extracts the returned remote robot parameters.
+     * 
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
+     * @return true if call was successful.
+     * @return false if call failed.
+     */
+    bool
+    contribute_statistics_called(size_t _output_size, UA_Variant* _output);
 
     /**
      * @brief Places a random order.
