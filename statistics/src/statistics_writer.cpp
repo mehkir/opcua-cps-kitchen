@@ -4,20 +4,19 @@
 #include <sstream>
 #include <iostream>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <limits.h>
+#include <filesystem>
 
 std::mutex statistics_writer::mutex_;
 statistics_writer* statistics_writer::instance_;
 size_t statistics_writer::robot_count_;
-std::string statistics_writer::absolute_results_directory_path_;
-std::string statistics_writer::result_filename_;
 
-statistics_writer* statistics_writer::get_instance(size_t _host_count, std::string _absolute_results_directory_path, std::string _result_filename) {
+statistics_writer* statistics_writer::get_instance(size_t _robot_count) {
     std::lock_guard<std::mutex> lock_guard(mutex_);
     if(instance_ == nullptr) {
         instance_ = new statistics_writer();
-        robot_count_ = _host_count;
-        absolute_results_directory_path_ = _absolute_results_directory_path;
-        result_filename_ = _result_filename;
+        robot_count_ = _robot_count;
     }
     return instance_;
 }
@@ -45,21 +44,34 @@ void statistics_writer::write_statistics() {
         condition.notify_one();
         condition.wait(lock);
     }
+    /* Get statistic results directory */
+    char directory_buffer[PATH_MAX + 1];  // +1 for the null terminator
+    ssize_t len = readlink("/proc/self/exe", directory_buffer, sizeof(directory_buffer) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return;
+    }
+    directory_buffer[len] = '\0';  // null terminate
+    std::filesystem::path exe_path(directory_buffer);
+    std::filesystem::path build_dir = exe_path.parent_path();
+    std::filesystem::path statistics_dir = build_dir.parent_path() / "statistic_results";
+    /* Find free filename */
     std::ofstream statistics_file;
     int filecount = 0;
-    std::stringstream absolute_result_file_path;
-    absolute_result_file_path << absolute_results_directory_path_ << result_filename_ << "-#" << filecount << ".csv";
-    struct stat buffer;
-    //Choose unused/non-existing absolute_result_file_path
-    for(filecount = 1; (stat(absolute_result_file_path.str().c_str(), &buffer) == 0); filecount++) {
-        absolute_result_file_path.str("");
-        absolute_result_file_path << absolute_results_directory_path_ << result_filename_ << "-#" << filecount << ".csv";
+    std::stringstream filename;
+    filename << "robot-statistics-#" << filecount << ".csv";
+    std::filesystem::path statistics_path = statistics_dir / filename.str();
+    struct stat filename_buffer;
+    for(filecount = 1; (stat(statistics_path.c_str(), &filename_buffer) == 0); filecount++) {
+        filename.str("");
+        filename << "robot-statistics-#" << filecount << ".csv";
+        statistics_path = statistics_dir / filename.str();
     }
-    statistics_file.open(absolute_result_file_path.str());
+    statistics_file.open(statistics_path);
     //Write header
-    for(size_t metric_idx = static_cast<size_t>(statistic_key_t::ROBOT_POSITION); metric_idx < static_cast<size_t>(statistic_key_t::METRIC_COUNT); metric_idx++) {
-        statistics_file << metric_to_string(statistic_key_t(metric_idx));
-        if(metric_idx < static_cast<size_t>(statistic_key_t::METRIC_COUNT)-1) {
+    for(size_t statistics_key = static_cast<size_t>(statistic_key_t::ROBOT_POSITION); statistics_key < static_cast<size_t>(statistic_key_t::METRIC_COUNT); statistics_key++) {
+        statistics_file << metric_to_string(statistic_key_t(statistics_key));
+        if(statistics_key < static_cast<size_t>(statistic_key_t::METRIC_COUNT)-1) {
             statistics_file << ",";
         } else {
             statistics_file << "\n";
@@ -87,9 +99,9 @@ void statistics_writer::print_statistics() {
     std::cout << __func__ << std::endl;
     std::stringstream sstream;
     // Write header
-    for(size_t metric_idx = static_cast<size_t>(statistic_key_t::ROBOT_POSITION); metric_idx < static_cast<size_t>(statistic_key_t::METRIC_COUNT); metric_idx++) {
-        sstream << metric_to_string(statistic_key_t(metric_idx));
-        if(metric_idx < static_cast<size_t>(statistic_key_t::METRIC_COUNT)-1) {
+    for(size_t statistics_key = static_cast<size_t>(statistic_key_t::ROBOT_POSITION); statistics_key < static_cast<size_t>(statistic_key_t::METRIC_COUNT); statistics_key++) {
+        sstream << metric_to_string(statistic_key_t(statistics_key));
+        if(statistics_key < static_cast<size_t>(statistic_key_t::METRIC_COUNT)-1) {
             sstream << ",";
         } else {
             sstream << "\n";
