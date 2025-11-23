@@ -323,7 +323,8 @@ private:
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
     boost::asio::steady_timer placing_timer_; /**< the placing timer. */
     bool placing_gate_open_; /**< the placing gate. */
-    std::queue<std::function<void()>> placing_queue_ /**< the placing queue. */;
+    std::queue<std::function<void()>> placing_queue_; /**< the placing queue. */
+    uint32_t evaluate_orders_count_; /** determines after how many orders the evaluation is done. */
     /* remote robot related member variables. */
     std::thread cyclic_remote_robot_discovery_thread_; /**< the thread updating the connectivity status of remote robots in the address space. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
@@ -498,8 +499,9 @@ public:
      * @brief Constructs a new kitchen object
      * 
      * @param _robot_count the total robot count in the kitchen.
+     * @param _evaluate_orders_count determines after how many orders the evaluation is done.
      */
-    kitchen(uint32_t _robot_count);
+    kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count = 0);
 
     /**
      * @brief Destroys the kitchen object.

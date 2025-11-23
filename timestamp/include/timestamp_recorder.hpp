@@ -6,16 +6,16 @@
 #include <chrono>
 #include <string>
     
-    enum class timepoint_t {
-        START,
-        END,
-        TIMEPOINT_COUNT = END + 1
+    enum class timestamp_key_t {
+        COMPLETED_ORDER_COUNT,
+        TIMESTAMP,
+        TIMESTAMP_COUNT = TIMESTAMP + 1
     };
 
-inline std::string timepoint_to_string(timepoint_t _timepoint) {
+inline std::string timestamp_key_to_string(timestamp_key_t _timepoint) {
     switch (_timepoint) {
-        case timepoint_t::START: return "START";
-        case timepoint_t::END: return "END";
+        case timestamp_key_t::COMPLETED_ORDER_COUNT: return "COMPLETED_ORDER_COUNT";
+        case timestamp_key_t::TIMESTAMP: return "TIMESTAMP";
         default: return "Unimplemented timepoint";
     }
 }
@@ -25,12 +25,12 @@ inline std::string timepoint_to_string(timepoint_t _timepoint) {
     private:
         static std::mutex mutex_;
         static timestamp_recorder* instance_;
-        std::map<timepoint_t, uint64_t> timestamps_;
+        std::map<uint32_t, uint64_t> timestamps_;
         timestamp_recorder();
         ~timestamp_recorder();
     public:
         static timestamp_recorder* get_instance();
-        void record_timestamp(timepoint_t _timepoint);
+        void record_timestamp(uint32_t _completed_order_count);
         void write_timestamps();
     };
 

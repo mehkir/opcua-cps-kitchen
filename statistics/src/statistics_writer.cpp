@@ -57,9 +57,9 @@ void statistics_writer::write_statistics() {
     }
     statistics_file.open(absolute_result_file_path.str());
     //Write header
-    for(size_t metric_idx = static_cast<size_t>(metric_t::POSITION); metric_idx < static_cast<size_t>(metric_t::METRIC_COUNT); metric_idx++) {
-        statistics_file << metric_to_string(metric_t(metric_idx));
-        if(metric_idx < static_cast<size_t>(metric_t::METRIC_COUNT)-1) {
+    for(size_t metric_idx = static_cast<size_t>(statistic_key_t::ROBOT_POSITION); metric_idx < static_cast<size_t>(statistic_key_t::METRIC_COUNT); metric_idx++) {
+        statistics_file << metric_to_string(statistic_key_t(metric_idx));
+        if(metric_idx < static_cast<size_t>(statistic_key_t::METRIC_COUNT)-1) {
             statistics_file << ",";
         } else {
             statistics_file << "\n";
@@ -87,9 +87,9 @@ void statistics_writer::print_statistics() {
     std::cout << __func__ << std::endl;
     std::stringstream sstream;
     // Write header
-    for(size_t metric_idx = static_cast<size_t>(metric_t::POSITION); metric_idx < static_cast<size_t>(metric_t::METRIC_COUNT); metric_idx++) {
-        sstream << metric_to_string(metric_t(metric_idx));
-        if(metric_idx < static_cast<size_t>(metric_t::METRIC_COUNT)-1) {
+    for(size_t metric_idx = static_cast<size_t>(statistic_key_t::ROBOT_POSITION); metric_idx < static_cast<size_t>(statistic_key_t::METRIC_COUNT); metric_idx++) {
+        sstream << metric_to_string(statistic_key_t(metric_idx));
+        if(metric_idx < static_cast<size_t>(statistic_key_t::METRIC_COUNT)-1) {
             sstream << ",";
         } else {
             sstream << "\n";

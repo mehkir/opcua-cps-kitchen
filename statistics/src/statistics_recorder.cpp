@@ -20,7 +20,7 @@ statistics_recorder::statistics_recorder() {
 statistics_recorder::~statistics_recorder() {
 }
 
-void statistics_recorder::record_timestamp(position_key_t _position, state_t _state) {
+void statistics_recorder::record_timestamp(position_key_t _position, state_key_t _state) {
     std::lock_guard<std::mutex> lock_guard(mutex_);
     utilization_statistics_[_position][std::chrono::system_clock::now().time_since_epoch().count()] = _state;
 }

@@ -23,15 +23,15 @@ timestamp_recorder::timestamp_recorder() {
 timestamp_recorder::~timestamp_recorder() {
 }
 
-void timestamp_recorder::record_timestamp(timepoint_t _timepoint) {
-    if(timestamps_.count(_timepoint)) {
+void timestamp_recorder::record_timestamp(uint32_t _completed_order_count) {
+    if(timestamps_.count(_completed_order_count)) {
         return;
     }
-    timestamps_[_timepoint] = std::chrono::system_clock::now().time_since_epoch().count();
+    timestamps_[_completed_order_count] = std::chrono::system_clock::now().time_since_epoch().count();
 }
 
 void timestamp_recorder::write_timestamps() {
-    std::ofstream timepoints_file;
+    std::ofstream completed_orders_file;
     int filecount = 0;
     std::stringstream filename;
     filename << "timestamp_results/timepoints-#" << filecount << ".csv";
@@ -40,24 +40,19 @@ void timestamp_recorder::write_timestamps() {
         filename.str("");
         filename << "timestamp_results/timepoints-#" << filecount << ".csv";
     }
-    timepoints_file.open(filename.str());
+    completed_orders_file.open(filename.str());
     //Write header
-    for(size_t timepoint_count = 0; timepoint_count < static_cast<size_t>(timepoint_t::TIMEPOINT_COUNT); timepoint_count++) {
-        timepoints_file << timepoint_to_string(timepoint_t(timepoint_count));
-        if(timepoint_count < static_cast<size_t>(timepoint_t::TIMEPOINT_COUNT)-1) {
-            timepoints_file << ",";
+    for(size_t timestamp_key = 0; timestamp_key < static_cast<size_t>(timestamp_key_t::TIMESTAMP_COUNT); timestamp_key++) {
+        completed_orders_file << timestamp_key_to_string(timestamp_key_t(timestamp_key));
+        if(timestamp_key < static_cast<size_t>(timestamp_key_t::TIMESTAMP_COUNT)-1) {
+            completed_orders_file << ",";
         } else {
-            timepoints_file << "\n";
+            completed_orders_file << "\n";
         }
     }
     //Write values
-    for(size_t timepoint_count = 0; timepoint_count < static_cast<size_t>(timepoint_t::TIMEPOINT_COUNT); timepoint_count++) {
-        timepoints_file << timestamps_[timepoint_t(timepoint_count)];
-        if(timepoint_count < static_cast<size_t>(timepoint_t::TIMEPOINT_COUNT)-1) {
-            timepoints_file << ",";
-        } else {
-            timepoints_file << "\n";
-        }
+    for(auto completed_order_entry : timestamps_) {
+        completed_orders_file << completed_order_entry.first << "," << completed_order_entry.second << "\n";
     }
-    timepoints_file.close();
+    completed_orders_file.close();
 }

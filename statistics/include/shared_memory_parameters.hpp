@@ -42,23 +42,23 @@ typedef std::pair<const position_key_t, utilization_map_data>                   
 typedef boost::interprocess::allocator<shared_utilization_map_value_t, segment_manager_t>                               shared_utilization_map_allocator;
 typedef boost::interprocess::map<position_key_t, utilization_map_data, std::less<position_key_t>, shared_utilization_map_allocator>  shared_utilization_map;
 
-enum class metric_t {
+enum class statistic_key_t {
     ROBOT_POSITION,
     TIMESTAMP,
     STATE,
     METRIC_COUNT = STATE+1
 };
 
-inline std::string metric_to_string(metric_t _metric) {
+inline std::string metric_to_string(statistic_key_t _metric) {
     switch (_metric) {
-        case metric_t::ROBOT_POSITION: return "ROBOT_POSITION";
-        case metric_t::TIMESTAMP: return "TIMESTAMP";
-        case metric_t::STATE: return "STATE";
+        case statistic_key_t::ROBOT_POSITION: return "ROBOT_POSITION";
+        case statistic_key_t::TIMESTAMP: return "TIMESTAMP";
+        case statistic_key_t::STATE: return "STATE";
         default: return "Unimplemented metric";
     }
 }
 
-enum class state_t {
+enum class state_key_t {
     IDLING,
     COOKING,
     RETOOLING,

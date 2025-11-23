@@ -370,7 +370,7 @@ robot::cook_next_order() {
         }
     }
     if (order_queue_.empty()) {
-        statistics_recorder::get_instance()->record_timestamp(position_, state_t::IDLING);
+        statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::IDLING);
         preparing_dish_ = false;
         return;
     }
@@ -574,7 +574,7 @@ robot::determine_next_action() {
         robot_tool required_tool = robot_act.get_required_tool();
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
-            statistics_recorder::get_instance()->record_timestamp(position_, state_t::RETOOLING);
+            statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RETOOLING);
             steady_timer_.expires_from_now(std::chrono::milliseconds(RETOOLING_TIME * TIME_UNIT));
             steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                 if (_error) {
@@ -597,7 +597,7 @@ robot::determine_next_action() {
             /* Schedule next action */
             current_action_duration_ = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), current_action_duration_);
-            statistics_recorder::get_instance()->record_timestamp(position_, state_t::COOKING);
+            statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::COOKING);
             steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT_UPDATE_RATE * TIME_UNIT));
             steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                 if (_error) {
@@ -659,7 +659,7 @@ robot::notify_conveyor() {
         }
     }
     receive_finished_order_notification_called(output_size, output);
-    statistics_recorder::get_instance()->record_timestamp(position_, state_t::WAITING_FOR_PICKUP);
+    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::WAITING_FOR_PICKUP);
 }
 
 void
@@ -849,7 +849,7 @@ robot::handle_switch_position() {
     uint32_t cw  = (new_target_position_ - position_ + conveyor_size_) % conveyor_size_;
     uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
     uint32_t distance = std::min(cw, ccw);
-    statistics_recorder::get_instance()->record_timestamp(position_, state_t::REARRANGING);
+    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::REARRANGING);
     steady_timer_.expires_from_now(std::chrono::milliseconds(distance * MOVE_TIME * TIME_UNIT));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
@@ -1009,7 +1009,7 @@ robot::handle_reconfiguration() {
     if (already_reconfiguring_)
         return;
     already_reconfiguring_ = true;
-    statistics_recorder::get_instance()->record_timestamp(position_, state_t::RECONFIGURING);
+    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RECONFIGURING);
     steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME * TIME_UNIT));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
@@ -1228,7 +1228,7 @@ robot::start() {
         io_context_.run();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
-    statistics_recorder::get_instance()->record_timestamp(position_, state_t::IDLING);
+    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::IDLING);
     join_threads();
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }

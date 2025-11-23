@@ -15,7 +15,7 @@
 #define PlACING_RATE 5LL
 #define REDISCOVER_INTERVAL 1LL
 
-kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
+kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
                                         robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
                                     #ifdef KITCHEN_SEED
                                         mersenne_twister_(KITCHEN_SEED),
@@ -23,7 +23,8 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
                                         mersenne_twister_(random_device_()),
                                     #endif
                                         uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr),
-                                        work_guard_(boost::asio::make_work_guard(io_context_)), placing_timer_(io_context_), placing_gate_open_(true) {
+                                        work_guard_(boost::asio::make_work_guard(io_context_)), placing_timer_(io_context_), placing_gate_open_(true),
+                                        evaluate_orders_count_(_evaluate_orders_count) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -167,11 +168,6 @@ kitchen::~kitchen() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     stop();
     join_threads();
-
-    /* Destroy remote robot instances BEFORE deleting the UA server
-    to avoid remote_robot::~remote_robot() touching a freed UA_Server */
-    position_remote_robot_map_.clear(); // remote_robot dtors run here
-
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         if (controller_client_ != nullptr)
@@ -211,9 +207,31 @@ kitchen::receive_completed_order(UA_Server* _server,
     kitchen* self = static_cast<kitchen*>(_method_context);
     self->io_context_.post([self] {
         self->increment_orders_counter(COMPLETED_ORDERS);
-        // TODO: After N orders do timestamp
-        timestamp_recorder::get_instance()->record_timestamp(timepoint_t::END);
-        timestamp_recorder::get_instance()->write_timestamps();
+        /* Get completed orders count */
+        UA_StatusCode status = UA_STATUSCODE_GOOD;
+        UA_Variant value;
+        UA_Variant_init(&value);
+        if ((status = self->kitchen_type_inserter_.get_attribute(INSTANCE_NAME, COMPLETED_ORDERS, value)) != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error getting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
+            UA_Variant_clear(&value);
+            return;
+        }
+        UA_UInt32 completed_orders = 0;
+        if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_UINT32]) && value.data) {
+            completed_orders = *(UA_UInt32*) value.data;
+        } else {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unexpected attribute type for %s", __FUNCTION__, COMPLETED_ORDERS);
+            UA_Variant_clear(&value);
+            return;
+        }
+        UA_Variant_clear(&value);
+        if (self->evaluate_orders_count_ > 0) {
+            timestamp_recorder::get_instance()->record_timestamp(completed_orders);
+            if (completed_orders >= self->evaluate_orders_count_) {
+                timestamp_recorder::get_instance()->write_timestamps();
+                // TODO call contribute statistics on robots
+            }
+        }
     });
     UA_Boolean result = true;
     UA_Variant_setScalarCopy(_output, &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
@@ -248,7 +266,7 @@ kitchen::place_random_order(UA_Server* _server,
 void
 kitchen::handle_random_order_request() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    timestamp_recorder::get_instance()->record_timestamp(timepoint_t::START);
+    if (evaluate_orders_count_ > 0) timestamp_recorder::get_instance()->record_timestamp(0);
     remove_stopped_robots();
     auto do_place = [this] {
         increment_orders_counter(RECEIVED_ORDERS);
