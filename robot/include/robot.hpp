@@ -265,6 +265,13 @@ private:
     determine_next_action();
 
     /**
+     * @brief Notifies the conveyor about an retrievable order.
+     * 
+     */
+    void
+    notify_conveyor();
+
+    /**
      * @brief Resets fields for displayed action and ingredients to "None" and updates the corresponding information nodes.
      * 
      */

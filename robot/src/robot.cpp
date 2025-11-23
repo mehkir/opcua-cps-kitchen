@@ -370,11 +370,10 @@ robot::cook_next_order() {
         }
     }
     if (order_queue_.empty()) {
-        if (preparing_dish_) statistics_recorder::get_instance()->record_timestamp(position_, false);
+        statistics_recorder::get_instance()->record_timestamp(position_, state_t::IDLING);
         preparing_dish_ = false;
         return;
     }
-    if (!preparing_dish_) statistics_recorder::get_instance()->record_timestamp(position_, true);
     preparing_dish_ = true;
     order next_order = order_queue_.front();
     order_queue_.pop();
@@ -568,41 +567,7 @@ robot::determine_next_action() {
             reset_in_process_fields();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send partially finished order notification", recipe_id_in_process, overall_processed_steps);
             is_dish_finished_ = false;
-            /* Notify conveyor about finished order */
-            method_node_caller receive_finished_order_notification_caller;
-            receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
-            receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-            object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-            size_t output_size = 0;
-            UA_Variant* output = nullptr;
-            UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
-            while (status != UA_STATUSCODE_GOOD) {
-                {
-                    std::unique_lock<std::mutex> lock(client_mutex_);
-                    if (conveyor_client_ != nullptr)
-                        status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-                    if (running_.load() && status != UA_STATUSCODE_GOOD) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                        if (output != nullptr) {
-                            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                            output_size = 0;
-                            output = nullptr;
-                        }
-                        UA_Client_delete(conveyor_client_);
-                        conveyor_client_ = nullptr;
-                        conveyor_connected_condition_.wait(lock);
-                        continue;
-                    }
-                    if(!running_.load()) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                        if (output != nullptr)
-                            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                        return;
-                    }
-                    pending_pickup_.store(true);
-                }
-            }
-            receive_finished_order_notification_called(output_size, output);
+            notify_conveyor();
             return;
         }
         /* Retool if necessary */
@@ -631,6 +596,7 @@ robot::determine_next_action() {
             /* Schedule next action */
             current_action_duration_ = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), current_action_duration_);
+            statistics_recorder::get_instance()->record_timestamp(position_, state_t::COOKING);
             steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT_UPDATE_RATE * TIME_UNIT));
             steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                 if (_error) {
@@ -651,42 +617,47 @@ robot::determine_next_action() {
         UA_Variant_clear(&overall_processed_steps_var);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process, overall_processed_steps);
         is_dish_finished_ = true;
-        /* Notify conveyor about finished order */
-        method_node_caller receive_finished_order_notification_caller;
-        receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
-        receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-        object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-        size_t output_size = 0;
-        UA_Variant* output = nullptr;
-        UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
-        while (status != UA_STATUSCODE_GOOD) {
-            {
-                std::unique_lock<std::mutex> lock(client_mutex_);
-                if (conveyor_client_ != nullptr)
-                    status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-                if (running_.load() && status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    if (output != nullptr) {
-                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                        output_size = 0;
-                        output = nullptr;
-                    }
-                    UA_Client_delete(conveyor_client_);
-                    conveyor_client_ = nullptr;
-                    conveyor_connected_condition_.wait(lock);
-                    continue;
-                }
-                if(!running_.load()) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    if (output != nullptr)
-                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                    return;
-                }
-                pending_pickup_.store(true);
-            }
-        }
-        receive_finished_order_notification_called(output_size, output);
+        notify_conveyor();
     }
+}
+
+void
+robot::notify_conveyor() {
+    /* Notify conveyor about finished order */
+    method_node_caller receive_finished_order_notification_caller;
+    receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+    receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
+    object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
+    size_t output_size = 0;
+    UA_Variant* output = nullptr;
+    UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+    while (status != UA_STATUSCODE_GOOD) {
+        {
+            std::unique_lock<std::mutex> lock(client_mutex_);
+            if (conveyor_client_ != nullptr)
+                status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+            if (running_.load() && status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                if (output != nullptr) {
+                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                    output_size = 0;
+                    output = nullptr;
+                }
+                UA_Client_delete(conveyor_client_);
+                conveyor_client_ = nullptr;
+                conveyor_connected_condition_.wait(lock);
+                continue;
+            }
+            if(!running_.load()) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                if (output != nullptr)
+                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                return;
+            }
+            pending_pickup_.store(true);
+        }
+    }
+    receive_finished_order_notification_called(output_size, output);
 }
 
 void
@@ -1253,6 +1224,7 @@ robot::start() {
         io_context_.run();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
+    statistics_recorder::get_instance()->record_timestamp(position_, state_t::IDLING);
     join_threads();
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
