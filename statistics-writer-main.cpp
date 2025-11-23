@@ -3,7 +3,7 @@
 #include <memory>
 
 int main (int argc, char* argv[]) {
-    if(argc != 4) {
+    if(argc != 2) {
       std::cerr << "Usage: " + std::string(argv[0]) + " <robot_count>\n";
       std::cerr << "  Example: " + std::string(argv[0]) + " 4\n";
       return EXIT_FAILURE;
