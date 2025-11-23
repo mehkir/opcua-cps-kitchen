@@ -25,8 +25,7 @@ timestamp_recorder::~timestamp_recorder() {
 
 void timestamp_recorder::record_timestamp(timepoint_t _timepoint) {
     if(timestamps_.count(_timepoint)) {
-        std::string error_string = "There is already a timestamp for the key: " + timepoint_to_string(_timepoint);
-        throw std::runtime_error(error_string);
+        return;
     }
     timestamps_[_timepoint] = std::chrono::system_clock::now().time_since_epoch().count();
 }
