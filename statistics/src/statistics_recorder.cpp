@@ -20,9 +20,9 @@ statistics_recorder::statistics_recorder() {
 statistics_recorder::~statistics_recorder() {
 }
 
-void statistics_recorder::record_timestamp(position_key_t _position, utilized_flag_t _utilized) {
+void statistics_recorder::record_timestamp(position_key_t _position, state_t _state) {
     std::lock_guard<std::mutex> lock_guard(mutex_);
-    utilization_statistics_[_position][std::chrono::system_clock::now().time_since_epoch().count()] = _utilized;
+    utilization_statistics_[_position][std::chrono::system_clock::now().time_since_epoch().count()] = _state;
 }
 
 void statistics_recorder::contribute_statistics() {
@@ -55,7 +55,7 @@ void statistics_recorder::contribute_statistics() {
                         map_data = &utilization_map_data_var;
                     }
                     for(auto value_entry : utilization_entry.second) {
-                        map_data->utilization_map_[value_entry.first] = value_entry.second;
+                        map_data->utilization_map_[value_entry.first] = (u_int32_t)value_entry.second;
                     }
                     composite_utilization_statistics_->insert({utilization_entry.first, *map_data});
                 }

@@ -7,13 +7,13 @@ class statistics_recorder
 {
 public:
     static statistics_recorder* get_instance();
-    void record_timestamp(position_key_t _position, utilized_flag_t _utilized);
+    void record_timestamp(position_key_t _position, state_t _state);
     void contribute_statistics();
     ~statistics_recorder();
 private:
     static std::mutex mutex_;
     static statistics_recorder* instance_;
-    std::unordered_map<position_key_t, std::unordered_map<timestamp_key_t, utilized_flag_t>> utilization_statistics_;
+    std::unordered_map<position_key_t, std::unordered_map<timestamp_key_t, state_t>> utilization_statistics_;
     shared_utilization_map* composite_utilization_statistics_;
     statistics_recorder();
 };
