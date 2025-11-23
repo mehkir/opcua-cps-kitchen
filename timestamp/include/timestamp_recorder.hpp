@@ -1,5 +1,5 @@
-#ifndef TIMESTAMP_RECORDER.HPP
-#define TIMESTAMP_RECORDER.HPP
+#ifndef TIMESTAMP_RECORDER_HPP
+#define TIMESTAMP_RECORDER_HPP
 
 #include <map>
 #include <mutex>
