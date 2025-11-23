@@ -33,8 +33,10 @@ kill_kitchen() {
 # Trap SIGINT (Ctrl+C)
 trap kill_kitchen SIGINT
 
-$PROJECT_DIRECTORY/start_scripts/start_statistics_writer.bash $ROBOTS_COUNT &
-sleep 1
+if [[ -n "$EVALUATE_ORDERS_COUNT" && "$EVALUATE_ORDERS_COUNT" -gt 0 ]]; then
+    $PROJECT_DIRECTORY/start_scripts/start_statistics_writer.bash "$ROBOTS_COUNT" &
+    sleep 1
+fi
 $PROJECT_DIRECTORY/build/demos/discovery_server &
 sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_controller.bash &
