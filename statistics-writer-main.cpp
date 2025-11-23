@@ -9,7 +9,7 @@ int main (int argc, char* argv[]) {
       return EXIT_FAILURE;
     }
     std::uint32_t robot_count = std::stoi(argv[1]);
-    if (robot_count <= 0) {
+    if (robot_count < 1) {
       std::cerr << "robot_count must be greater than 0\n";
       return EXIT_FAILURE;
     }
