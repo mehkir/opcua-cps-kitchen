@@ -98,13 +98,27 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     method_arguments commit_new_position_method_arguments;
     commit_new_position_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
     status = robot_type_inserter_.add_method(ROBOT_TYPE, COMMIT_NEW_POSITION, commit_new_position, commit_new_position_method_arguments, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, COMMIT_NEW_POSITION);
+        running_.store(false);
+        return;
+    }
     /* Add reconfigure method node */
     method_arguments reconfigure_method_arguments;
     reconfigure_method_arguments.add_input_argument("the new capabilities profile", "capabilities_profile", UA_TYPES_STRING);
     reconfigure_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
     status = robot_type_inserter_.add_method(ROBOT_TYPE, RECONFIGURE, reconfigure, reconfigure_method_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, SWITCH_POSITION);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, RECONFIGURE);
+        running_.store(false);
+        return;
+    }
+    /* Add contribute statistics method node */
+    method_arguments contribute_statistics_method_arguments;
+    contribute_statistics_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
+    status = robot_type_inserter_.add_method(ROBOT_TYPE, CONTRIBUTE_STATISTICS, contribute_statistics, contribute_statistics_method_arguments, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, CONTRIBUTE_STATISTICS);
         running_.store(false);
         return;
     }
@@ -894,7 +908,11 @@ robot::commit_new_position(UA_Server *_server,
     robot* self = static_cast<robot*>(_method_context);
     UA_Variant new_commit_is_pending_var;
     UA_Variant_init(&new_commit_is_pending_var);
-    self->robot_type_inserter_.get_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, new_commit_is_pending_var);
+    if (self->robot_type_inserter_.get_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, new_commit_is_pending_var) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed getting %s attribute", __FUNCTION__, NEW_POSITION_COMMIT_IS_PENDING);
+        self->stop();
+        return UA_STATUSCODE_BAD;
+    }
     UA_Boolean new_commit_is_pending = *(UA_Boolean*) new_commit_is_pending_var.data;
     UA_Variant_clear(&new_commit_is_pending_var);
     {
@@ -1050,6 +1068,38 @@ robot::complete_reconfiguration() {
     }
     cook_next_order();
 
+}
+
+UA_StatusCode
+robot::contribute_statistics(UA_Server *_server,
+        const UA_NodeId *_session_id, void *_session_context,
+        const UA_NodeId *_method_id, void *_method_context,
+        const UA_NodeId *_object_id, void *_object_context,
+        size_t _input_size, const UA_Variant *_input,
+        size_t _output_size, UA_Variant *_output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_input_size != 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+
+    robot* self = static_cast<robot*>(_method_context);
+    self->io_context_.post([] {
+        statistics_recorder::get_instance()->contribute_statistics();
+    });
+    bool result = true;
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+        self->stop();
+        return status;
+    }
+    return UA_STATUSCODE_GOOD;
 }
 
 void
