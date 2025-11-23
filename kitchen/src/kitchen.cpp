@@ -7,6 +7,7 @@
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
 #include "time_unit.hpp"
+#include "timestamp_recorder.hpp"
 
 #define INSTANCE_NAME "CpsKitchen"
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
@@ -210,6 +211,9 @@ kitchen::receive_completed_order(UA_Server* _server,
     kitchen* self = static_cast<kitchen*>(_method_context);
     self->io_context_.post([self] {
         self->increment_orders_counter(COMPLETED_ORDERS);
+        // TODO: After N orders do timestamp
+        timestamp_recorder::get_instance()->record_timestamp(timepoint_t::END);
+        timestamp_recorder::get_instance()->write_timestamps();
     });
     UA_Boolean result = true;
     UA_Variant_setScalarCopy(_output, &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
@@ -244,6 +248,7 @@ kitchen::place_random_order(UA_Server* _server,
 void
 kitchen::handle_random_order_request() {
     // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    timestamp_recorder::get_instance()->record_timestamp(timepoint_t::START);
     remove_stopped_robots();
     auto do_place = [this] {
         increment_orders_counter(RECEIVED_ORDERS);
