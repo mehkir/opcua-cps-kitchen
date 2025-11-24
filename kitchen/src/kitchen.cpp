@@ -245,7 +245,7 @@ kitchen::receive_completed_order(UA_Server* _server,
                     continue;
                 }
                 bool result = self->contribute_statistics_called(output_size, output);
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling %s returned %s", __FUNCTION__, CONTRIBUTE_STATISTICS, result ? "true" : "false");
+                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling %s on robot at position %d returned %s", __FUNCTION__, CONTRIBUTE_STATISTICS, entry.first, result ? "true" : "false");
             }
         }
     });
