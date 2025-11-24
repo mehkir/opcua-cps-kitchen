@@ -8,7 +8,7 @@ class statistics_recorder
 public:
     static statistics_recorder* get_instance();
     void record_timestamp(position_key_t _position, state_key_t _state);
-    void contribute_statistics();
+    void contribute_statistics(position_key_t _position);
     ~statistics_recorder();
 private:
     static std::mutex mutex_;

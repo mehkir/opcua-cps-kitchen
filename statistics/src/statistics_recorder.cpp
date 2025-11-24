@@ -25,7 +25,8 @@ void statistics_recorder::record_timestamp(position_key_t _position, state_key_t
     utilization_statistics_[_position][std::chrono::system_clock::now().time_since_epoch().count()] = _state;
 }
 
-void statistics_recorder::contribute_statistics() {
+void statistics_recorder::contribute_statistics(position_key_t _position) {
+    std::cout << "[<statistics_recorder>] (" << __func__ << ") robot at position" << _position << "is contributing ..." << std::endl;
     bool waited_for_shm = false;
     for (bool shared_objects_initialized = false; !shared_objects_initialized;) {
         try {
@@ -61,6 +62,7 @@ void statistics_recorder::contribute_statistics() {
                 }
                 shared_objects_initialized = true;
             }
+            std::cout << "[<statistics_recorder>] (" << __func__ << ") robot at position" << _position << "contributed successfully" << std::endl;
             condition.notify_one();
         } catch (boost::interprocess::interprocess_exception& interprocess_exception) {
             std::cerr << __func__ << interprocess_exception.what() << std::endl;

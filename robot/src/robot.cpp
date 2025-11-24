@@ -41,7 +41,9 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     // Set a unique application URI for the robot
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(robot_uri_.c_str());
-    // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+#ifdef FILTERED_LOGGING
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+#endif
     /* Add attributes */
     robot_type_inserter_.add_attribute(ROBOT_TYPE, POSITION);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, RECIPE_ID);
@@ -1089,8 +1091,8 @@ robot::contribute_statistics(UA_Server *_server,
     }
 
     robot* self = static_cast<robot*>(_method_context);
-    self->io_context_.post([] {
-        statistics_recorder::get_instance()->contribute_statistics();
+    self->io_context_.post([self] {
+        statistics_recorder::get_instance()->contribute_statistics(self->position_);
     });
     bool result = true;
     UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);

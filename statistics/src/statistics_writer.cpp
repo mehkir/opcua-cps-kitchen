@@ -89,9 +89,9 @@ void statistics_writer::write_statistics() {
 
 bool statistics_writer::entries_are_complete() {
     size_t utilization_entry_count = composite_utilization_statistics_->size();
-    // std::cout << __func__ << " " << utilization_entry_count << std::endl;
-    // boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
-    // std::cout << __func__ << " free memory=" << segment.get_free_memory() << std::endl;
+    std::cout << __func__ << " " << utilization_entry_count << std::endl;
+    boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
+    std::cout << __func__ << " free memory=" << segment.get_free_memory() << std::endl;
     return utilization_entry_count == robot_count_;
 }
 

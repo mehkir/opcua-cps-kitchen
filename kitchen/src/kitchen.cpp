@@ -36,7 +36,9 @@ kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : serve
     // Set a unique application URI for the robot
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(kitchen_uri_.c_str());
-    // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+#ifdef FILTERED_LOGGING
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+#endif
     /* Add kitchen attributes */
     kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, ASSIGNED_ORDERS);
     kitchen_type_inserter_.add_attribute(KITCHEN_TYPE, DROPPED_ORDERS);

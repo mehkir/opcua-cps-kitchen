@@ -27,6 +27,7 @@ if (USE_CUSTOM_VERSION)
     link_directories("${OPEN62541_DIR}/lib")
 endif()
 
+add_compile_definitions(FILTERED_LOGGING)
 # add_compile_definitions(ROBOT_SEED=12345 KITCHEN_SEED=12345)
 
 add_subdirectory(timestamp)
