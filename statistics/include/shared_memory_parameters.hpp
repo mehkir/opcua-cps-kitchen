@@ -2,7 +2,7 @@
 #define SHARED_MEMORY_PARAMETERS_HPP
 
 #define SEGMENT_NAME                    "statistics_shared_memory"
-#define TIME_STATISTICS_MAP_NAME        "time_statistics_shared_map"
+#define UTILIZATION_MAP_NAME            "utilization_shared_map"
 #define STATISTICS_MUTEX                "statistics_mutex"
 #define STATISTICS_CONDITION            "statistics_condition"
 #define SEGMENT_SIZE_BYTES              1048576
@@ -21,41 +21,51 @@
 #include <utility>
 
 //Typedefs of allocators and containers
-typedef boost::interprocess::managed_shared_memory::segment_manager                                               segment_manager_t;
-typedef boost::interprocess::allocator<void, segment_manager_t>                                                   void_allocator;
-typedef std::uint32_t                                                                                             metric_key_t;
-typedef std::uint64_t                                                                                             metric_value_t;
-typedef std::pair<const metric_key_t, metric_value_t>                                                             metrics_map_value_t;
-typedef boost::interprocess::allocator<metrics_map_value_t, segment_manager_t>                                    metrics_map_allocator;
-typedef boost::interprocess::map<metric_key_t, metric_value_t, std::less<metric_key_t>, metrics_map_allocator>    metrics_map;
+typedef boost::interprocess::managed_shared_memory::segment_manager             segment_manager_t;
+typedef std::uint64_t                                                           timestamp_key_t;
+typedef std::uint32_t                                                           state_value_t;
+typedef std::pair<const timestamp_key_t, state_value_t>                         utilization_map_t;
+typedef boost::interprocess::allocator<utilization_map_t, segment_manager_t>    utilization_map_allocator;
+typedef boost::interprocess::map<timestamp_key_t, state_value_t, std::less<timestamp_key_t>, utilization_map_allocator>  utilization_map;
 
-class metrics_map_data {
+class utilization_map_data {
    public:
-      metrics_map metrics_map_;
-      metrics_map_data(const void_allocator& void_allocator_instance)
-         : metrics_map_(void_allocator_instance)
+      utilization_map utilization_map_;
+      utilization_map_data(segment_manager_t* _segment_manager)
+         : utilization_map_(std::less<timestamp_key_t>(), utilization_map_allocator(_segment_manager))
       {}
 };
 
 //Definition of the <host,metrics> map holding an uint32_t as key and metrics_map_data as mapped type
-typedef std::uint32_t                                                                                                   host_key_t;
-typedef std::pair<const host_key_t, metrics_map_data>                                                                   shared_statistics_map_value_t;
-typedef boost::interprocess::allocator<shared_statistics_map_value_t, segment_manager_t>                                shared_statistics_map_allocator;
-typedef boost::interprocess::map<host_key_t, metrics_map_data, std::less<host_key_t>, shared_statistics_map_allocator>  shared_statistics_map;
+typedef std::uint32_t                                                                                                   position_key_t;
+typedef std::pair<const position_key_t, utilization_map_data>                                                           shared_utilization_map_value_t;
+typedef boost::interprocess::allocator<shared_utilization_map_value_t, segment_manager_t>                               shared_utilization_map_allocator;
+typedef boost::interprocess::map<position_key_t, utilization_map_data, std::less<position_key_t>, shared_utilization_map_allocator>  shared_utilization_map;
 
-enum class time_metric {
-    JOB_START,
-    JOB_END,
-    TIME_METRIC_COUNT = JOB_END+1
+enum class statistic_key_t {
+    ROBOT_POSITION,
+    TIMESTAMP,
+    STATE,
+    METRIC_COUNT = STATE+1
 };
 
-inline std::string time_metric_to_string(time_metric _time_metric) {
-    switch (_time_metric) {
-        case time_metric::JOB_START: return "JOB_START";
-        case time_metric::JOB_END: return "JOB_END";
-        default: std::runtime_error("Unimplemented timepoint");
+inline std::string metric_to_string(statistic_key_t _metric) {
+    switch (_metric) {
+        case statistic_key_t::ROBOT_POSITION: return "ROBOT_POSITION";
+        case statistic_key_t::TIMESTAMP: return "TIMESTAMP";
+        case statistic_key_t::STATE: return "STATE";
+        default: return "Unimplemented metric";
     }
-    return "Unimplemented timepoint";
 }
+
+enum class state_key_t {
+    IDLING,
+    COOKING,
+    RETOOLING,
+    WAITING_FOR_PICKUP,
+    REARRANGING,
+    RECONFIGURING,
+    STATE_COUNT = RECONFIGURING+1
+};
 
 #endif // SHARED_MEMORY_PARAMETERS_HPP

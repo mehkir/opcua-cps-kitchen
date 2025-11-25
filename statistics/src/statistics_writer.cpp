@@ -4,40 +4,39 @@
 #include <sstream>
 #include <iostream>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <limits.h>
+#include <filesystem>
 
 std::mutex statistics_writer::mutex_;
 statistics_writer* statistics_writer::instance_;
-size_t statistics_writer::host_count_;
-std::string statistics_writer::absolute_results_directory_path_;
-std::string statistics_writer::result_filename_;
+size_t statistics_writer::robot_count_;
 
-statistics_writer* statistics_writer::get_instance(size_t _host_count, std::string _absolute_results_directory_path, std::string _result_filename) {
+statistics_writer* statistics_writer::get_instance(size_t _robot_count) {
     std::lock_guard<std::mutex> lock_guard(mutex_);
     if(instance_ == nullptr) {
         instance_ = new statistics_writer();
-        host_count_ = _host_count;
-        absolute_results_directory_path_ = _absolute_results_directory_path;
-        result_filename_ = _result_filename;
+        robot_count_ = _robot_count;
     }
     return instance_;
 }
 
 statistics_writer::statistics_writer() {
     boost::interprocess::managed_shared_memory segment(boost::interprocess::create_only, SEGMENT_NAME, SEGMENT_SIZE_BYTES);
-    void_allocator void_allocator_instance(segment.get_segment_manager());
-    composite_time_statistics_ = segment.construct<shared_statistics_map>(TIME_STATISTICS_MAP_NAME)(std::less<host_key_t>(), void_allocator_instance);
+    shared_utilization_map_allocator sum_allocator(segment.get_segment_manager());
+    composite_utilization_statistics_ = segment.construct<shared_utilization_map>(UTILIZATION_MAP_NAME)(std::less<position_key_t>(), sum_allocator);
     boost::interprocess::named_condition condition(boost::interprocess::create_only, STATISTICS_CONDITION);
     boost::interprocess::named_mutex mutex(boost::interprocess::create_only, STATISTICS_MUTEX);
 }
 
 statistics_writer::~statistics_writer() {
     boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
-    segment.destroy<shared_statistics_map>(TIME_STATISTICS_MAP_NAME);
+    segment.destroy<shared_utilization_map>(UTILIZATION_MAP_NAME);
 }
 
 void statistics_writer::write_statistics() {
     boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
-    composite_time_statistics_ = segment.find<shared_statistics_map>(TIME_STATISTICS_MAP_NAME).first;
+    composite_utilization_statistics_ = segment.find<shared_utilization_map>(UTILIZATION_MAP_NAME).first;
     boost::interprocess::named_condition condition(boost::interprocess::open_only, STATISTICS_CONDITION);
     boost::interprocess::named_mutex mutex(boost::interprocess::open_only, STATISTICS_MUTEX);
     boost::interprocess::scoped_lock<boost::interprocess::named_mutex> lock(mutex);
@@ -45,91 +44,75 @@ void statistics_writer::write_statistics() {
         condition.notify_one();
         condition.wait(lock);
     }
+    /* Get statistic results directory */
+    char directory_buffer[PATH_MAX + 1];  // +1 for the null terminator
+    ssize_t len = readlink("/proc/self/exe", directory_buffer, sizeof(directory_buffer) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return;
+    }
+    directory_buffer[len] = '\0';  // null terminate
+    std::filesystem::path exe_path(directory_buffer);
+    std::filesystem::path build_dir = exe_path.parent_path();
+    std::filesystem::path statistics_dir = build_dir.parent_path() / "statistic_results";
+    /* Find free filename */
     std::ofstream statistics_file;
     int filecount = 0;
-    std::stringstream absolute_result_file_path;
-    absolute_result_file_path << absolute_results_directory_path_ << result_filename_ << "-#" << filecount << ".csv";
-    struct stat buffer;
-    //Choose unused/non-existing absolute_result_file_path
-    for(filecount = 1; (stat(absolute_result_file_path.str().c_str(), &buffer) == 0); filecount++) {
-        absolute_result_file_path.str("");
-        absolute_result_file_path << absolute_results_directory_path_ << result_filename_ << "-#" << filecount << ".csv";
+    std::stringstream filename;
+    filename << "robot-statistics-#" << filecount << ".csv";
+    std::filesystem::path statistics_path = statistics_dir / filename.str();
+    struct stat filename_buffer;
+    for(filecount = 1; (stat(statistics_path.c_str(), &filename_buffer) == 0); filecount++) {
+        filename.str("");
+        filename << "robot-statistics-#" << filecount << ".csv";
+        statistics_path = statistics_dir / filename.str();
     }
-    statistics_file.open(absolute_result_file_path.str());
+    statistics_file.open(statistics_path);
     //Write header
-    statistics_file << "HOST,";
-    for(metric_key_t metric_key = 0; metric_key < static_cast<metric_key_t>(time_metric::TIME_METRIC_COUNT); metric_key++) {
-        statistics_file << time_metric_to_string(time_metric(metric_key));
-        if(metric_key < static_cast<metric_key_t>(time_metric::TIME_METRIC_COUNT)-1) {
+    for(size_t statistics_key = static_cast<size_t>(statistic_key_t::ROBOT_POSITION); statistics_key < static_cast<size_t>(statistic_key_t::METRIC_COUNT); statistics_key++) {
+        statistics_file << metric_to_string(statistic_key_t(statistics_key));
+        if(statistics_key < static_cast<size_t>(statistic_key_t::METRIC_COUNT)-1) {
             statistics_file << ",";
         } else {
             statistics_file << "\n";
         }
     }
     //Write values (keep metric order like above so that header and values comply)
-    for(auto host_entry = composite_time_statistics_->begin(); host_entry != composite_time_statistics_->end(); host_entry++) {
-        statistics_file << host_entry->first << ",";
-        auto metrics_map = host_entry->second.metrics_map_;
-        for(metric_key_t metric_key = 0; metric_key < static_cast<metric_key_t>(time_metric::TIME_METRIC_COUNT); metric_key++) {
-            if(metrics_map.count(metric_key)) {
-                statistics_file << metrics_map[metric_key];
-            } else {
-                statistics_file << 0;
-            }
-            if(metric_key < static_cast<metric_key_t>(time_metric::TIME_METRIC_COUNT)-1) {
-                statistics_file << ",";
-            } else {
-                statistics_file << "\n";
-            }
+    for(auto utilization_entry = composite_utilization_statistics_->begin(); utilization_entry != composite_utilization_statistics_->end(); utilization_entry++) {
+        auto utilization_map = utilization_entry->second.utilization_map_;
+        for(auto utilization_value = utilization_map.begin(); utilization_value != utilization_map.end(); utilization_value++) {
+            statistics_file << utilization_entry->first << "," << utilization_value->first << "," << utilization_value->second << "\n";
         }
     }
     statistics_file.close();
 }
 
 bool statistics_writer::entries_are_complete() {
-    bool entries_are_complete = false;
-    size_t host_entry_count = composite_time_statistics_->size();
-    // std::cout << __func__ << " " << host_entry_count << std::endl;
-    // boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
-    // std::cout << __func__ << " free memory=" << segment.get_free_memory() << std::endl;
-    for(auto host_entry = composite_time_statistics_->begin(); (host_entry_count == host_count_) && (host_entry != composite_time_statistics_->end()); host_entry++) {
-        auto metrics_map = host_entry->second.metrics_map_;
-        entries_are_complete = metrics_map.count(static_cast<metric_key_t>(time_metric::JOB_START)) && metrics_map.count(static_cast<metric_key_t>(time_metric::JOB_END));
-        if(!entries_are_complete)
-            break;
-    }
-    return entries_are_complete;
+    size_t utilization_entry_count = composite_utilization_statistics_->size();
+    std::cout << __func__ << " " << utilization_entry_count << std::endl;
+    boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
+    std::cout << __func__ << " free memory=" << segment.get_free_memory() << std::endl;
+    return utilization_entry_count == robot_count_;
 }
 
 void statistics_writer::print_statistics() {
     std::cout << __func__ << std::endl;
     std::stringstream sstream;
-    sstream << "HOST,";
-    for(metric_key_t metric_key = 0; metric_key < static_cast<metric_key_t>(time_metric::TIME_METRIC_COUNT); metric_key++) {
-        sstream << time_metric_to_string(time_metric(metric_key));
-        if(metric_key < static_cast<metric_key_t>(time_metric::TIME_METRIC_COUNT)-1) {
+    // Write header
+    for(size_t statistics_key = static_cast<size_t>(statistic_key_t::ROBOT_POSITION); statistics_key < static_cast<size_t>(statistic_key_t::METRIC_COUNT); statistics_key++) {
+        sstream << metric_to_string(statistic_key_t(statistics_key));
+        if(statistics_key < static_cast<size_t>(statistic_key_t::METRIC_COUNT)-1) {
             sstream << ",";
         } else {
             sstream << "\n";
         }
     }
-
-    for(auto host_entry = composite_time_statistics_->begin(); host_entry != composite_time_statistics_->end(); host_entry++) {
-        sstream << host_entry->first << ",";
-        auto metrics_map = host_entry->second.metrics_map_;
-        for(metric_key_t metric_key = 0; metric_key < static_cast<metric_key_t>(time_metric::TIME_METRIC_COUNT); metric_key++) {
-            if(metrics_map.count(metric_key)) {
-                sstream << metrics_map[metric_key];
-            } else {
-                sstream << 0;
-            }
-            if(metric_key < static_cast<metric_key_t>(time_metric::TIME_METRIC_COUNT)-1) {
-                sstream << ",";
-            } else {
-                sstream << "\n";
-            }
+    // Write values
+    for(auto utilization_entry = composite_utilization_statistics_->begin(); utilization_entry != composite_utilization_statistics_->end(); utilization_entry++) {
+        auto utilization_map = utilization_entry->second.utilization_map_;
+        for(auto utilization_value = utilization_map.begin(); utilization_value != utilization_map.end(); utilization_value++) {
+            sstream << utilization_entry->first << "," << utilization_value->first << "," << utilization_value->second << "\n";
         }
     }
-
     std::cout << sstream.str() << std::endl;
 }

@@ -265,6 +265,13 @@ private:
     determine_next_action();
 
     /**
+     * @brief Notifies the conveyor about an retrievable order.
+     * 
+     */
+    void
+    notify_conveyor();
+
+    /**
      * @brief Resets fields for displayed action and ingredients to "None" and updates the corresponding information nodes.
      * 
      */
@@ -408,6 +415,30 @@ private:
      */
     void
     complete_reconfiguration();
+
+    /**
+     * @brief Contributes the recorded statistics.
+     * 
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
+     */
+    static UA_StatusCode
+    contribute_statistics(UA_Server *_server,
+            const UA_NodeId *_session_id, void *_session_context,
+            const UA_NodeId *_method_id, void *_method_context,
+            const UA_NodeId *_object_id, void *_object_context,
+            size_t _input_size, const UA_Variant *_input,
+            size_t _output_size, UA_Variant *_output);
 
     /**
      * @brief Joins all started threads.

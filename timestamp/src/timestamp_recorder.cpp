@@ -5,6 +5,9 @@
 #include <sys/stat.h>
 #include <vector>
 #include <stdexcept>
+#include <unistd.h>
+#include <limits.h>
+#include <filesystem>
 
 std::mutex timestamp_recorder::mutex_;
 timestamp_recorder* timestamp_recorder::instance_;
@@ -23,50 +26,50 @@ timestamp_recorder::timestamp_recorder() {
 timestamp_recorder::~timestamp_recorder() {
 }
 
-void timestamp_recorder::record_timestamp(timepoint _timepoint) {
-    if(timestamps_.count(_timepoint)) {
-        std::string error_string = "There is already a timestamp for the key: " + timepoint_to_string(_timepoint);
-        throw std::runtime_error(error_string);
+void timestamp_recorder::record_timestamp(uint32_t _completed_order_count) {
+    if(timestamps_.count(_completed_order_count)) {
+        return;
     }
-    timestamps_[_timepoint] = std::chrono::system_clock::now();
+    timestamps_[_completed_order_count] = std::chrono::system_clock::now().time_since_epoch().count();
 }
 
 void timestamp_recorder::write_timestamps() {
-    std::ofstream timepoints_file;
+    /* Get timestamp results directory */
+    char directory_buffer[PATH_MAX + 1];  // +1 for the null terminator
+    ssize_t len = readlink("/proc/self/exe", directory_buffer, sizeof(directory_buffer) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return;
+    }
+    directory_buffer[len] = '\0';  // null terminate
+    std::filesystem::path exe_path(directory_buffer);
+    std::filesystem::path build_dir = exe_path.parent_path();
+    std::filesystem::path timestamp_dir = build_dir.parent_path() / "timestamp_results";
+    /* Find free filename */
+    std::ofstream completed_orders_file;
     int filecount = 0;
     std::stringstream filename;
-    filename << "timestamp_results/timepoints-#" << filecount << ".csv";
-    struct stat buffer;
-    for(filecount = 1; (stat(filename.str().c_str(), &buffer) == 0); filecount++) {
+    filename << "completed-orders-#" << filecount << ".csv";
+    std::filesystem::path timestamp_path = timestamp_dir / filename.str();
+    struct stat filename_buffer;
+    for(filecount = 1; (stat(timestamp_path.c_str(), &filename_buffer) == 0); filecount++) {
         filename.str("");
-        filename << "timestamp_results/timepoints-#" << filecount << ".csv";
+        filename << "completed-orders-#" << filecount << ".csv";
+        timestamp_path = timestamp_dir / filename.str();
     }
-    timepoints_file.open(filename.str());
+    completed_orders_file.open(timestamp_path);
     //Write header
-    for(size_t timepoint_count = 0; timepoint_count < static_cast<size_t>(timepoint::TIMEPOINT_COUNT); timepoint_count++) {
-        timepoints_file << timepoint_to_string(timepoint(timepoint_count));
-        if(timepoint_count < static_cast<size_t>(timepoint::TIMEPOINT_COUNT)-1) {
-            timepoints_file << ",";
+    for(size_t timestamp_key = 0; timestamp_key < static_cast<size_t>(timestamp_key_t::TIMESTAMP_COUNT); timestamp_key++) {
+        completed_orders_file << timestamp_key_to_string(timestamp_key_t(timestamp_key));
+        if(timestamp_key < static_cast<size_t>(timestamp_key_t::TIMESTAMP_COUNT)-1) {
+            completed_orders_file << ",";
         } else {
-            timepoints_file << "\n";
+            completed_orders_file << "\n";
         }
     }
     //Write values
-    for(size_t timepoint_count = 0; timepoint_count < static_cast<size_t>(timepoint::TIMEPOINT_COUNT); timepoint_count++) {
-        timepoints_file << timestamps_[timepoint(timepoint_count)].time_since_epoch().count();
-        if(timepoint_count < static_cast<size_t>(timepoint::TIMEPOINT_COUNT)-1) {
-            timepoints_file << ",";
-        } else {
-            timepoints_file << "\n";
-        }
+    for(auto completed_order_entry : timestamps_) {
+        completed_orders_file << completed_order_entry.first << "," << completed_order_entry.second << "\n";
     }
-    timepoints_file.close();
-}
-
-std::string timestamp_recorder::timepoint_to_string(timepoint _timepoint) {
-    switch (_timepoint) {
-    case timepoint::JOB_START: return "JOB_START";
-    case timepoint::JOB_END: return "JOB_END";
-    default: std::runtime_error("Unimplemented timepoint");
-    }
+    completed_orders_file.close();
 }

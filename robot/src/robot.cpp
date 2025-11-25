@@ -12,6 +12,7 @@
 #include "filtered_logger.hpp"
 #include "browsenames.h"
 #include "discovery_and_connection.hpp"
+#include "statistics_recorder.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
 #define TIME_UNIT_UPDATE_RATE 1LL
@@ -21,7 +22,13 @@
 robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_rearranging_(false), already_reconfiguring_(false),
         is_dish_finished_(false), running_(true), current_action_duration_(0), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
-        conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_state_(robot_state::AVAILABLE), new_target_position_(0), new_capabilities_profile_(""), mersenne_twister_(random_device_()), uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1) {
+        conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_state_(robot_state::AVAILABLE), new_target_position_(0), new_capabilities_profile_(""),
+    #ifdef ROBOT_SEED
+        mersenne_twister_(ROBOT_SEED),
+    #else
+        mersenne_twister_(random_device_()),
+    #endif
+        uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -34,7 +41,9 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     // Set a unique application URI for the robot
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(robot_uri_.c_str());
-    // *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+#ifdef FILTERED_LOGGING
+    *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+#endif
     /* Add attributes */
     robot_type_inserter_.add_attribute(ROBOT_TYPE, POSITION);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, RECIPE_ID);
@@ -91,13 +100,27 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     method_arguments commit_new_position_method_arguments;
     commit_new_position_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
     status = robot_type_inserter_.add_method(ROBOT_TYPE, COMMIT_NEW_POSITION, commit_new_position, commit_new_position_method_arguments, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, COMMIT_NEW_POSITION);
+        running_.store(false);
+        return;
+    }
     /* Add reconfigure method node */
     method_arguments reconfigure_method_arguments;
     reconfigure_method_arguments.add_input_argument("the new capabilities profile", "capabilities_profile", UA_TYPES_STRING);
     reconfigure_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
     status = robot_type_inserter_.add_method(ROBOT_TYPE, RECONFIGURE, reconfigure, reconfigure_method_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, SWITCH_POSITION);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, RECONFIGURE);
+        running_.store(false);
+        return;
+    }
+    /* Add contribute statistics method node */
+    method_arguments contribute_statistics_method_arguments;
+    contribute_statistics_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
+    status = robot_type_inserter_.add_method(ROBOT_TYPE, CONTRIBUTE_STATISTICS, contribute_statistics, contribute_statistics_method_arguments, this);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, CONTRIBUTE_STATISTICS);
         running_.store(false);
         return;
     }
@@ -363,6 +386,7 @@ robot::cook_next_order() {
         }
     }
     if (order_queue_.empty()) {
+        statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::IDLING);
         preparing_dish_ = false;
         return;
     }
@@ -559,47 +583,14 @@ robot::determine_next_action() {
             reset_in_process_fields();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send partially finished order notification", recipe_id_in_process, overall_processed_steps);
             is_dish_finished_ = false;
-            /* Notify conveyor about finished order */
-            method_node_caller receive_finished_order_notification_caller;
-            receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
-            receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-            object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-            size_t output_size = 0;
-            UA_Variant* output = nullptr;
-            UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
-            while (status != UA_STATUSCODE_GOOD) {
-                {
-                    std::unique_lock<std::mutex> lock(client_mutex_);
-                    if (conveyor_client_ != nullptr)
-                        status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-                    if (running_.load() && status != UA_STATUSCODE_GOOD) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                        if (output != nullptr) {
-                            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                            output_size = 0;
-                            output = nullptr;
-                        }
-                        UA_Client_delete(conveyor_client_);
-                        conveyor_client_ = nullptr;
-                        conveyor_connected_condition_.wait(lock);
-                        continue;
-                    }
-                    if(!running_.load()) {
-                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                        if (output != nullptr)
-                            UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                        return;
-                    }
-                    pending_pickup_.store(true);
-                }
-            }
-            receive_finished_order_notification_called(output_size, output);
+            notify_conveyor();
             return;
         }
         /* Retool if necessary */
         robot_tool required_tool = robot_act.get_required_tool();
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
+            statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RETOOLING);
             steady_timer_.expires_from_now(std::chrono::milliseconds(RETOOLING_TIME * TIME_UNIT));
             steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                 if (_error) {
@@ -622,6 +613,7 @@ robot::determine_next_action() {
             /* Schedule next action */
             current_action_duration_ = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), current_action_duration_);
+            statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::COOKING);
             steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT_UPDATE_RATE * TIME_UNIT));
             steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                 if (_error) {
@@ -642,42 +634,48 @@ robot::determine_next_action() {
         UA_Variant_clear(&overall_processed_steps_var);
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Recipe_id=%d finished with %d processed steps, send finished order notification", recipe_id_in_process, overall_processed_steps);
         is_dish_finished_ = true;
-        /* Notify conveyor about finished order */
-        method_node_caller receive_finished_order_notification_caller;
-        receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
-        receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-        object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
-        size_t output_size = 0;
-        UA_Variant* output = nullptr;
-        UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
-        while (status != UA_STATUSCODE_GOOD) {
-            {
-                std::unique_lock<std::mutex> lock(client_mutex_);
-                if (conveyor_client_ != nullptr)
-                    status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
-                if (running_.load() && status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    if (output != nullptr) {
-                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                        output_size = 0;
-                        output = nullptr;
-                    }
-                    UA_Client_delete(conveyor_client_);
-                    conveyor_client_ = nullptr;
-                    conveyor_connected_condition_.wait(lock);
-                    continue;
-                }
-                if(!running_.load()) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    if (output != nullptr)
-                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                    return;
-                }
-                pending_pickup_.store(true);
-            }
-        }
-        receive_finished_order_notification_called(output_size, output);
+        notify_conveyor();
     }
+}
+
+void
+robot::notify_conveyor() {
+    /* Notify conveyor about finished order */
+    method_node_caller receive_finished_order_notification_caller;
+    receive_finished_order_notification_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+    receive_finished_order_notification_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
+    object_method_info omi = method_id_map_[FINISHED_ORDER_NOTIFICATION];
+    size_t output_size = 0;
+    UA_Variant* output = nullptr;
+    UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+    while (status != UA_STATUSCODE_GOOD) {
+        {
+            std::unique_lock<std::mutex> lock(client_mutex_);
+            if (conveyor_client_ != nullptr)
+                status = receive_finished_order_notification_caller.call_method_node(conveyor_client_, omi.object_id_, omi.method_id_, &output_size, &output);
+            if (running_.load() && status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error sending finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                if (output != nullptr) {
+                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                    output_size = 0;
+                    output = nullptr;
+                }
+                UA_Client_delete(conveyor_client_);
+                conveyor_client_ = nullptr;
+                conveyor_connected_condition_.wait(lock);
+                continue;
+            }
+            if(!running_.load()) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to send finished order notification (%s)", __FUNCTION__, UA_StatusCode_name(status));
+                if (output != nullptr)
+                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                return;
+            }
+            pending_pickup_.store(true);
+        }
+    }
+    receive_finished_order_notification_called(output_size, output);
+    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::WAITING_FOR_PICKUP);
 }
 
 void
@@ -867,6 +865,7 @@ robot::handle_switch_position() {
     uint32_t cw  = (new_target_position_ - position_ + conveyor_size_) % conveyor_size_;
     uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
     uint32_t distance = std::min(cw, ccw);
+    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::REARRANGING);
     steady_timer_.expires_from_now(std::chrono::milliseconds(distance * MOVE_TIME * TIME_UNIT));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
@@ -911,7 +910,11 @@ robot::commit_new_position(UA_Server *_server,
     robot* self = static_cast<robot*>(_method_context);
     UA_Variant new_commit_is_pending_var;
     UA_Variant_init(&new_commit_is_pending_var);
-    self->robot_type_inserter_.get_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, new_commit_is_pending_var);
+    if (self->robot_type_inserter_.get_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, new_commit_is_pending_var) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed getting %s attribute", __FUNCTION__, NEW_POSITION_COMMIT_IS_PENDING);
+        self->stop();
+        return UA_STATUSCODE_BAD;
+    }
     UA_Boolean new_commit_is_pending = *(UA_Boolean*) new_commit_is_pending_var.data;
     UA_Variant_clear(&new_commit_is_pending_var);
     {
@@ -1026,6 +1029,7 @@ robot::handle_reconfiguration() {
     if (already_reconfiguring_)
         return;
     already_reconfiguring_ = true;
+    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RECONFIGURING);
     steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME * TIME_UNIT));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
@@ -1066,6 +1070,38 @@ robot::complete_reconfiguration() {
     }
     cook_next_order();
 
+}
+
+UA_StatusCode
+robot::contribute_statistics(UA_Server *_server,
+        const UA_NodeId *_session_id, void *_session_context,
+        const UA_NodeId *_method_id, void *_method_context,
+        const UA_NodeId *_object_id, void *_object_context,
+        size_t _input_size, const UA_Variant *_input,
+        size_t _output_size, UA_Variant *_output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_input_size != 0) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+
+    if(_method_context == NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
+        return UA_STATUSCODE_BAD;
+    }
+
+    robot* self = static_cast<robot*>(_method_context);
+    self->io_context_.post([self] {
+        statistics_recorder::get_instance()->contribute_statistics(self->position_);
+    });
+    bool result = true;
+    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
+    if(status != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
+        self->stop();
+        return status;
+    }
+    return UA_STATUSCODE_GOOD;
 }
 
 void
@@ -1244,6 +1280,7 @@ robot::start() {
         io_context_.run();
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
+    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::IDLING);
     join_threads();
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }

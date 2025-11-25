@@ -7,15 +7,14 @@ class statistics_recorder
 {
 public:
     static statistics_recorder* get_instance();
-    void record_timestamp(uint32_t _host_ip, time_metric _time_metric);
-    void record_custom_timestamp(uint32_t _host_ip, time_metric _time_metric, uint64_t _timestamp);
-    void contribute_statistics();
+    void record_timestamp(position_key_t _position, state_key_t _state);
+    void contribute_statistics(position_key_t _position);
     ~statistics_recorder();
 private:
     static std::mutex mutex_;
     static statistics_recorder* instance_;
-    std::unordered_map<host_key_t, std::unordered_map<metric_key_t, metric_value_t>> time_statistics_;
-    shared_statistics_map* composite_time_statistics_;
+    std::unordered_map<position_key_t, std::unordered_map<timestamp_key_t, state_key_t>> utilization_statistics_;
+    shared_utilization_map* composite_utilization_statistics_;
     statistics_recorder();
 };
 

@@ -20,35 +20,25 @@ statistics_recorder::statistics_recorder() {
 statistics_recorder::~statistics_recorder() {
 }
 
-void statistics_recorder::record_custom_timestamp(uint32_t _host_ip, time_metric _time_metric, uint64_t _timestamp) {
+void statistics_recorder::record_timestamp(position_key_t _position, state_key_t _state) {
     std::lock_guard<std::mutex> lock_guard(mutex_);
-    if(!time_statistics_.count(_host_ip) || !time_statistics_[_host_ip].count(static_cast<metric_key_t>(_time_metric))) {
-        time_statistics_[_host_ip][static_cast<metric_key_t>(_time_metric)] = _timestamp;
-    }
+    utilization_statistics_[_position][std::chrono::system_clock::now().time_since_epoch().count()] = _state;
 }
 
-void statistics_recorder::record_timestamp(uint32_t _host_ip, time_metric _time_metric) {
-    std::lock_guard<std::mutex> lock_guard(mutex_);
-    if(!time_statistics_.count(_host_ip) || !time_statistics_[_host_ip].count(static_cast<metric_key_t>(_time_metric))) {
-        time_statistics_[_host_ip][static_cast<metric_key_t>(_time_metric)] = std::chrono::system_clock::now().time_since_epoch().count();
-    }
-}
-
-void statistics_recorder::contribute_statistics() {
+void statistics_recorder::contribute_statistics(position_key_t _position) {
+    std::cout << "[<statistics_recorder>] (" << __func__ << ") robot at position" << _position << " is contributing ..." << std::endl;
     bool waited_for_shm = false;
     for (bool shared_objects_initialized = false; !shared_objects_initialized;) {
         try {
             boost::interprocess::named_condition condition(boost::interprocess::open_only, STATISTICS_CONDITION);
             boost::interprocess::named_mutex mutex(boost::interprocess::open_only, STATISTICS_MUTEX);
-            boost::interprocess::managed_shared_memory segment(boost::interprocess::open_only, SEGMENT_NAME);
-            void_allocator void_allocator_instance(segment.get_segment_manager());
-
+            boost::interprocess::managed_shared_memory msm(boost::interprocess::open_only, SEGMENT_NAME);
             {
                 boost::interprocess::scoped_lock<boost::interprocess::named_mutex> lock(mutex);
-                while (!(composite_time_statistics_ = segment.find<shared_statistics_map>(TIME_STATISTICS_MAP_NAME).first)) {
+                while (!(composite_utilization_statistics_ = msm.find<shared_utilization_map>(UTILIZATION_MAP_NAME).first)) {
                     waited_for_shm = true;
                     condition.wait(lock);
-                    std::cout << "[<statistics_recorder>] (" << __func__ << ") shared maps not intialized yet" << std::endl;
+                    std::cout << "[<statistics_recorder>] (" << __func__ << ") shared map not intialized yet" << std::endl;
                 }
             }
             if(waited_for_shm) {
@@ -57,21 +47,22 @@ void statistics_recorder::contribute_statistics() {
             
             {
                 boost::interprocess::scoped_lock<boost::interprocess::named_mutex> lock(mutex);
-                for(auto host_entry : time_statistics_) {
-                    metrics_map_data* mapped_metrics_map;
-                    if(composite_time_statistics_->count(host_entry.first)) {
-                        mapped_metrics_map = &composite_time_statistics_->at(host_entry.first);
+                for(auto utilization_entry : utilization_statistics_) {
+                    utilization_map_data* map_data;
+                    if(composite_utilization_statistics_->count(utilization_entry.first)) {
+                        map_data = &composite_utilization_statistics_->at(utilization_entry.first);
                     } else {
-                        metrics_map_data metrics_map_data_var = metrics_map_data(void_allocator_instance);
-                        mapped_metrics_map = &metrics_map_data_var;
+                        utilization_map_data utilization_map_data_var = utilization_map_data(msm.get_segment_manager());
+                        map_data = &utilization_map_data_var;
                     }
-                    for(auto metrics_entry : host_entry.second) {
-                        mapped_metrics_map->metrics_map_.insert({metrics_entry.first, metrics_entry.second});
+                    for(auto value_entry : utilization_entry.second) {
+                        map_data->utilization_map_[value_entry.first] = (u_int32_t)value_entry.second;
                     }
-                    composite_time_statistics_->insert({host_entry.first, *mapped_metrics_map});
+                    composite_utilization_statistics_->insert({utilization_entry.first, *map_data});
                 }
                 shared_objects_initialized = true;
             }
+            std::cout << "[<statistics_recorder>] (" << __func__ << ") robot at position" << _position << "contributed successfully" << std::endl;
             condition.notify_one();
         } catch (boost::interprocess::interprocess_exception& interprocess_exception) {
             std::cerr << __func__ << interprocess_exception.what() << std::endl;
