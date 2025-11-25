@@ -5,7 +5,7 @@
 #define UTILIZATION_MAP_NAME            "utilization_shared_map"
 #define STATISTICS_MUTEX                "statistics_mutex"
 #define STATISTICS_CONDITION            "statistics_condition"
-#define SEGMENT_SIZE_BYTES              (1024u * 1024u * 4u)
+#define SEGMENT_SIZE_BYTES              (1024u * 1024u * 100u)
 
 #include <mutex>
 #include <chrono>
