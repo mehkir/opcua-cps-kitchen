@@ -26,7 +26,7 @@ void statistics_recorder::record_timestamp(position_key_t _position, state_key_t
 }
 
 void statistics_recorder::contribute_statistics(position_key_t _position) {
-    std::cout << "[<statistics_recorder>] (" << __func__ << ") robot at position" << _position << "is contributing ..." << std::endl;
+    std::cout << "[<statistics_recorder>] (" << __func__ << ") robot at position" << _position << " is contributing ..." << std::endl;
     bool waited_for_shm = false;
     for (bool shared_objects_initialized = false; !shared_objects_initialized;) {
         try {
