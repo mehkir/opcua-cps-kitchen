@@ -227,8 +227,10 @@ kitchen::receive_completed_order(UA_Server* _server,
             return;
         }
         UA_Variant_clear(&value);
+        /* Check if evaluation is requested */
         if (self->evaluate_orders_count_ > 0) {
             timestamp_recorder::get_instance()->record_timestamp(completed_orders);
+            /* Check if orders count for evaluation is reached */
             if (completed_orders != self->evaluate_orders_count_)
                 return;
             timestamp_recorder::get_instance()->write_timestamps();
@@ -707,7 +709,7 @@ kitchen::start() {
                 UA_Boolean connectivity_state = true;
                 for (std::string endpoint : endpoints) {
                     if (node_browser_helper().has_instance(endpoint, ROBOT_TYPE)) {
-                        /* Get position remote robot's position */
+                        /* Get remote robot's position */
                         UA_Client* remote_robot_client = nullptr;
                         client_connection_establisher cce;
                         bool connected = cce.establish_connection(remote_robot_client, endpoint);

@@ -55,7 +55,6 @@ struct remote_robot {
         std::string endpoint_; /**< the remote robot's endpoint address. */
         std::atomic<position_t> cached_position_; /**< the remote robot's position on the conveyor belt. */
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
-        object_type_node_inserter& remote_robot_type_inserter_; /**< the remote robot type inserter for adding the remote robot's attributes to the address space. */
         position_swapped_callback_t position_swapped_callback_; /**< the callback to notify about position change. */
         std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
         std::thread client_iterate_thread_; /**< the client iteration thread. */
@@ -86,13 +85,11 @@ struct remote_robot {
          * 
          * @param _endpoint the remote robot's endpoint url.
          * @param _position the remote robot's position.
-         * @param _remote_robot_type_inserter the remote robot type inserter.
          * @param _position_swapped_callback the position swapped callback.
          */
-        remote_robot(std::string _endpoint, UA_UInt32 _position, object_type_node_inserter& _remote_robot_type_inserter,
+        remote_robot(std::string _endpoint, UA_UInt32 _position,
                     position_swapped_callback_t _position_swapped_callback) :
                     client_(nullptr), endpoint_(_endpoint), cached_position_(_position), running_(true),
-                    remote_robot_type_inserter_(_remote_robot_type_inserter),
                     position_swapped_callback_(_position_swapped_callback), initial_subscription_(true) {
         }
 
