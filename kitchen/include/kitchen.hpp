@@ -398,17 +398,6 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     /**
-     * @brief Extracts the returned remote robot parameters.
-     * 
-     * @param _output_size the count of returned output values.
-     * @param _output the variant containing the output values.
-     * @return true if call was successful.
-     * @return false if call failed.
-     */
-    bool
-    contribute_statistics_called(size_t _output_size, UA_Variant* _output);
-
-    /**
      * @brief Places a random order.
      * 
      * @param _server the server instance from which this method is called.
@@ -533,6 +522,24 @@ private:
      */
     void
     join_threads();
+
+    /**
+     * @brief Instructs all remote robots to contribute their statistics.
+     * 
+     */
+    void
+    contribute_remote_robot_statistics();
+
+    /**
+     * @brief Extracts the returned remote robot parameters.
+     * 
+     * @param _output_size the count of returned output values.
+     * @param _output the variant containing the output values.
+     * @return true if call was successful.
+     * @return false if call failed.
+     */
+    bool
+    contribute_statistics_called(size_t _output_size, UA_Variant* _output);
 
 public:
     /**

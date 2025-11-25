@@ -234,49 +234,12 @@ kitchen::receive_completed_order(UA_Server* _server,
             if (completed_orders != self->evaluate_orders_count_)
                 return;
             timestamp_recorder::get_instance()->write_timestamps();
-            for (const auto &entry : self->position_remote_robot_map_) {
-                const std::unique_ptr<remote_robot> &remote_robot_ptr = entry.second;
-                if (remote_robot_ptr == nullptr)
-                    continue;
-                size_t output_size = 0;
-                UA_Variant* output = nullptr;
-                if (remote_robot_ptr->contribute_statistics(&output_size, &output) != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling choose next robot (%s)", __FUNCTION__, UA_StatusCode_name(status));
-                    if (output != nullptr)
-                        UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                    continue;
-                }
-                bool result = self->contribute_statistics_called(output_size, output);
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling %s on robot at position %d returned %s", __FUNCTION__, CONTRIBUTE_STATISTICS, entry.first, result ? "true" : "false");
-            }
+            self->contribute_remote_robot_statistics();
         }
     });
     UA_Boolean result = true;
     UA_Variant_setScalarCopy(_output, &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
     return UA_STATUSCODE_GOOD;
-}
-
-bool
-kitchen::contribute_statistics_called(size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_output_size != 1) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        if (_output != nullptr)
-            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        stop();
-        return false;
-    }
-    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        if (_output != nullptr)
-            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        stop();
-        return false;
-    }
-    UA_Boolean result = *(UA_Boolean*) _output[0].data;
-    if (_output != nullptr)
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-    return result;
 }
 
 UA_StatusCode
@@ -461,8 +424,7 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
     }
     if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end() || _robot_endpoint.compare(position_remote_robot_map_[_robot_position]->get_endpoint())) {
         position_remote_robot_map_.erase(_robot_position);
-        std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, remote_robot_type_inserter_,
-                                                                            std::bind(&kitchen::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
+        std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_robot_endpoint, _robot_position, std::bind(&kitchen::position_swapped_callback, this, std::placeholders::_1, std::placeholders::_2));
         if (robot->initialize_and_start() != UA_STATUSCODE_GOOD) {
             increment_orders_counter(DROPPED_ORDERS);
             return;
@@ -752,6 +714,74 @@ kitchen::start() {
     }
     join_threads();
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
+}
+
+void
+kitchen::contribute_remote_robot_statistics() {
+    std::vector<std::string> endpoints;
+    if (discovery_util_.lookup_endpoints(endpoints) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to lookup endpoints.", __FUNCTION__);
+        return;
+    }
+    for (std::string endpoint : endpoints) {
+        if (node_browser_helper().has_instance(endpoint, ROBOT_TYPE)) {
+            /* Get remote robot's position */
+            UA_Client* remote_robot_client = nullptr;
+            client_connection_establisher cce;
+            bool connected = cce.establish_connection(remote_robot_client, endpoint);
+            if (!connected) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error establishing robot client session", __FUNCTION__);
+                if (remote_robot_client != nullptr)
+                    UA_Client_delete(remote_robot_client);
+                continue;
+            }
+            /* Get contribute statistics method id */
+            object_method_info omi;
+            if ((omi = node_browser_helper().get_method_id(remote_robot_client, ROBOT_TYPE, CONTRIBUTE_STATISTICS)) == OBJECT_METHOD_INFO_NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CONTRIBUTE_STATISTICS);
+                UA_Client_delete(remote_robot_client);
+                continue;
+            }
+            /* Call contribute statistics method */
+            size_t output_size = 0;
+            UA_Variant* output = nullptr;
+            method_node_caller contribute_statistics_caller;
+            UA_StatusCode status = contribute_statistics_caller.call_method_node(remote_robot_client, omi.object_id_, omi.method_id_, &output_size, &output);
+            if(status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, CONTRIBUTE_STATISTICS, UA_StatusCode_name(status));
+                if (output != nullptr)
+                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                UA_Client_delete(remote_robot_client);
+                continue;
+            }
+            bool result = contribute_statistics_called(output_size, output);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling %s on robot returned %s", __FUNCTION__, CONTRIBUTE_STATISTICS, result ? "true" : "false");
+            UA_Client_delete(remote_robot_client);
+        }
+    }
+}
+
+bool
+kitchen::contribute_statistics_called(size_t _output_size, UA_Variant* _output) {
+    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if(_output_size != 1) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        stop();
+        return false;
+    }
+    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+        if (_output != nullptr)
+            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+        stop();
+        return false;
+    }
+    UA_Boolean result = *(UA_Boolean*) _output[0].data;
+    if (_output != nullptr)
+        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+    return result;
 }
 
 void
