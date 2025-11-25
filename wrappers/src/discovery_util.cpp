@@ -3,6 +3,7 @@
 #include <open62541/plugin/log_stdout.h>
 #include <string>
 #include "../include/client_connection_establisher.hpp"
+#include "../include/filtered_logger.hpp"
 
 #define DISCOVERY_SERVER_ENDPOINT "opc.tcp://localhost:4840"
 #define REGISTER_INTERVAL 300
@@ -47,7 +48,11 @@ discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::stri
     UA_StatusCode retval;
     {
         UA_Client* client = UA_Client_new();
-        UA_ClientConfig_setDefault(UA_Client_getConfig(client));
+        UA_ClientConfig* cc = UA_Client_getConfig(client);
+        UA_ClientConfig_setDefault(cc);
+#ifdef FILTERED_LOGGING
+        *cc->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
+#endif
         retval = UA_Client_findServers(client, DISCOVERY_SERVER_ENDPOINT, 0, NULL, 0, NULL,
                                        &application_description_array_size, &application_description_array);
         UA_Client_delete(client);
