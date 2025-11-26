@@ -15,7 +15,6 @@
 #include "statistics_recorder.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
-#define TIME_UNIT_UPDATE_RATE 1LL
 #define MOVE_TIME 5LL
 #define RECONFIGURATION_TIME 5LL
 
@@ -614,7 +613,7 @@ robot::determine_next_action() {
             current_action_duration_ = robot_act.get_action_duration();
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), current_action_duration_);
             statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::COOKING);
-            steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT_UPDATE_RATE * TIME_UNIT));
+            steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
             steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                 if (_error) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
@@ -722,12 +721,12 @@ robot::pass_time() {
     robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
     UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
     UA_Variant_clear(&overall_time_var);
-    overall_time -= TIME_UNIT_UPDATE_RATE;
+    overall_time--;
     /* Update overall time */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
-    current_action_duration_ -= TIME_UNIT_UPDATE_RATE;
+    current_action_duration_--;
     if (current_action_duration_ != 0) {
-        steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT_UPDATE_RATE * TIME_UNIT));
+        steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
         steady_timer_.async_wait([this](const boost::system::error_code& _error) {
             if (_error) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
