@@ -20,7 +20,7 @@
 
 robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_rearranging_(false), already_reconfiguring_(false),
-        is_dish_finished_(false), running_(true), current_action_duration_(0), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
+        is_dish_finished_(false), running_(true), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
         conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_state_(robot_state::AVAILABLE), new_target_position_(0), new_capabilities_profile_(""),
     #ifdef ROBOT_SEED
         mersenne_twister_(ROBOT_SEED),
@@ -590,15 +590,19 @@ robot::determine_next_action() {
         if (required_tool != current_tool_) {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RETOOLING);
-            steady_timer_.expires_from_now(std::chrono::milliseconds(RETOOLING_TIME * TIME_UNIT));
-            steady_timer_.async_wait([this](const boost::system::error_code& _error) {
-                if (_error) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
-                    stop();
-                    return;
-                }
+            if (RETOOLING_TIME > 0) {
+                steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
+                steady_timer_.async_wait([this](const boost::system::error_code& _error) {
+                    if (_error) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
+                        stop();
+                        return;
+                    }
+                    pass_time(RETOOLING_TIME, std::bind(&robot::retool, this));
+                });
+            } else {
                 retool();
-            });
+            }
         /* Process the next action */
         } else {
             /* Update action in process */
@@ -610,18 +614,22 @@ robot::determine_next_action() {
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, INGREDIENTS, &ingredients_in_process, UA_TYPES_STRING);
             UA_String_clear(&ingredients_in_process);
             /* Schedule next action */
-            current_action_duration_ = robot_act.get_action_duration();
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), current_action_duration_);
+            duration_t action_duration = robot_act.get_action_duration();
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
             statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::COOKING);
-            steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
-            steady_timer_.async_wait([this](const boost::system::error_code& _error) {
-                if (_error) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
-                    stop();
-                    return;
-                }
-                pass_time();
-            });
+            if (action_duration > 0) {
+                steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
+                steady_timer_.async_wait([this, action_duration](const boost::system::error_code& _error) {
+                    if (_error) {
+                        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
+                        stop();
+                        return;
+                    }
+                    pass_time(action_duration, std::bind(&robot::action_performed, this));
+                });
+            } else {
+                action_performed();
+            }
         }
     } else {
         reset_in_process_fields();
@@ -714,7 +722,7 @@ robot::receive_finished_order_notification_called(size_t _output_size, UA_Varian
 }
 
 void
-robot::pass_time() {
+robot::pass_time(duration_t _duration, std::function<void ()> _to_be_performed) {
     /* Get overall time */
     UA_Variant overall_time_var;
     UA_Variant_init(&overall_time_var);
@@ -724,19 +732,19 @@ robot::pass_time() {
     overall_time--;
     /* Update overall time */
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
-    current_action_duration_--;
-    if (current_action_duration_ != 0) {
+    _duration--;
+    if (_duration != 0) {
         steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
-        steady_timer_.async_wait([this](const boost::system::error_code& _error) {
+        steady_timer_.async_wait([this, _duration, _to_be_performed](const boost::system::error_code& _error) {
             if (_error) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
                 stop();
                 return;
             }
-            pass_time();
+            pass_time(_duration, _to_be_performed);
         });
     } else {
-        action_performed();
+        _to_be_performed();
     }
 }
 
@@ -776,16 +784,7 @@ robot::retool() {
     current_tool_ = action_queue_in_process_.front().get_required_tool();
     UA_String current_tool = UA_STRING(const_cast<char*>(robot_tool_to_string(current_tool_)));
     /* Update current tool */
-    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);
-    /* Get overall time */
-    UA_Variant overall_time_var;
-    UA_Variant_init(&overall_time_var);
-    robot_type_inserter_.get_attribute(INSTANCE_NAME, OVERALL_TIME, overall_time_var);
-    UA_UInt32 overall_time = *(UA_UInt32*) overall_time_var.data;
-    UA_Variant_clear(&overall_time_var);
-    overall_time -= RETOOLING_TIME;
-    /* Update overall time */
-    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, CURRENT_TOOL, &current_tool, UA_TYPES_STRING);;
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Current tool now is %s", robot_tool_to_string(current_tool_));
     determine_next_action();
 }

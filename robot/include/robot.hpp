@@ -116,7 +116,6 @@ private:
     object_type_node_inserter robot_type_inserter_; /**< the robot type inserter for adding the robot's attributes and methods to the address space. */
     robot_tool current_tool_; /**< the current tool the robot is equipped with. */
     std::queue<order> order_queue_; /**< the queue holding all the assigned orders. */
-    duration_t current_action_duration_; /**< the current action duration. */
     std::queue<robot_action> action_queue_in_process_; /**< the current actions in process. */
     bool preparing_dish_; /**< flag to indicate whether the robot is busy preparing a dish. */
     bool already_rearranging_; /**< flag to indicate whether the worker thread is already rearranging the robot. */
@@ -290,9 +289,11 @@ private:
     /**
      * @brief Passes the time for the current action.
      * 
+     * @param _duration the time to pass.
+     * @param _to_be_performed the method to be performed after the duration has expired.
      */
     void
-    pass_time();
+    pass_time(duration_t _duration, std::function<void ()> _to_be_performed);
 
     /**
      * @brief Callback to indicate the current action completion.
