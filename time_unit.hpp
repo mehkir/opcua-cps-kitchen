@@ -11,9 +11,9 @@
 #include <open62541/types.h>
 
 /* Robot-Agent */
-#define ROBOT_MOVE_TIME 5LL
-#define RECONFIGURATION_TIME 5LL
-#define RETOOLING_TIME 1LL
+#define ROBOT_MOVE_TIME 500LL
+#define RECONFIGURATION_TIME 500LL
+#define RETOOLING_TIME 150LL
 #define ACTION_FACTOR 100LL
 
 /* Conveyor-Agent */
