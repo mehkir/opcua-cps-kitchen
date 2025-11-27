@@ -72,10 +72,10 @@ recipe_parser::recipe_parser() {
             duration_t action_time;
             robot_tool required_tool;
             if (autonomous_act != nullptr) {
-                action_time = autonomous_act->get_action_duration();
+                action_time = autonomous_act->get_action_duration() * ACTION_FACTOR;
                 required_tool = autonomous_act->get_required_tool();
             } else {
-                action_time = instruction[DURATION_KEY].asUInt();
+                action_time = instruction[DURATION_KEY].asUInt() * ACTION_FACTOR;
                 required_tool = recipe_timed_act->get_required_tool();
             }
             cooking_time += action_time;

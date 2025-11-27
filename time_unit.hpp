@@ -14,12 +14,13 @@
 #define MOVE_TIME 5LL
 #define RECONFIGURATION_TIME 5LL
 #define RETOOLING_TIME 1LL
+#define ACTION_FACTOR 1LL
 
 /* Conveyor-Agent */
 #define DEBOUNCE_TIME 100LL
 #define MOVE_TIME 100LL
 
 /* Kitchen-Agent */
-#define PlACING_RATE 5LL
+#define PlACING_RATE 50LL
 
 #endif // TIME_UNIT_HPP

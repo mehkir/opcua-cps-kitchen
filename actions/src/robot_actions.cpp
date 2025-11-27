@@ -14,7 +14,7 @@
 #define BOIL "boil"
 #define BAKE "bake"
 #define FRY "fry"
-
+/* Action times given in milliseconds */
 #define PEELING_TIME 5LL
 #define CUTTING_TIME 3LL
 #define BRAISING_TIME 8LL
