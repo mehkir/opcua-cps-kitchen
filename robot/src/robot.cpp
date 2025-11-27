@@ -15,8 +15,6 @@
 #include "statistics_recorder.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
-#define MOVE_TIME 5LL
-#define RECONFIGURATION_TIME 5LL
 
 robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_rearranging_(false), already_reconfiguring_(false),
@@ -593,7 +591,7 @@ robot::determine_next_action() {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RETOOLING);
             if (RETOOLING_TIME > 0) {
-                steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
+                steady_timer_.expires_from_now(std::chrono::milliseconds(1));
                 steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                     if (_error) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
@@ -620,7 +618,7 @@ robot::determine_next_action() {
             UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
             statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::COOKING);
             if (action_duration > 0) {
-                steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
+                steady_timer_.expires_from_now(std::chrono::milliseconds(1));
                 steady_timer_.async_wait([this, action_duration](const boost::system::error_code& _error) {
                     if (_error) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
@@ -736,7 +734,7 @@ robot::pass_time(duration_t _duration, std::function<void ()> _to_be_performed) 
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
     _duration--;
     if (_duration != 0) {
-        steady_timer_.expires_from_now(std::chrono::milliseconds(TIME_UNIT));
+        steady_timer_.expires_from_now(std::chrono::milliseconds(1));
         steady_timer_.async_wait([this, _duration, _to_be_performed](const boost::system::error_code& _error) {
             if (_error) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
@@ -866,7 +864,7 @@ robot::handle_switch_position() {
     uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
     uint32_t distance = std::min(cw, ccw);
     statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::REARRANGING);
-    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * MOVE_TIME * TIME_UNIT));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * MOVE_TIME));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling switch position (%s)", __FUNCTION__, _error.what().c_str());
@@ -1030,7 +1028,7 @@ robot::handle_reconfiguration() {
         return;
     already_reconfiguring_ = true;
     statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RECONFIGURING);
-    steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME * TIME_UNIT));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling reconfiguration (%s)", __FUNCTION__, _error.what().c_str());

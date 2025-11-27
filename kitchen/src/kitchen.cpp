@@ -12,7 +12,6 @@
 #define INSTANCE_NAME "CpsKitchen"
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
-#define PlACING_RATE 5LL
 #define REDISCOVER_INTERVAL 1LL
 
 kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
@@ -331,7 +330,7 @@ kitchen::handle_random_order_request() {
 
 void
 kitchen::arm_placing_gate() {
-    placing_timer_.expires_after(std::chrono::milliseconds(PlACING_RATE * TIME_UNIT));
+    placing_timer_.expires_after(std::chrono::milliseconds(PlACING_RATE));
     placing_timer_.async_wait([this](const boost::system::error_code& ec){
         if (ec) {
             // timer cancelled on shutdown; ignore
