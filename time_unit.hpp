@@ -11,14 +11,14 @@
 #include <open62541/types.h>
 
 /* Robot-Agent */
-#define MOVE_TIME 5LL
+#define ROBOT_MOVE_TIME 5LL
 #define RECONFIGURATION_TIME 5LL
 #define RETOOLING_TIME 1LL
-#define ACTION_FACTOR 1LL
+#define ACTION_FACTOR 100LL
 
 /* Conveyor-Agent */
 #define DEBOUNCE_TIME 100LL
-#define MOVE_TIME 100LL
+#define CONVEYOR_MOVE_TIME 100LL
 
 /* Kitchen-Agent */
 #define PlACING_RATE 50LL

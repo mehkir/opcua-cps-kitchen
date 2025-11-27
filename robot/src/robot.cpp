@@ -615,7 +615,7 @@ robot::determine_next_action() {
             UA_String_clear(&ingredients_in_process);
             /* Schedule next action */
             duration_t action_duration = robot_act.get_action_duration();
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
+            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld ms", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
             statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::COOKING);
             if (action_duration > 0) {
                 steady_timer_.expires_from_now(std::chrono::milliseconds(1));
@@ -774,7 +774,7 @@ robot::action_performed() {
     robot_type_inserter_.get_attribute(INSTANCE_NAME, RECIPE_ID, recipe_id_in_process_var);
     UA_UInt32 recipe_id_in_process = *(UA_UInt32*)recipe_id_in_process_var.data;
     UA_Variant_clear(&recipe_id_in_process_var);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld time units", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
+    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COOK: Performed %s on recipe_id=%d with ingredients=%s for %ld ms", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
     action_queue_in_process_.pop();
     determine_next_action();
 }
@@ -864,7 +864,7 @@ robot::handle_switch_position() {
     uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
     uint32_t distance = std::min(cw, ccw);
     statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::REARRANGING);
-    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * MOVE_TIME));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * ROBOT_MOVE_TIME));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling switch position (%s)", __FUNCTION__, _error.what().c_str());

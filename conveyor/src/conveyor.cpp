@@ -252,7 +252,7 @@ conveyor::request_next_robots() {
     }
     if (next_robot_request_queue_.empty()) {
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: No next robots requested. ");
-        steady_timer_.expires_from_now(std::chrono::milliseconds(MOVE_TIME));
+        steady_timer_.expires_from_now(std::chrono::milliseconds(CONVEYOR_MOVE_TIME));
         steady_timer_.async_wait([this](const boost::system::error_code& _error) {
             if (_error) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling conveyor movement", __FUNCTION__);
@@ -450,7 +450,7 @@ conveyor::handle_receive_next_robot(position_t _robot_position, std::string _rob
         return;
     }
     UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Received all next robot responses");
-    steady_timer_.expires_from_now(std::chrono::milliseconds(MOVE_TIME));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(CONVEYOR_MOVE_TIME));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling conveyor movement", __FUNCTION__);
