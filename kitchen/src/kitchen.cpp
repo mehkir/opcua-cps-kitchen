@@ -36,7 +36,9 @@ kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : serve
     // Set a unique application URI for the robot
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(kitchen_uri_.c_str());
-#ifdef FILTERED_LOGGING
+#ifdef DISABLED_LOGGING
+    *server_config->logging = filtered_logger().create_disabled_logger();
+#elifdef FILTERED_LOGGING
     *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
     /* Add kitchen attributes */
@@ -275,7 +277,8 @@ kitchen::handle_random_order_request() {
     auto do_place = [this] {
         increment_orders_counter(RECEIVED_ORDERS);
         bool instructed = false;
-        recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
+        // recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
+        recipe_id_t recipe_id = 1;
         UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
         object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
         UA_Variant* output = nullptr;

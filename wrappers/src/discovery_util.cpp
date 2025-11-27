@@ -50,7 +50,9 @@ discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::stri
         UA_Client* client = UA_Client_new();
         UA_ClientConfig* cc = UA_Client_getConfig(client);
         UA_ClientConfig_setDefault(cc);
-#ifdef FILTERED_LOGGING
+#ifdef DISABLED_LOGGING
+        *cc->logging = filtered_logger().create_disabled_logger();
+#elifdef FILTERED_LOGGING
         *cc->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
         retval = UA_Client_findServers(client, DISCOVERY_SERVER_ENDPOINT, 0, NULL, 0, NULL,

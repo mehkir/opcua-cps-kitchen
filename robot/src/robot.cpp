@@ -40,7 +40,9 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     // Set a unique application URI for the robot
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(robot_uri_.c_str());
-#ifdef FILTERED_LOGGING
+#ifdef DISABLED_LOGGING
+    *server_config->logging = filtered_logger().create_disabled_logger();
+#elifdef FILTERED_LOGGING
     *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
     /* Add attributes */

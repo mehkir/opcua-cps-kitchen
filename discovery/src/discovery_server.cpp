@@ -34,7 +34,9 @@ int main(void) {
     UA_String_clear(&config->applicationDescription.applicationUri);
     config->applicationDescription.applicationUri =
             UA_String_fromChars("urn:open62541.example.local_discovery_server");
-#ifdef FILTERED_LOGGING
+#ifdef DISABLED_LOGGING
+    *config->logging = filtered_logger().create_disabled_logger();
+#elifdef FILTERED_LOGGING
     *config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
     // Enable the mDNS announce and response functionality

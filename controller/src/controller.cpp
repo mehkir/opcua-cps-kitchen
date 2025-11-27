@@ -18,7 +18,9 @@ controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_
     }
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC("urn:kitchen:controller");
-#ifdef FILTERED_LOGGING
+#ifdef DISABLED_LOGGING
+    *server_config->logging = filtered_logger().create_disabled_logger();
+#elifdef FILTERED_LOGGING
     *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
     /* Add choose next robot method node */

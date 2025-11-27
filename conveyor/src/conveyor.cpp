@@ -9,8 +9,8 @@
 #include "discovery_and_connection.hpp"
 
 #define CONVEYOR_INSTANCE_NAME "KitchenConveyor"
-#define DEBOUNCE_TIME 1LL
-#define MOVE_TIME 1LL
+#define DEBOUNCE_TIME 100LL
+#define MOVE_TIME 100LL
 
 conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_uri_("urn:kitchen:conveyor"), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE),
                                             running_(true), state_status_(conveyor::state::IDLING), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_),
@@ -24,7 +24,9 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     }
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(conveyor_uri_.c_str());
-#ifdef FILTERED_LOGGING
+#ifdef DISABLED_LOGGING
+    *server_config->logging = filtered_logger().create_disabled_logger();
+#elifdef FILTERED_LOGGING
     *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
     /* Add conveyor attribute nodes */

@@ -22,7 +22,9 @@ client_connection_establisher::establish_connection_retry(UA_Client*& _client, s
     UA_ClientConfig_setDefault(client_config);
     client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
     client_config->timeout = 1000;
-#ifdef FILTERED_LOGGING
+#ifdef DISABLED_LOGGING
+    *client_config->logging = filtered_logger().create_disabled_logger();
+#elifdef FILTERED_LOGGING
     *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
     auto start = std::chrono::steady_clock::now();
@@ -56,7 +58,9 @@ client_connection_establisher::establish_connection(UA_Client*& _client, std::st
     UA_ClientConfig_setDefault(client_config);
     client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
     client_config->timeout = 1000;
-#ifdef FILTERED_LOGGING
+#ifdef DISABLED_LOGGING
+    *client_config->logging = filtered_logger().create_disabled_logger();
+#elifdef FILTERED_LOGGING
     *client_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
     UA_StatusCode status = UA_Client_connect(_client, _server_endpoint.c_str());
