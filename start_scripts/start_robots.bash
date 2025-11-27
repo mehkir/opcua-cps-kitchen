@@ -14,12 +14,21 @@ if (( $2 < 2 )); then
 fi
 CONVEYOR_SIZE=$2
 
+# best-case
 declare -A position_capabilities=(
-    [1]="r4.json"
-    [2]="r3.json"
-    [3]="r2.json"
-    [4]="r1.json"
+    [1]="r1.json"
+    [2]="r2.json"
+    [3]="r3.json"
+    [4]="r4.json"
 )
+# worst-case
+# declare -A position_capabilities=(
+#     [1]="r4.json"
+#     [2]="r3.json"
+#     [3]="r2.json"
+#     [4]="r1.json"
+# )
+
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 cd -- "$SCRIPT_DIR"
