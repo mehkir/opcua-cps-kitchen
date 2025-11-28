@@ -30,7 +30,7 @@ client_connection_establisher::establish_connection_retry(UA_Client*& _client, s
     while(status != UA_STATUSCODE_GOOD) {
         status = UA_Client_connect(_client, _server_endpoint.c_str());
         if (status != UA_STATUSCODE_GOOD) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Connection attempt failed. Retrying to connect in 1 second", __FUNCTION__);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Connection attempt failed. Retrying to connect in 1 second", __FUNCTION__);
             sleep(1);
         }
         auto now = std::chrono::steady_clock::now();
@@ -76,7 +76,7 @@ client_connection_establisher::test_connection(std::string _server_endpoint) {
     client_config->securityMode = UA_MESSAGESECURITYMODE_NONE;
     client_config->timeout = 1000;
     UA_StatusCode status = UA_Client_connect(test_client, _server_endpoint.c_str());
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Test connection status: %s", __FUNCTION__, UA_StatusCode_name(status));
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Test connection status: %s", __FUNCTION__, UA_StatusCode_name(status));
     UA_Client_delete(test_client);
     return status == UA_STATUSCODE_GOOD;
 }
