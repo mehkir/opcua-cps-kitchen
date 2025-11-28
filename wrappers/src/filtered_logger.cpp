@@ -36,14 +36,3 @@ filtered_logger::create_filtered_logger(UA_LogLevel _level, UA_LogCategory _cate
     logger.clear = clear_logger;
     return logger;
 }
-
-UA_Logger
-filtered_logger::create_disabled_logger() {
-    UA_Logger logger;
-    logger.log = [](void*, UA_LogLevel, UA_LogCategory, const char*, va_list) {
-        // do nothing
-    };
-    logger.context = nullptr;
-    logger.clear = nullptr;
-    return logger;
-}

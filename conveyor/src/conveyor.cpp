@@ -22,9 +22,7 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
     }
     UA_String_clear(&server_config->applicationDescription.applicationUri);
     server_config->applicationDescription.applicationUri = UA_STRING_ALLOC(conveyor_uri_.c_str());
-#ifdef DISABLED_LOGGING
-    *server_config->logging = filtered_logger().create_disabled_logger();
-#elifdef FILTERED_LOGGING
+#ifdef FILTERED_LOGGING
     *server_config->logging = filtered_logger().create_filtered_logger(UA_LOGLEVEL_INFO, UA_LOGCATEGORY_USERLAND);
 #endif
     /* Add conveyor attribute nodes */

@@ -60,13 +60,6 @@ public:
      * @return UA_Logger struct suitable for UA_ServerConfig.
      */
     UA_Logger create_filtered_logger(UA_LogLevel _level, UA_LogCategory _category);
-
-    /**
-     * @brief Creates a no-op logger.
-     * 
-     * @return UA_Logger struct suitable for UA_ServerConfig or UA_ServerConfig.
-     */
-    UA_Logger create_disabled_logger();
 };
 
 #endif // FILTERED_LOGGER_HPP
