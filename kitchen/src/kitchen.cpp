@@ -166,7 +166,7 @@ kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : serve
 }
 
 kitchen::~kitchen() {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     stop();
     join_threads();
     {
@@ -180,7 +180,7 @@ kitchen::~kitchen() {
     UA_String_clear(&type_);
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
 }
 
 UA_StatusCode
@@ -199,7 +199,7 @@ kitchen::receive_completed_order(UA_Server* _server,
         return UA_STATUSCODE_BAD;
     }
     recipe_id_t completed_recipe = *(recipe_id_t*)_input[0].data;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Conveyor delivered completed dish with the recipe ID %d", __FUNCTION__, completed_recipe);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Conveyor delivered completed dish with the recipe ID %d", __FUNCTION__, completed_recipe);
     /* Extract method context */
     if(_method_context == NULL) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
@@ -268,14 +268,14 @@ kitchen::place_random_order(UA_Server* _server,
 
 void
 kitchen::handle_random_order_request() {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (evaluate_orders_count_ > 0) timestamp_recorder::get_instance()->record_timestamp(0);
     remove_stopped_robots();
     auto do_place = [this] {
         increment_orders_counter(RECEIVED_ORDERS);
         bool instructed = false;
         recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
         object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
         UA_Variant* output = nullptr;
         size_t output_size = 0;
@@ -313,7 +313,7 @@ kitchen::handle_random_order_request() {
             }
         }
         bool result = choose_next_robot_called(output_size, output);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Controller returned %s for next robot request.", result ? "true" : "false");
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Controller returned %s for next robot request.", result ? "true" : "false");
     };
 
     if (placing_gate_open_) {
@@ -346,7 +346,7 @@ kitchen::arm_placing_gate() {
 
 bool
 kitchen::choose_next_robot_called(size_t _output_size, UA_Variant *_output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         if (_output != nullptr)
@@ -374,7 +374,7 @@ kitchen::receive_next_robot(UA_Server* _server,
             const UA_NodeId* _object_id, void* _object_context,
             size_t _input_size, const UA_Variant* _input,
             size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_input_size != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
@@ -417,7 +417,7 @@ void
 kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robot_endpoint, recipe_id_t _recipe_id) {
     remove_stopped_robots();
     if (_robot_position == 0 || _robot_endpoint.empty()) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller couldn't return a suitable robot. Dropping order with recipe id %d", _recipe_id);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller couldn't return a suitable robot. Dropping order with recipe id %d", _recipe_id);
         increment_orders_counter(DROPPED_ORDERS);
         return;
     }
@@ -432,7 +432,7 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
     }
     size_t output_size = 0;
     UA_Variant* output = nullptr;
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller returned the robot at position %d (%s) for recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: The controller returned the robot at position %d (%s) for recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
     remote_robot* target_robot = position_remote_robot_map_[_robot_position].get();
     if (target_robot->get_position() != _robot_position || !target_robot->is_available()) {
         increment_orders_counter(DROPPED_ORDERS);
@@ -448,16 +448,16 @@ kitchen::handle_receive_next_robot(position_t _robot_position, std::string _robo
     }
     if (receive_robot_task_called(output_size, output)) {
         increment_orders_counter(ASSIGNED_ORDERS);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Assigned the next robot at position %d (%s) with recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Assigned the next robot at position %d (%s) with recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
     } else {
         increment_orders_counter(DROPPED_ORDERS);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Dropped order for the next robot at position %d (%s) with recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Dropped order for the next robot at position %d (%s) with recipe id %d", _robot_position, _robot_endpoint.c_str(), _recipe_id);
     }
 }
 
 bool
 kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 2) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         if (_output != nullptr)
@@ -489,9 +489,9 @@ kitchen::receive_robot_task_called(size_t _output_size, UA_Variant* _output) {
 
 void
 kitchen::position_swapped_callback(position_t _old_position, position_t _new_position) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     io_context_.post([this, _old_position, _new_position] {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING(Kitchen): Reflecting position swap/switch from %d to %d", _old_position, _new_position);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "REARRANGING(Kitchen): Reflecting position swap/switch from %d to %d", _old_position, _new_position);
         remote_robot* first = nullptr;
         remote_robot* second = nullptr;
         if (position_remote_robot_map_.find(_old_position) != position_remote_robot_map_.end()) {
@@ -514,7 +514,7 @@ kitchen::position_swapped_callback(position_t _old_position, position_t _new_pos
 
 UA_StatusCode
 kitchen::increment_orders_counter(std::string _attribute_name) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_Variant value;
     UA_Variant_init(&value);
@@ -543,12 +543,12 @@ kitchen::increment_orders_counter(std::string _attribute_name) {
 
 void
 kitchen::remove_stopped_robots() {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for (auto it = position_remote_robot_map_.begin(); it != position_remote_robot_map_.end();) {
         if (it->second->is_stopped()) {
             position_t position = it->first;
             it = position_remote_robot_map_.erase(it);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
         } else {
             it++;
         }
@@ -576,9 +576,9 @@ kitchen::start() {
     /* Lookup own endpoint */
     std::vector<std::string> endpoints;
     while (endpoints.empty()) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Looking up own endpoint", __FUNCTION__);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Looking up own endpoint", __FUNCTION__);
         if (discovery_util_.lookup_endpoints(endpoints, kitchen_uri_) != UA_STATUSCODE_GOOD || endpoints.empty()) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Couldn't look up own endpoint. Trying again in %d seconds", __FUNCTION__, LOOKUP_INTERVAL);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Couldn't look up own endpoint. Trying again in %d seconds", __FUNCTION__, LOOKUP_INTERVAL);
             std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
         }
         if (!running_.load()) {
@@ -642,7 +642,7 @@ kitchen::start() {
                     stop();
                     return;
                 }
-                // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
             }
         });
     } catch (...) {
@@ -653,7 +653,7 @@ kitchen::start() {
     /* Setup worker thread */
     worker_thread_ = std::thread([this]() {
         io_context_.run();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
     /* Run the cyclic remote robot discovery thread */
     try {
@@ -712,7 +712,7 @@ kitchen::start() {
         return;
     }
     join_threads();
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
 
 void
@@ -754,7 +754,7 @@ kitchen::contribute_remote_robot_statistics() {
                 continue;
             }
             bool result = contribute_statistics_called(output_size, output);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Calling %s on robot returned %s", __FUNCTION__, CONTRIBUTE_STATISTICS, result ? "true" : "false");
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Calling %s on robot returned %s", __FUNCTION__, CONTRIBUTE_STATISTICS, result ? "true" : "false");
             UA_Client_delete(remote_robot_client);
         }
     }
@@ -762,7 +762,7 @@ kitchen::contribute_remote_robot_statistics() {
 
 bool
 kitchen::contribute_statistics_called(size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         if (_output != nullptr)
@@ -785,7 +785,7 @@ kitchen::contribute_statistics_called(size_t _output_size, UA_Variant* _output) 
 
 void
 kitchen::stop() {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     {
         std::lock_guard<std::mutex> client_loop_lock(client_mutex_);
         running_.store(false);
@@ -795,5 +795,5 @@ kitchen::stop() {
     io_context_.stop();
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }

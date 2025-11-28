@@ -155,7 +155,7 @@ struct remote_robot {
                             running_.store(false);
                             return UA_STATUSCODE_BAD;
                         }
-                        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                        // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
                     return UA_STATUSCODE_BAD;
                 });
@@ -180,8 +180,8 @@ struct remote_robot {
          */
         UA_StatusCode
         instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, position_t _addressed_position, size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d from step %d", cached_position_.load(), _recipe_id, _processed_steps);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d from step %d", cached_position_.load(), _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);
@@ -210,8 +210,8 @@ struct remote_robot {
          */
         UA_StatusCode
         contribute_statistics(size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CONTRIBUTE STATISTICS: Instruct robot on position %d to contribute its statistics", cached_position_.load());
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "CONTRIBUTE STATISTICS: Instruct robot on position %d to contribute its statistics", cached_position_.load());
             method_node_caller contribute_statistics_caller;
             object_method_info omi = method_id_map_[CONTRIBUTE_STATISTICS];
             UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -296,7 +296,7 @@ struct remote_robot {
                 return;
             }
             self->position_swapped_callback_(old_position, self->cached_position_.load());
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->cached_position_);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->cached_position_);
         }
 
         /**

@@ -76,7 +76,7 @@ struct remote_robot {
         remote_robot(std::string _endpoint, position_t _position, position_swapped_callback_t _position_swapped_callback) :
                     endpoint_(_endpoint), cached_position_(_position), client_(nullptr), running_(true),
                     position_swapped_callback_(_position_swapped_callback), initial_subscription_(true) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
         }
 
         /**
@@ -86,7 +86,7 @@ struct remote_robot {
          */
         UA_StatusCode
         initialize_and_start() {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
             if (client_ != nullptr) {
                 return running_.load() ? UA_STATUSCODE_GOOD : UA_STATUSCODE_BAD;
             }
@@ -138,7 +138,7 @@ struct remote_robot {
                             running_.store(false);
                             return UA_STATUSCODE_BAD;
                         }
-                        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                        // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
                     return UA_STATUSCODE_BAD;
                 });
@@ -218,7 +218,7 @@ struct remote_robot {
                 return;
             }
             self->position_swapped_callback_(old_position, self->cached_position_.load());
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->cached_position_);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position updated/changed to %d ", __FUNCTION__, self->cached_position_);
         }
 
         /**
@@ -248,8 +248,8 @@ struct remote_robot {
          * @return UA_StatusCode the status whether the method call was successful.
          */
         UA_StatusCode handover_finished_order(size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d", cached_position_.load());
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "HANDOVER: Retrieve finished order from robot on position %d", cached_position_.load());
             method_node_caller handover_finished_order_caller;
             object_method_info omi = method_id_map_[HANDOVER_FINISHED_ORDER];
             UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -277,8 +277,8 @@ struct remote_robot {
          * @return UA_StatusCode the status whether the method call was successful.
          */
         UA_StatusCode instruct(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, position_t _addressed_position, size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", cached_position_.load(), _recipe_id, _processed_steps);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "INSTRUCTIONS: Instruct robot on position %d to cook recipe %d after step %d", cached_position_.load(), _recipe_id, _processed_steps);
             method_node_caller receive_robot_task_caller;
             receive_robot_task_caller.add_scalar_input_argument(&_recipe_id, UA_TYPES_UINT32);
             receive_robot_task_caller.add_scalar_input_argument(&_processed_steps, UA_TYPES_UINT32);

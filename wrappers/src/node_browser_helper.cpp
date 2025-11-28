@@ -14,7 +14,7 @@ node_browser_helper::get_method_id(UA_Client* _client, std::string _object_type_
     node_browser nb;
     UA_NodeId object_type_id = nb.browse_object_type(_client, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE), _object_type_name);
     if (UA_NodeId_equal(&object_type_id, &UA_NODEID_NULL)) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
         return omi;
     }
     UA_BrowseResult browse_objects_result;
@@ -50,7 +50,7 @@ node_browser_helper::get_attribute_id(UA_Client* _client, std::string _object_ty
     node_browser nb;
     UA_NodeId object_type_id = nb.browse_object_type(_client, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE), _object_type_name);
     if (UA_NodeId_equal(&object_type_id, &UA_NODEID_NULL)) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
         return attribute_id;
     }
     UA_BrowseResult browse_objects_result;
@@ -85,7 +85,7 @@ node_browser_helper::has_instance(UA_Client* _client, std::string _object_type_n
     node_browser nb;
     UA_NodeId object_type_id = nb.browse_object_type(_client, UA_NODEID_NUMERIC(0, UA_NS0ID_BASEOBJECTTYPE), _object_type_name);
     if (UA_NodeId_equal(&object_type_id, &UA_NODEID_NULL)) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: There is no object type with the browse name %s", __FUNCTION__, _object_type_name.c_str());
         return has_instance;
     }
     UA_BrowseResult browse_objects_result;

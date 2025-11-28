@@ -11,7 +11,7 @@ discover_and_connect(UA_Client*& _client, discovery_util& _discovery_util, std::
         return UA_STATUSCODE_BAD;
     }
     for (std::string endpoint : endpoints) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint URL: %s\n", endpoint.c_str());
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "Endpoint URL: %s\n", endpoint.c_str());
         _endpoint = endpoint;
         if (node_browser_helper().has_instance(_endpoint, _object_type_name))
             break;
