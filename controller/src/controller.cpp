@@ -93,7 +93,7 @@ controller::~controller() {
     position_remote_robot_map_.clear();
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
 }
 
 UA_StatusCode
@@ -103,7 +103,7 @@ controller::register_robot(UA_Server* _server,
         const UA_NodeId* _object_id, void* _object_context,
         size_t _input_size, const UA_Variant* _input,
         size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_input_size != 3) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
@@ -148,14 +148,14 @@ controller::register_robot(UA_Server* _server,
 
 void
 controller::handle_robot_registration(std::string _endpoint, position_t _position, std::unordered_set<std::string> _remote_robot_capabilities) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::string capabilites_str = "REGISTRATION: Capabilities of robot at position " + std::to_string(_position) + " [";
     for (std::string capability : _remote_robot_capabilities) {
         capabilites_str += capability + ", ";
     }
     capabilites_str.erase(capabilites_str.end()-2, capabilites_str.end());
     capabilites_str += "]";
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: %s", __FUNCTION__, capabilites_str.c_str());
     remove_stopped_robots();
     erase_stale_pending_swap_entries();
     swap_key sk = std::make_tuple(0,0);
@@ -194,7 +194,7 @@ controller::choose_next_robot(UA_Server* _server,
         const UA_NodeId* _object_id, void* _object_context,
         size_t _input_size, const UA_Variant* _input,
         size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if(_input_size != 4) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
         return UA_STATUSCODE_BAD;
@@ -236,10 +236,10 @@ controller::choose_next_robot(UA_Server* _server,
 
 void
 controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _processed_steps, std::string _endpoint, std::string _type) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     remove_stopped_robots();
     erase_stale_pending_swap_entries();
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot receiver (%s,%s) requests suitable robot for recipe id %d processed with %d steps already", _endpoint.c_str(), _type.c_str(), _recipe_id, _processed_steps);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot receiver (%s,%s) requests suitable robot for recipe id %d processed with %d steps already", _endpoint.c_str(), _type.c_str(), _recipe_id, _processed_steps);
     std::pair nrr_key = std::make_pair(_endpoint, _type);
     if (next_robot_receiver_map_.find(nrr_key) == next_robot_receiver_map_.end()) {
         std::unique_ptr<next_robot_receiver> nrr = std::make_unique<next_robot_receiver>(_endpoint, _type);
@@ -252,7 +252,7 @@ controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _process
     if (next_suitable_robot != nullptr && !next_suitable_robot->is_adaptivity_pending()) {
         next_suitable_robot_position = next_suitable_robot->get_position();
         next_suitable_robot_endpoint = next_suitable_robot->get_endpoint();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d (%s)", next_suitable_robot_position, next_suitable_robot->get_endpoint().c_str());
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot is at position %d (%s)", next_suitable_robot_position, next_suitable_robot->get_endpoint().c_str());
     } else {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: No next suitable robot found");
     }
@@ -267,13 +267,13 @@ controller::handle_next_robot_request(recipe_id_t _recipe_id, UA_UInt32 _process
             return;
         }
         bool result = receive_next_robot_called(output_size, output);
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot receiver returned %s", result ? "true" : "false");
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "CHOOSE NEXT ROBOT: Next robot receiver returned %s", result ? "true" : "false");
     }
 }
 
 bool
 controller::receive_next_robot_called(size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         if (_output != nullptr)
@@ -294,7 +294,7 @@ controller::receive_next_robot_called(size_t _output_size, UA_Variant* _output) 
 
 remote_robot*
 controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_steps) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     std::queue<robot_action> recipe_action_queue = recipe_parser_.get_recipe(_recipe_id).get_action_queue();
     for (size_t i = 0; i < _processed_steps; i++) {
         recipe_action_queue.pop();
@@ -304,8 +304,8 @@ controller::find_suitable_robot(recipe_id_t _recipe_id, UA_UInt32 _processed_ste
 
 void
 controller::swap_robot_positions(position_t _from, position_t _to) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Initiating swap for the positions (%d,%d)", _from, _to);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "REARRANGING: Initiating swap for the positions (%d,%d)", _from, _to);
     if (_from == _to) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Position swaps to the same position are ignored (%d,%d)", __FUNCTION__, _from, _to);
         return;
@@ -388,7 +388,7 @@ controller::swap_robot_positions(position_t _from, position_t _to) {
 
 bool
 controller::adaptivity_action_called(size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (_output_size != 1) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
         if (_output != nullptr)
@@ -411,10 +411,10 @@ void
 controller::position_swapped_callback(position_t _old_position, position_t _new_position) {
     constexpr const char* func_name = __FUNCTION__;
     io_context_.post([this, _old_position, _new_position, func_name] {
-        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", func_name);
+        // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", func_name);
         remove_stopped_robots();
         erase_stale_pending_swap_entries();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING(Controller): Robot from its old position %d acknowledged swap to the new position %d", _old_position, _new_position);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "REARRANGING(Controller): Robot from its old position %d acknowledged swap to the new position %d", _old_position, _new_position);
         swap_key sk = (_old_position < _new_position) ? std::make_tuple(_old_position, _new_position) : std::make_tuple(_new_position, _old_position);
         if (pending_swaps_.find(sk) == pending_swaps_.end()) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no pending swap entry for positions (%d,%d)", __FUNCTION__, std::get<0>(sk), std::get<1>(sk));
@@ -466,7 +466,7 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Committing new position %d returned false.", __FUNCTION__, second_position);
                 }
             }
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REARRANGING: Position swap successfully completed for (%d,%d)", std::get<0>(sk), std::get<1>(sk));
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "REARRANGING: Position swap successfully completed for (%d,%d)", std::get<0>(sk), std::get<1>(sk));
             pending_swaps_.erase(sk);
         }
     });
@@ -474,7 +474,7 @@ controller::position_swapped_callback(position_t _old_position, position_t _new_
 
 void
 controller::erase_stale_pending_swap_entries() {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for (auto pending_entry = pending_swaps_.begin(); pending_entry != pending_swaps_.end();) {
         swap_key key = pending_entry->first;
         if (position_remote_robot_map_.find(std::get<0>(key)) == position_remote_robot_map_.end()
@@ -488,7 +488,7 @@ controller::erase_stale_pending_swap_entries() {
 
 void
 controller::reconfigure_robot_capability(position_t _robot_position, std::string _new_capabilities_profile) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (position_remote_robot_map_.find(_robot_position) == position_remote_robot_map_.end()) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: There is no robot at position %d", __FUNCTION__, _robot_position);
         return;
@@ -519,7 +519,7 @@ void
 controller::capabilities_reconfigured_callback(position_t _robot_position) {
     constexpr const char* func_name = __FUNCTION__;
     io_context_.post([this, _robot_position, func_name] {
-        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", func_name);
+        // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", func_name);
         remove_stopped_robots();
         if (position_remote_robot_map_.find(_robot_position) != position_remote_robot_map_.end()) {
             position_remote_robot_map_[_robot_position]->reset_adaptivity_flag();
@@ -551,13 +551,13 @@ controller::resolve_missed_new_position_commit(position_t _robot_position) {
 
 void
 controller::remove_stopped_robots() {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     for (auto it = position_remote_robot_map_.begin(); it != position_remote_robot_map_.end();) {
         if (it->second->is_stopped()) {
             position_t position = it->first;
             it = position_remote_robot_map_.erase(it);
             increment_or_decrement_counter_node(REGISTERED_ROBOTS, false);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "Removed remote robot at position %d", position);
             swap_key sk;
             if(is_robot_position_swapping(position, sk)) {
                 if (position == std::get<0>(sk))
@@ -573,7 +573,7 @@ controller::remove_stopped_robots() {
 
 UA_StatusCode
 controller::increment_or_decrement_counter_node(std::string _attribute_name, bool increment) {
-    // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_Variant value;
     UA_Variant_init(&value);
@@ -618,10 +618,10 @@ controller::start() {
     /* Setup worker thread */        
     worker_thread_ = std::thread([this]() {
         io_context_.run();
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
     join_threads();
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
 
 void
@@ -631,5 +631,5 @@ controller::stop() {
     io_context_.stop();
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
-    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }

@@ -42,7 +42,7 @@ void method_node_inserter::add_output_argument(std::string _description, std::st
 UA_StatusCode method_node_inserter::add_method_node(UA_Server* _server, UA_NodeId _method_node_id, std::string _browse_name, UA_MethodCallback _method_callback, void* _node_context) {
     UA_StatusCode status_code = UA_STATUSCODE_BAD;
     if (is_method_node_added_) {
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Method node already added");
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "Method node already added");
         return status_code;
     }
     method_attributes_ = UA_MethodAttributes_default;

@@ -66,7 +66,7 @@ discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::stri
     for(size_t i = 0; i < application_description_array_size; i++) {
         UA_ApplicationDescription* description = &application_description_array[i];
         if(description->discoveryUrlsSize == 0) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_CLIENT,
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_CLIENT,
                         "Server %.*s did not provide any discovery urls. Skipping.",
                         (int)description->applicationUri.length, description->applicationUri.data);
             continue;
@@ -82,7 +82,7 @@ discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::stri
         }
         UA_String_clear(&application_uri);
 
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "Endpoint for Server[%lu]: %.*s = %.*s", (unsigned long) i,
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "Endpoint for Server[%lu]: %.*s = %.*s", (unsigned long) i,
                (int) description->applicationUri.length, description->applicationUri.data, (int) description->discoveryUrls[0].length, description->discoveryUrls[0].data);
 
         std::string discovery_url((char*) description->discoveryUrls[0].data, description->discoveryUrls[0].length);
@@ -106,7 +106,7 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
                     std::this_thread::sleep_for(std::chrono::seconds(1));
                     continue;
                 } else {
-                    UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Server registered successfully. Registering will be renewed in %d seconds", REGISTER_INTERVAL);
+                    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Server registered successfully. Registering will be renewed in %d seconds", REGISTER_INTERVAL);
                 }
                 {
                     std::unique_lock<std::mutex> lock(discovery_mutex_);

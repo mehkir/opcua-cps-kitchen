@@ -154,14 +154,11 @@ Recipes are defined in the [recipes.json](recipes.json) file in the root folder.
 Recipe IDs must be consecutive starting at 1 with no gaps (e.g. 1,2,3,4,5 is valid; 1,2,4,5 is invalid because 3 is missing).
 Only recipe timed actions must define a duration; other actions do not (see also [Define and Set Capabilities](#define-and-set-capabilities)).
 
-## Setting Time Units
-The actions and retooling of Robot-Agents and movement of the Conveyor-Agent are simulated with time.
-This is modeled with the number of time units each agent needs for a certain action, retooling or movement and the time unit itself.
-The time unit is set by the *TIME_UNIT* define in [time_unit.hpp](time_unit.hpp).
-For the number of time units consider the following files:
-- Robot Actions: You can define and set the time unit count for every action in [robot_actions.cpp](actions/src/robot_actions.cpp).
-- Robot Retooling: The time unit count for retooling can be set via the *RETOOLING_TIME* define in [robot_actions.hpp](actions/src/robot_actions.hpp).
-- Conveyor Movement: The time unit count for the conveyor movement can be set via the *MOVE_TIME* define in [conveyor.cpp](conveyor/src/conveyor.cpp). In addtion, the *DEBOUNCE_TIME* define sets the time unit count before the conveyor starts to move, after the first notification from a Robot-Agent is received.
+## Timing
+Action execution, tool changes (retooling), and conveyor movement are time-simulated.
+Global agent timing parameters are defined in [agent_timing.hpp](agent_timing.hpp).
+Per-action durations for Robot-Agents are configured in [robot_actions.cpp](actions/src/robot_actions.cpp).
+Update these files to adjust simulation speed and action-specific timings.
 
 ## Implement Your Own Scheduling Algorithm
 The Controller-Agent responds to "choose_next_robot" requests with a suitable robot for the next preparation steps of a recipe.

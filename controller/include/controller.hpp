@@ -186,7 +186,7 @@ struct remote_robot {
                             running_.store(false);
                             return UA_STATUSCODE_BAD;
                         }
-                        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                        // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
                     return UA_STATUSCODE_BAD;
                 });
@@ -306,8 +306,8 @@ struct remote_robot {
          */
         UA_StatusCode
         switch_position_to(position_t _new_position, size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "SWITCH POSTION: Instruct robot on position %d to switch to position %d", position_.load(), _new_position);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "SWITCH POSTION: Instruct robot on position %d to switch to position %d", position_.load(), _new_position);
             method_node_caller switch_robot_position_caller;
             switch_robot_position_caller.add_scalar_input_argument(&_new_position, UA_TYPES_UINT32);
             object_method_info omi = method_id_map_[SWITCH_POSITION];
@@ -334,8 +334,8 @@ struct remote_robot {
          */
         UA_StatusCode
         reconfigure_capabilities(std::string _new_capabilities_profile, size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RECONFIGURE CAPABILITIES: Instruct robot on position %d to reconfigure capabilities to profile %s", position_.load(), _new_capabilities_profile.c_str());
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RECONFIGURE CAPABILITIES: Instruct robot on position %d to reconfigure capabilities to profile %s", position_.load(), _new_capabilities_profile.c_str());
             method_node_caller reconfigure_robot_caller;
             UA_String new_capabilities_profile = UA_STRING_ALLOC(_new_capabilities_profile.c_str());
             reconfigure_robot_caller.add_scalar_input_argument(&new_capabilities_profile, UA_TYPES_STRING);
@@ -364,8 +364,8 @@ struct remote_robot {
          */
         UA_StatusCode
         commit_new_position(size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "COMMIT NEW POSTION: Commit the remote robot's new position %d", position_.load());
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "COMMIT NEW POSTION: Commit the remote robot's new position %d", position_.load());
             method_node_caller commit_new_position_caller;
             object_method_info omi = method_id_map_[COMMIT_NEW_POSITION];
             UA_StatusCode status = UA_STATUSCODE_GOOD;
@@ -411,7 +411,7 @@ struct remote_robot {
                 return;
             }
             self->position_swapped_callback_(old_position, self->position_.load());
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position changed from %d to %d", __FUNCTION__, old_position, self->position_.load());
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position changed from %d to %d", __FUNCTION__, old_position, self->position_.load());
         }
 
         /**
@@ -474,7 +474,7 @@ struct remote_robot {
                 return;
             }
             self->overall_time_.store(*(UA_UInt32*) _value->value.data);
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's overall time at position %d is %ld", __FUNCTION__, self->position_.load(), self->overall_time_);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's overall time at position %d is %ld", __FUNCTION__, self->position_.load(), self->overall_time_);
         }
 
         /**
@@ -501,7 +501,7 @@ struct remote_robot {
                 return;
             }
             self->last_equipped_tool_.store(*(robot_tool*) _value->value.data);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, self->position_.load(), robot_tool_to_string(self->last_equipped_tool_.load()));
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's last equipped tool at position %d is %s", __FUNCTION__, self->position_.load(), robot_tool_to_string(self->last_equipped_tool_.load()));
         }
 
         /**
@@ -624,7 +624,7 @@ struct next_robot_receiver {
                             running_.store(false);
                             return UA_STATUSCODE_BAD;
                         }
-                        // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
+                        // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Starting the next client iterate", __FUNCTION__);
                     }
                     return UA_STATUSCODE_BAD;
                 });
@@ -668,8 +668,8 @@ struct next_robot_receiver {
          */
         UA_StatusCode
         receive_next_robot(position_t _robot_position, std::string _robot_endpoint, recipe_id_t _recipe_id, size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "RECEIVE NEXT ROBOT: Respond to next robot receiver (%s,%s) with robot position %d for recipe id %d", endpoint_.c_str(), type_.c_str(), _robot_position, _recipe_id);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RECEIVE NEXT ROBOT: Respond to next robot receiver (%s,%s) with robot position %d for recipe id %d", endpoint_.c_str(), type_.c_str(), _robot_position, _recipe_id);
             method_node_caller receive_next_robot_caller;
             receive_next_robot_caller.add_scalar_input_argument(&_robot_position, UA_TYPES_UINT32);
             UA_String robot_endpoint = UA_STRING_ALLOC(_robot_endpoint.c_str());

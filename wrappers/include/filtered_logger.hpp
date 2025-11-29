@@ -52,9 +52,10 @@ public:
      * 
      */
     ~filtered_logger();
+
     /**
      * @brief Creates a filtered logger instance.
-     * @param _level minimum log level.
+     * @param _level the log level.
      * @param _category category to allow (others ignored).
      * @return UA_Logger struct suitable for UA_ServerConfig.
      */

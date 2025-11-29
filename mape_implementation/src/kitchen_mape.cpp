@@ -4,7 +4,7 @@
 
 remote_robot*
 kitchen_mape::on_new_order(const std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) {
-    return simple_reconfiguration(_position_remote_robot_map, _recipe_action_queue);
+    return simple_capability_check(_position_remote_robot_map, _recipe_action_queue);
 }
 
 // Simple capability check
@@ -36,7 +36,7 @@ kitchen_mape::simple_rearranging(const std::map<position_t, std::unique_ptr<remo
         remote_robot* robot = position_remote_robot->second.get();
         if (!robot->is_adaptivity_pending() && robot->is_capable_to(next_action)) {
             suitable_robot = robot;
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot at position %d %s", suitable_robot->get_position(), suitable_robot->get_capabilites_string().c_str());
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot at position %d %s", suitable_robot->get_position(), suitable_robot->get_capabilites_string().c_str());
             break;
         }
     }
@@ -56,14 +56,14 @@ kitchen_mape::simple_rearranging(const std::map<position_t, std::unique_ptr<remo
             remote_robot* robot = position_remote_robot->second.get();
             if (!robot->is_adaptivity_pending() && robot->is_capable_to(action_queue_copy.front().get_name())) {
                 suitable_robot_after_next = robot;
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot after next at position %d %s", suitable_robot_after_next->get_position(), suitable_robot_after_next->get_capabilites_string().c_str());
+                UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot after next at position %d %s", suitable_robot_after_next->get_position(), suitable_robot_after_next->get_capabilites_string().c_str());
                 break;
             }
         }
     }
     if (suitable_robot != nullptr && suitable_robot_after_next != nullptr
         && (suitable_robot->get_position() > suitable_robot_after_next->get_position())) {
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Swap robots at position %d and %d", suitable_robot->get_position(), suitable_robot_after_next->get_position());
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "MAPE: Swap robots at position %d and %d", suitable_robot->get_position(), suitable_robot_after_next->get_position());
             swap_robot_positions_callback_(suitable_robot->get_position(), suitable_robot_after_next->get_position());
     }
     return suitable_robot;
@@ -85,7 +85,7 @@ kitchen_mape::simple_reconfiguration(const std::map<position_t, std::unique_ptr<
         remote_robot* robot = position_remote_robot->second.get();
         if (!robot->is_adaptivity_pending() && robot->is_capable_to(first_action)) {
             suitable_robot = robot;
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot at position %d %s", suitable_robot->get_position(), suitable_robot->get_capabilites_string().c_str());
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot at position %d %s", suitable_robot->get_position(), suitable_robot->get_capabilites_string().c_str());
             break;
         }
     }
@@ -97,7 +97,7 @@ kitchen_mape::simple_reconfiguration(const std::map<position_t, std::unique_ptr<
     for (auto it : get_capabilites()) {
         if (it.second.is_capable_to(first_action)) {
             new_possible_profile_for_robot_after_next = it.first;
-            UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Found possible capabilities profile %s for robot after next", it.first.c_str());
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "MAPE: Found possible capabilities profile %s for robot after next", it.first.c_str());
             break;
         }
     }
@@ -114,7 +114,7 @@ kitchen_mape::simple_reconfiguration(const std::map<position_t, std::unique_ptr<
             remote_robot* robot = position_remote_robot->second.get();
             if (!robot->is_adaptivity_pending() && robot->is_capable_to(after_next_action)) {
                 suitable_robot_after_next = robot;
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot after next at position %d %s", suitable_robot_after_next->get_position(), suitable_robot_after_next->get_capabilites_string().c_str());
+                UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "MAPE: Found next suitable robot after next at position %d %s", suitable_robot_after_next->get_position(), suitable_robot_after_next->get_capabilites_string().c_str());
                 break;
             }
         }
@@ -125,12 +125,12 @@ kitchen_mape::simple_reconfiguration(const std::map<position_t, std::unique_ptr<
         for (auto it : get_capabilites()) {
             if (it.second.is_capable_to(after_next_action)) {
                 new_possible_profile_for_suitable_robot = it.first;
-                UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Found possible capabilities profile %s for suitable robot", it.first.c_str());
+                UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "MAPE: Found possible capabilities profile %s for suitable robot", it.first.c_str());
                 break;
             }
         }
         if (!after_next_action.empty() && (first_action.compare(after_next_action)) && !new_possible_profile_for_suitable_robot.empty() && !new_possible_profile_for_robot_after_next.empty())
-        UA_LOG_INFO(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "MAPE: Swap capability profiles at position %d and %d with %s and %s, respectively", suitable_robot->get_position(), suitable_robot_after_next->get_position(), new_possible_profile_for_suitable_robot.c_str(), new_possible_profile_for_robot_after_next.c_str());
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "MAPE: Swap capability profiles at position %d and %d with %s and %s, respectively", suitable_robot->get_position(), suitable_robot_after_next->get_position(), new_possible_profile_for_suitable_robot.c_str(), new_possible_profile_for_robot_after_next.c_str());
         reconfigure_robot_callback_(suitable_robot->get_position(), new_possible_profile_for_suitable_robot);
         reconfigure_robot_callback_(suitable_robot_after_next->get_position(), new_possible_profile_for_robot_after_next);
     }
