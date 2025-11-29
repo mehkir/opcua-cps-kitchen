@@ -157,7 +157,7 @@ Only recipe timed actions must define a duration; other actions do not (see also
 ## Setting Time Units
 The actions and retooling of Robot-Agents and movement of the Conveyor-Agent are simulated with time.
 This is modeled with the number of time units each agent needs for a certain action, retooling or movement and the time unit itself.
-The time unit is set by the *TIME_UNIT* define in [time_unit.hpp](time_unit.hpp).
+The time unit is set by the *TIME_UNIT* define in [agent_timing.hpp](agent_timing.hpp).
 For the number of time units consider the following files:
 - Robot Actions: You can define and set the time unit count for every action in [robot_actions.cpp](actions/src/robot_actions.cpp).
 - Robot Retooling: The time unit count for retooling can be set via the *RETOOLING_TIME* define in [robot_actions.hpp](actions/src/robot_actions.hpp).

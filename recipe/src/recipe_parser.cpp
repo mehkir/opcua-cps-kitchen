@@ -10,7 +10,7 @@
 #include <iostream>
 
 #include "types.hpp"
-#include "time_unit.hpp"
+#include "agent_timing.hpp"
 
 #define DISH_NAME_KEY "name"
 #define INSTRUCTIONS_KEY "instructions"

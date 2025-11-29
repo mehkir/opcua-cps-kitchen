@@ -8,7 +8,7 @@
 #include <chrono>
 #include <set>
 #include "client_connection_establisher.hpp"
-#include "time_unit.hpp"
+#include "agent_timing.hpp"
 #include "filtered_logger.hpp"
 #include "browsenames.h"
 #include "discovery_and_connection.hpp"

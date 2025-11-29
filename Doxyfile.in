@@ -17,7 +17,7 @@ INPUT                  = \
                         "@CMAKE_SOURCE_DIR@/start_conveyor_instance.cpp" \
                         "@CMAKE_SOURCE_DIR@/start_kitchen_instance.cpp" \
                         "@CMAKE_SOURCE_DIR@/start_robot_instance.cpp" \
-                        "@CMAKE_SOURCE_DIR@/time_unit.hpp" \
+                        "@CMAKE_SOURCE_DIR@/agent_timing.hpp" \
                         "@CMAKE_SOURCE_DIR@/types.hpp" \
                         "@CMAKE_SOURCE_DIR@/README.md"
 EXCLUDE                = "@CMAKE_SOURCE_DIR@/build" "@CMAKE_SOURCE_DIR@/build_debug" "@CMAKE_SOURCE_DIR@/build_sanitized"

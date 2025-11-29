@@ -6,7 +6,7 @@
 #include <set>
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
-#include "time_unit.hpp"
+#include "agent_timing.hpp"
 #include "timestamp_recorder.hpp"
 
 #define INSTANCE_NAME "CpsKitchen"
@@ -274,7 +274,8 @@ kitchen::handle_random_order_request() {
     auto do_place = [this] {
         increment_orders_counter(RECEIVED_ORDERS);
         bool instructed = false;
-        recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
+        // recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
+        recipe_id_t recipe_id = 1;
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
         object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
         UA_Variant* output = nullptr;
@@ -327,7 +328,7 @@ kitchen::handle_random_order_request() {
 
 void
 kitchen::arm_placing_gate() {
-    placing_timer_.expires_after(std::chrono::milliseconds(PlACING_RATE));
+    placing_timer_.expires_after(std::chrono::milliseconds(PLACING_RATE));
     placing_timer_.async_wait([this](const boost::system::error_code& ec){
         if (ec) {
             // timer cancelled on shutdown; ignore

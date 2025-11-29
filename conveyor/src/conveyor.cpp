@@ -4,7 +4,7 @@
 #include <string>
 #include <memory>
 #include "callback_scheduler.hpp"
-#include "time_unit.hpp"
+#include "agent_timing.hpp"
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
 
