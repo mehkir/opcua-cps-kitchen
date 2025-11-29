@@ -27,8 +27,8 @@ if (USE_CUSTOM_VERSION)
     link_directories("${OPEN62541_DIR}/lib")
 endif()
 
-add_compile_definitions(DISABLED_LOGGING)
-# add_compile_definitions(FILTERED_LOGGING)
+add_compile_definitions(APP_LOGGER=NULL)
+add_compile_definitions(FILTERED_LOGGING)
 add_compile_definitions(ROBOT_SEED=5489u KITCHEN_SEED=5489u)
 
 add_subdirectory(timestamp)
