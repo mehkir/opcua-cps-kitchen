@@ -274,8 +274,7 @@ kitchen::handle_random_order_request() {
     auto do_place = [this] {
         increment_orders_counter(RECEIVED_ORDERS);
         bool instructed = false;
-        // recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
-        recipe_id_t recipe_id = 1;
+        recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
         object_method_info omi = method_id_map_[CHOOSE_NEXT_ROBOT];
         UA_Variant* output = nullptr;
