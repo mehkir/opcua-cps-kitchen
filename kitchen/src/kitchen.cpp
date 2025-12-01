@@ -280,21 +280,11 @@ kitchen::handle_random_order_request() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (evaluate_orders_count_ > 0) timestamp_recorder::get_instance()->record_timestamp(0);
     remove_stopped_robots();
-    auto do_place = [this] {
-        increment_orders_counter(RECEIVED_ORDERS);
-        bool instructed = false;
-        recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
-        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
-        call_choose_next_robot(recipe_id);
-    };
-
-    if (placing_gate_open_) {
-        placing_gate_open_ = false;
-        do_place();
-        arm_placing_gate();
-    } else {
-        placing_queue_.push(std::move(do_place));
-    }
+    increment_orders_counter(RECEIVED_ORDERS);
+    bool instructed = false;
+    recipe_id_t recipe_id = uniform_int_distribution_(mersenne_twister_);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", recipe_id);
+    call_choose_next_robot(recipe_id);
 }
 
 void
@@ -337,25 +327,6 @@ kitchen::call_choose_next_robot(recipe_id_t _recipe_id) {
     }
     bool result = choose_next_robot_called(output_size, output);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Controller returned %s for next robot request.", result ? "true" : "false");
-}
-
-void
-kitchen::arm_placing_gate() {
-    placing_timer_.expires_after(std::chrono::milliseconds(PLACING_RATE));
-    placing_timer_.async_wait([this](const boost::system::error_code& ec){
-        if (ec) {
-            // timer cancelled on shutdown; ignore
-            return;
-        }
-        if (!placing_queue_.empty()) {
-            auto task = std::move(placing_queue_.front());
-            placing_queue_.pop();
-            task();
-            arm_placing_gate();
-        } else {
-            placing_gate_open_ = true;
-        }
-    });
 }
 
 UA_StatusCode

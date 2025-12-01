@@ -422,13 +422,6 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     /**
-     * @brief Arms the placing gate.
-     * 
-     */
-    void
-    arm_placing_gate();
-
-    /**
      * @brief Handles the random order request.
      * 
      */

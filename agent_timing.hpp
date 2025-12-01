@@ -20,6 +20,4 @@
 #define DEBOUNCE_TIME 100LL
 #define CONVEYOR_MOVE_TIME 100LL
 
-/* Kitchen-Agent */
-#define PLACING_RATE 50LL
 #endif // TIME_UNIT_HPP
