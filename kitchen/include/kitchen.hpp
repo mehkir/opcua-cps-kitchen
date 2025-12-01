@@ -422,18 +422,51 @@ private:
             size_t _output_size, UA_Variant* _output);
 
     /**
-     * @brief Arms the placing gate.
-     * 
-     */
-    void
-    arm_placing_gate();
-
-    /**
      * @brief Handles the random order request.
      * 
      */
     void
     handle_random_order_request();
+
+    /**
+     * @brief Calls the conveyor's choose next robot.
+     * 
+     * @param _recipe_id the recipe id.
+     */
+    void
+    call_choose_next_robot(recipe_id_t _recipe_id);
+
+    /**
+     * @brief Places an order.
+     * 
+     * @param _server the server instance from which this method is called.
+     * @param _session_id the client session id.
+     * @param _session_context user-defined context data passed via the access control/plugin.
+     * @param _method_id the node id of this method.
+     * @param _method_context user-defined context data passed to the method node.
+     * @param _object_id node id of the object or object type on which the method is called (the “parent” that hasComponent to the method).
+     * @param _object_context user-defined context data passed to that object/ObjectType node. Use for instance-specific state.
+     * @param _input_size the count of the input parameters.
+     * @param _input the input pointer of the input parameters.
+     * @param _output_size the allocated output size.
+     * @param _output the output pointer to store return parameters.
+     * @return UA_StatusCode the status code.
+     */
+    static UA_StatusCode
+    place_order(UA_Server* _server,
+            const UA_NodeId* _session_id, void* _session_context,
+            const UA_NodeId* _method_id, void* _method_context,
+            const UA_NodeId* _object_id, void* _object_context,
+            size_t _input_size, const UA_Variant* _input,
+            size_t _output_size, UA_Variant* _output);
+
+    /**
+     * @brief Handles the order request.
+     * 
+     * @param _recipe_id the recipe id.
+     */
+    void
+    handle_order_request(recipe_id_t _recipe_id);
 
     /**
      * @brief Extracts the returned remote robot parameters.
