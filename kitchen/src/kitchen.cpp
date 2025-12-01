@@ -393,10 +393,14 @@ kitchen::place_order(UA_Server* _server,
 
 void
 kitchen::handle_order_request(recipe_id_t _recipe_id) {
+    if (_recipe_id < 1 || _recipe_id > recipe_parser_.get_recipe_count()) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "PLACE ORDER: Recipe id %d is out of range [1,%d] of known recipes", _recipe_id, recipe_parser_.get_recipe_count());
+        return;
+    }
     if (evaluate_orders_count_ > 0) timestamp_recorder::get_instance()->record_timestamp(0);
     increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
-    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RANDOM ORDER: Generated recipe with the ID %d", _recipe_id);
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "PLACE ORDER: Order placed for recipe with the ID %d", _recipe_id);
     call_choose_next_robot(_recipe_id);
 }
 
