@@ -1,4 +1,5 @@
 const DISCOVERY_URL = "opc.tcp://localhost:4840";
+const PLACING_RATE_MS = 50;
 const my_module = require('../cps-kitchen-dashboard/my-addons/my_module.node');
 const { Kitchen } = require('../cps-kitchen-dashboard/browsenames');
 const {
@@ -118,6 +119,13 @@ class subscriber {
     }
 }
 
+async function read_attribute_value(_node_id) {
+    const data_value = await kitchen.session.read({
+        nodeId: _node_id,
+    });
+    return data_value.value.value;
+}
+
 async function browse_kitchen_instance (_server, _instance_id) {
     const kitchen = { 
         methods: {},
@@ -157,17 +165,9 @@ async function subscribe_kitchen (_kitchen) {
     }
 }
 
-async function place_order() {
-    if (order_queue.length === 0) {
-        console.log("All orders have been placed.");
-        return;
-    }
-    const order_id = order_queue[0];
-}
-
 function assigned_orders_callback(value) {
     console.log(`🍽️ Assigned Orders updated: ${value}`);
-    if (value === 0) {
+    if (value === initial_assigned_orders) {
         place_order();
     } else {
         order_queue.shift();
@@ -208,6 +208,7 @@ function get_recipe_count() {
 
 async function connect_to_kitchen() {
     console.log('Connecting to kitchen');
+    kitchen.client = null;
     kitchen.client = OPCUAClient.create({});
     kitchen.session = null;
     try {
@@ -221,8 +222,13 @@ async function connect_to_kitchen() {
     }
 }
 
-async function place_order (_order_id) {
-    await new Promise(resolve => setTimeout(resolve, 50));
+async function place_order() {
+    if (order_queue.length === 0) {
+        console.log("All orders have been placed.");
+        process.exit(0);
+    }
+    const _order_id = order_queue[0];
+    await new Promise(resolve => setTimeout(resolve, PLACING_RATE_MS));
     console.log("Place order");
     const method_id = kitchen.methods['PlaceOrder'];
     try {
@@ -230,19 +236,19 @@ async function place_order (_order_id) {
             objectId: kitchen.instance_id,
             methodId: method_id,
             inputArguments: [
-            { dataType: "Int32", value: _order_id }
+            { dataType: "UInt32", value: _order_id }
             ]
         });
         console.log("Method call result:", result);
     } catch (err) {
         console.error("Error calling kitchen method:", err);
-    } finally {
         process.exit(1);
     }
 }
 
 let kitchen = null;
 let kitchen_subscriber = null;
+let initial_assigned_orders = 0;
 const order_queue = [];
 const mt_generator = new MersenneTwister(5489);
 
@@ -257,7 +263,7 @@ async function main() {
     }
     console.log("Order Count:", order_count);
     for (let i = 0; i < order_count; i++) {
-        const order_id = mt_generator.random_int_in_range(1, get_recipe_count());
+        const order_id = random_int_in_range(1, get_recipe_count());
         order_queue.push(order_id);
     }
     const opcua_browser_instance = new opcua_browser();
@@ -268,7 +274,6 @@ async function main() {
         console.log(`${error} (is the discovery server started?)`);
         process.exit(1);
     }
-
     for (const server of servers) {
         if (server.applicationType !== ApplicationType.Server) {
             console.log(`Skipping non-server application: ${server.applicationUri}`);
@@ -284,6 +289,8 @@ async function main() {
         ) {
             console.log(`Kitchen type found on server: ${server.discoveryUrl}`);
             kitchen = await browse_kitchen_instance(server, instance_id);
+            await connect_to_kitchen();
+            initial_assigned_orders = await read_attribute_value(kitchen.attributes[Kitchen.ASSIGNED_ORDERS]);
             await subscribe_kitchen(kitchen);
         }
     }
