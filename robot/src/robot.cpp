@@ -19,7 +19,7 @@
 robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_rearranging_(false), already_reconfiguring_(false),
         is_dish_finished_(false), running_(true), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
-        conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_state_(robot_state::AVAILABLE), new_target_position_(0), new_capabilities_profile_(""),
+        conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_adaptivity_state_(robot_adaptivity_state::AVAILABLE), new_target_position_(0), new_capabilities_profile_(""),
     #ifdef ROBOT_SEED
         mersenne_twister_(ROBOT_SEED),
     #else
@@ -315,8 +315,8 @@ robot::receive_task(UA_Server *_server,
     robot* self = static_cast<robot*>(_method_context);
     UA_Boolean task_received = true;
     {
-        std::lock_guard<std::mutex> lock(self->state_mutex_);
-        if (self->robot_state_ != robot_state::AVAILABLE || addressed_position != self->position_) {
+        std::lock_guard<std::mutex> lock(self->adaptivity_state_mutex_);
+        if (self->robot_adaptivity_state_ != robot_adaptivity_state::AVAILABLE || addressed_position != self->position_) {
             task_received = false;
         }
     }
@@ -372,12 +372,12 @@ void
 robot::cook_next_order() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     {
-        std::lock_guard<std::mutex> lock(state_mutex_);
-        if (robot_state_ == robot_state::REARRANGING) {
+        std::lock_guard<std::mutex> lock(adaptivity_state_mutex_);
+        if (robot_adaptivity_state_ == robot_adaptivity_state::REARRANGING) {
             handle_switch_position();
             return;
         }
-        if (robot_state_ == robot_state::RECONFIGURING) {
+        if (robot_adaptivity_state_ == robot_adaptivity_state::RECONFIGURING) {
             handle_reconfiguration();
             return;
         }
@@ -828,10 +828,10 @@ robot::switch_position(UA_Server *_server,
     }
     {
         bool availability = false;
-        std::lock_guard<std::mutex> lock(self->state_mutex_);
-        if (self->robot_state_ == robot_state::AVAILABLE
+        std::lock_guard<std::mutex> lock(self->adaptivity_state_mutex_);
+        if (self->robot_adaptivity_state_ == robot_adaptivity_state::AVAILABLE
             && self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN) == UA_STATUSCODE_GOOD) {
-            self->robot_state_ = robot_state::REARRANGING;
+            self->robot_adaptivity_state_ = robot_adaptivity_state::REARRANGING;
             UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "REARRANGING: Robot at position %d will switch to its new position %d", self->position_, self->new_target_position_);
             self->io_context_.post([self, new_position] {
                 self->new_target_position_ = new_position;
@@ -914,8 +914,8 @@ robot::commit_new_position(UA_Server *_server,
     UA_Boolean new_commit_is_pending = *(UA_Boolean*) new_commit_is_pending_var.data;
     UA_Variant_clear(&new_commit_is_pending_var);
     {
-        std::lock_guard<std::mutex> lock(self->state_mutex_);
-        if (self->robot_state_ != robot_state::REARRANGING || !new_commit_is_pending) {
+        std::lock_guard<std::mutex> lock(self->adaptivity_state_mutex_);
+        if (self->robot_adaptivity_state_ != robot_adaptivity_state::REARRANGING || !new_commit_is_pending) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: The robot is not rearranging or there is no new position commit pending", __FUNCTION__);
             result = false;
             UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
@@ -947,8 +947,8 @@ robot::handle_new_position_commit() {
     bool new_position_commit_is_pending = false;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, &new_position_commit_is_pending, UA_TYPES_BOOLEAN);
     {
-        std::lock_guard<std::mutex> lock(state_mutex_);
-        robot_state_ = robot_state::AVAILABLE;
+        std::lock_guard<std::mutex> lock(adaptivity_state_mutex_);
+        robot_adaptivity_state_ = robot_adaptivity_state::AVAILABLE;
         bool availability = true;
         robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN);
     }
@@ -996,10 +996,10 @@ robot::reconfigure(UA_Server *_server,
     }
     {
         bool availability = false;
-        std::lock_guard<std::mutex> lock(self->state_mutex_);
-        if (self->robot_state_ == robot_state::AVAILABLE
+        std::lock_guard<std::mutex> lock(self->adaptivity_state_mutex_);
+        if (self->robot_adaptivity_state_ == robot_adaptivity_state::AVAILABLE
             && self->robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN) == UA_STATUSCODE_GOOD) {
-            self->robot_state_ = robot_state::RECONFIGURING;
+            self->robot_adaptivity_state_ = robot_adaptivity_state::RECONFIGURING;
             self->new_capabilities_profile_ = std::string((char*) new_capabilities_profile.data, new_capabilities_profile.length);
             self->io_context_.post([self] {
                 if (!self->preparing_dish_) {
@@ -1041,7 +1041,7 @@ void
 robot::complete_reconfiguration() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     {
-        std::lock_guard<std::mutex> lock(state_mutex_);
+        std::lock_guard<std::mutex> lock(adaptivity_state_mutex_);
         capability_parser_ = capability_parser(new_capabilities_profile_);
         new_capabilities_profile_ = "";
         set_capabilities_node();
@@ -1060,7 +1060,7 @@ robot::complete_reconfiguration() {
             handle_receive_task(recipe_id, overall_processed_steps);
         }
         already_reconfiguring_ = false;
-        robot_state_ = robot_state::AVAILABLE;
+        robot_adaptivity_state_ = robot_adaptivity_state::AVAILABLE;
         bool availability = true;
         robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, AVAILABILITY, &availability, UA_TYPES_BOOLEAN);
     }
@@ -1190,12 +1190,12 @@ robot::start() {
                         robot_type_inserter_.get_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, new_position_commit_is_pending_val);
                         UA_Boolean new_position_commit_is_pending = *(UA_Boolean*) new_position_commit_is_pending_val.data;
                         UA_Variant_clear(&new_position_commit_is_pending_val);
-                        robot_state rs;
+                        robot_adaptivity_state ras;
                         {
-                            std::lock_guard<std::mutex> lock(state_mutex_);
-                            rs = robot_state_;
+                            std::lock_guard<std::mutex> lock(adaptivity_state_mutex_);
+                            ras = robot_adaptivity_state_;
                         }
-                        if ((rs == robot_state::AVAILABLE || new_position_commit_is_pending) && discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) == UA_STATUSCODE_GOOD) {
+                        if ((ras == robot_adaptivity_state::AVAILABLE || new_position_commit_is_pending) && discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE) == UA_STATUSCODE_GOOD) {
                             method_node_caller register_robot_caller;
                             register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
                             register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);

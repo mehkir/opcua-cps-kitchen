@@ -123,8 +123,8 @@ private:
     bool is_dish_finished_; /**< flag to indicate whether the robot is holding a completed dish or partially finished dish. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
     std::atomic<bool> pending_pickup_; /**< flag to indicate whether there is a pending pickup for an sucessfully sent notifcation to the conveyor. */
-    robot_state robot_state_; /**< state to indicate if robot is either available or performing an adaptive action */
-    std::mutex state_mutex_; /**< the mutex to synchronize robot state checks. */
+    robot_adaptivity_state robot_adaptivity_state_; /**< state to indicate if robot is either available or performing an adaptive action */
+    std::mutex adaptivity_state_mutex_; /**< the mutex to synchronize robot adaptivity state checks. */
     position_t new_target_position_; /**< new target position requested by the controller. */
     std::string new_capabilities_profile_; /**< new capabilities profile requested by the controller */
     discovery_util discovery_util_; /**< the discovery utility. */

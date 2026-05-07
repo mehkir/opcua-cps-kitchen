@@ -10,27 +10,27 @@
 #include <string>
 
 /**
- * @brief The robot states
+ * @brief The robot adaptivity states
  * 
  */
-enum class robot_state {
+enum class robot_adaptivity_state {
     AVAILABLE,
     REARRANGING,
     RECONFIGURING
 };
 
 /**
- * @brief Returns the corresponding string for a robot state.
+ * @brief Returns the corresponding string for a robot adaptivity state.
  * 
- * @param _state the robot state.
+ * @param _adaptivity_state the robot's adaptivity state.
  * @return std::string the corresponding string.
  */
 static std::string
-robot_state_to_string(robot_state _state) {
-    switch (_state) {
-        case robot_state::AVAILABLE: return "AVAILABLE";
-        case robot_state::REARRANGING: return "REARRANGING";
-        case robot_state::RECONFIGURING: return "RECONFIGURING";
+robot_adaptivity_state_to_string(robot_adaptivity_state _adaptivity_state) {
+    switch (_adaptivity_state) {
+        case robot_adaptivity_state::AVAILABLE: return "AVAILABLE";
+        case robot_adaptivity_state::REARRANGING: return "REARRANGING";
+        case robot_adaptivity_state::RECONFIGURING: return "RECONFIGURING";
         default: return "Unimplemented item";
     }
 }
