@@ -19,7 +19,7 @@
 robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_rearranging_(false), already_reconfiguring_(false),
         is_dish_finished_(false), running_(true), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
-        conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_adaptivity_state_(robot_adaptivity_state::AVAILABLE), new_target_position_(0), new_capabilities_profile_(""),
+        conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_state_(robot_state::IDLING), robot_adaptivity_state_(robot_adaptivity_state::AVAILABLE), new_target_position_(0), new_capabilities_profile_(""),
     #ifdef ROBOT_SEED
         mersenne_twister_(ROBOT_SEED),
     #else
@@ -57,6 +57,7 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     robot_type_inserter_.add_attribute(ROBOT_TYPE, OVERALL_PROCESSING_STEPS);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, AVAILABILITY);
     robot_type_inserter_.add_attribute(ROBOT_TYPE, NEW_POSITION_COMMIT_IS_PENDING);
+    robot_type_inserter_.add_attribute(ROBOT_TYPE, ROBOT_STATE);
     /* Add receive task method node */
     method_arguments receive_task_method_arguments;
     receive_task_method_arguments.add_input_argument("the recipe id", "recipe_id", UA_TYPES_UINT32);
@@ -162,6 +163,8 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     /* Set new position commit is pending */
     bool initial_new_position_commit_is_pending = false;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, NEW_POSITION_COMMIT_IS_PENDING, &initial_new_position_commit_is_pending, UA_TYPES_BOOLEAN);
+    /* Set robot state */
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
     /* Run the robot server */
     status = UA_Server_run_startup(server_);
     if (status != UA_STATUSCODE_GOOD) {
@@ -384,6 +387,8 @@ robot::cook_next_order() {
     }
     if (order_queue_.empty()) {
         statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::IDLING);
+        robot_state_ = robot_state::IDLING;
+        robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
         preparing_dish_ = false;
         return;
     }
@@ -588,6 +593,8 @@ robot::determine_next_action() {
         if (required_tool != current_tool_) {
             UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RETOOLING);
+            robot_state_ = robot_state::RETOOLING;
+            robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
             if (RETOOLING_TIME > 0) {
                 steady_timer_.expires_from_now(std::chrono::milliseconds(1));
                 steady_timer_.async_wait([this](const boost::system::error_code& _error) {
@@ -615,6 +622,8 @@ robot::determine_next_action() {
             duration_t action_duration = robot_act.get_action_duration();
             UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld ms", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
             statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::COOKING);
+            robot_state_ = robot_state::COOKING;
+            robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
             if (action_duration > 0) {
                 steady_timer_.expires_from_now(std::chrono::milliseconds(1));
                 steady_timer_.async_wait([this, action_duration](const boost::system::error_code& _error) {
@@ -681,6 +690,8 @@ robot::notify_conveyor() {
     }
     receive_finished_order_notification_called(output_size, output);
     statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::WAITING_FOR_PICKUP);
+    robot_state_ = robot_state::WAITING_FOR_PICKUP;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
 }
 
 void
@@ -862,6 +873,8 @@ robot::handle_switch_position() {
     uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
     uint32_t distance = std::min(cw, ccw);
     statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::REARRANGING);
+    robot_state_ = robot_state::REARRANGING;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
     steady_timer_.expires_from_now(std::chrono::milliseconds(distance * ROBOT_MOVE_TIME));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
@@ -1026,6 +1039,8 @@ robot::handle_reconfiguration() {
         return;
     already_reconfiguring_ = true;
     statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RECONFIGURING);
+    robot_state_ = robot_state::RECONFIGURING;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
     steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
@@ -1277,6 +1292,8 @@ robot::start() {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
     statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::IDLING);
+    robot_state_ = robot_state::IDLING;
+    robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
     join_threads();
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
