@@ -41,7 +41,6 @@ discovery_util::deregister_server(UA_Server* _server) {
 
 UA_StatusCode
 discovery_util::lookup_endpoints(std::vector<std::string>& _endpoints, std::string _application_uri) {
-    /* Example for calling FindServers */
     UA_ApplicationDescription* application_description_array = NULL;
     size_t application_description_array_size = 0;
 
