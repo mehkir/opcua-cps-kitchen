@@ -45,6 +45,7 @@ add_subdirectory(controller)
 add_subdirectory(mape_implementation)
 add_subdirectory(conveyor)
 add_subdirectory(kitchen)
+add_subdirectory(event_collector)
 
 add_executable(start_robot_instance start_robot_instance.cpp)
 target_link_libraries(start_robot_instance PUBLIC robot_lib)
@@ -65,6 +66,10 @@ target_include_directories(start_kitchen_instance PUBLIC ${PROJECT_BINARY_DIR} $
 add_executable(statistics-writer-main statistics-writer-main.cpp)
 target_link_libraries(statistics-writer-main PUBLIC statistics_lib)
 target_include_directories(statistics-writer-main PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/statistics/include)
+
+add_executable(start_event_collector start_event_collector.cpp)
+target_link_libraries(start_event_collector PUBLIC event_collector_lib)
+target_include_directories(start_event_collector PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/event_collector/include)
 
 # Find Doxygen
 find_package(Doxygen QUIET)
