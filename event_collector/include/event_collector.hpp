@@ -22,6 +22,7 @@
 #include "client_connection_establisher.hpp"
 #include "browsenames.h"
 #include "robot_state.hpp"
+#include "robot_timestamp_recorder.hpp"
 
 using namespace cps_kitchen;
 
@@ -40,6 +41,7 @@ struct remote_robot {
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
         std::thread client_iterate_thread_; /**< the client iteration thread. */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
+        robot_timestamp_recorder timestamp_recorder_; /**< the timestamp recorder reference to record robot state changes. */
 
     public:
         /**
@@ -50,7 +52,7 @@ struct remote_robot {
          */
         remote_robot(std::string _endpoint, position_t _position) :
                     endpoint_(_endpoint), position_(_position), client_(nullptr),
-                    running_(true) {
+                    running_(true), timestamp_recorder_(_endpoint) {
         }
 
         /**
@@ -130,6 +132,7 @@ struct remote_robot {
             running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
+            timestamp_recorder_.write_timestamps();
             nv_subscriber_.reset();
             UA_Client_delete(client_);
         }
@@ -206,6 +209,7 @@ struct remote_robot {
                 return;
             }
             self->state_.store(*(robot_state*) _value->value.data);
+            self->timestamp_recorder_.record_timestamp(self->position_.load(), self->state_.load());
             // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's state at position %d is %s", __FUNCTION__, self->position_.load(), robot_state_to_string(self->state_.load()).c_str());
         }
 

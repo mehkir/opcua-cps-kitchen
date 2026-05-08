@@ -10,4 +10,5 @@ $(which cmake) --build "${PROJECT_DIR}/build_debug" --config Debug --target \
     start_controller_instance \
     start_conveyor_instance \
     start_kitchen_instance \
+    start_event_collector \
     -- -j$(nproc)
