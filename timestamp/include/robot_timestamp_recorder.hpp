@@ -32,13 +32,24 @@ public:
      * @param _position the robot position.
      * @param _state the robot state.
      */
-    void record_timestamp(position_t _position, robot_state _state);
+    void
+    record_timestamp(position_t _position, robot_state _state);
 
     /**
      * @brief Writes the recorded timestamps to a csv file.
      * 
      */
-    void write_timestamps();
+    void
+    write_timestamps();
+
+    /**
+     * @brief Sanitizes an endpoint string for use as a filename by replacing invalid characters with underscores.
+     * 
+     * @param _endpoint the endpoint to sanitize.
+     * @return the sanitized endpoint.
+     */
+    std::string
+    sanitize_endpoint(const std::string& _endpoint);
     
 };
 

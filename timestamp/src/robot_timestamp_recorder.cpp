@@ -39,12 +39,13 @@ void robot_timestamp_recorder::write_timestamps() {
     std::ofstream robot_states_file;
     int filecount = 0;
     std::stringstream filename;
-    filename << robot_endpoint_ << "-robot-states-#" << filecount << ".csv";
+    std::string sanitized_endpoint = sanitize_endpoint(robot_endpoint_);
+    filename << sanitized_endpoint << "-robot-states-#" << filecount << ".csv";
     std::filesystem::path timestamp_path = timestamp_dir / filename.str();
     struct stat filename_buffer;
     for(filecount = 1; (stat(timestamp_path.c_str(), &filename_buffer) == 0); filecount++) {
         filename.str("");
-        filename << robot_endpoint_ << "-robot-states-#" << filecount << ".csv";
+        filename << sanitized_endpoint << "-robot-states-#" << filecount << ".csv";
         timestamp_path = timestamp_dir / filename.str();
     }
     robot_states_file.open(timestamp_path);
@@ -55,4 +56,18 @@ void robot_timestamp_recorder::write_timestamps() {
         robot_states_file << robot_state_entry.first << "," << std::get<0>(robot_state_entry.second) << "," << static_cast<int>(std::get<1>(robot_state_entry.second)) << "\n";
     }
     robot_states_file.close();
+}
+
+std::string robot_timestamp_recorder::sanitize_endpoint(const std::string& _endpoint) {
+    std::string sanitized = _endpoint;
+    auto pos = sanitized.find("://");
+    if (pos != std::string::npos)
+        sanitized = sanitized.substr(pos + 3);
+    
+    for (char& c : sanitized) {
+        if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
+            c = '_';
+        }
+    }
+    return sanitized;
 }
