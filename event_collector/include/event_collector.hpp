@@ -3,7 +3,11 @@
  * @brief OPC UA based event collector that monitors robot and kitchen events and outputs them to csv files for analysis.
  *
  * @details
- * The event collector monitors robot and kitchen events and outputs them to csv files for analysis.
+ * Uses OPC UA discovery to find robot and kitchen endpoints, establishes per-agent client sessions, and
+ * subscribes to relevant monitored items (e.g., position, robot state). Received events and value changes
+ * are written as timestamped CSV records (one or more files) to support offline analysis and
+ * visualization. The implementation uses an io_context-driven worker thread and per-agent subscribers to
+ * manage network I/O and clean shutdown.
  */
 #ifndef EVENT_COLLECTOR_HPP
 #define EVENT_COLLECTOR_HPP
