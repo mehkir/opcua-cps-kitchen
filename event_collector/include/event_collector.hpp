@@ -48,10 +48,9 @@ struct remote_robot {
          * @brief Constructs a new remote robot object.
          * 
          * @param _endpoint the robot's endpoint url.
-         * @param _position the position of the remote robot at the conveyor.
          */
-        remote_robot(std::string _endpoint, position_t _position) :
-                    endpoint_(_endpoint), position_(_position), client_(nullptr),
+        remote_robot(std::string _endpoint) :
+                    endpoint_(_endpoint), position_(0), client_(nullptr),
                     running_(true), timestamp_recorder_(_endpoint) {
         }
 
@@ -157,6 +156,16 @@ struct remote_robot {
             return position_.load();
         }
 
+        /**
+         * @brief Indicates whether the robot is stopped and not running anymore.
+         * 
+         * @return true if robot is stopped.
+         * @return false if robot is still running.
+         */
+        bool
+        is_stopped() const {
+            return !running_.load();
+        }
     private:
         /**
          * @brief The position changed callback for the subscription.
@@ -212,17 +221,6 @@ struct remote_robot {
             self->timestamp_recorder_.record_timestamp(self->position_.load(), self->state_.load());
             // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's state at position %d is %s", __FUNCTION__, self->position_.load(), robot_state_to_string(self->state_.load()).c_str());
         }
-
-        /**
-         * @brief Indicates whether the robot is stopped and not running anymore.
-         * 
-         * @return true if robot is stopped.
-         * @return false if robot is still running.
-         */
-        bool
-        is_stopped() {
-            return !running_.load();
-        }
 };
 
 
@@ -236,7 +234,7 @@ private:
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
     boost::asio::steady_timer steady_timer_; /**< the steady timer for action time simulation. */
     /* robot related member variables */
-    std::map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
+    std::map<std::string, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
 
 public:
     event_collector(/* args */);
@@ -263,6 +261,13 @@ public:
      */
     void
     handle_discovered_robot(std::string _endpoint);
+
+    /**
+    * @brief Removes the stopped robots from the map.
+    * 
+    */
+    void
+    remove_stopped_robots();
 
     /**
      * @brief Join worker thread if joinable.

@@ -13,6 +13,7 @@ event_collector::~event_collector() {
 
 void
 event_collector::discover_agents() {
+    remove_stopped_robots();
     std::vector<std::string> endpoints;
     if (discovery_util_.lookup_endpoints(endpoints) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to lookup endpoints.", __FUNCTION__);
@@ -55,26 +56,27 @@ event_collector::handle_discovered_robot(std::string _endpoint) {
             UA_Client_delete(remote_robot_client);
         return;
     }
-    UA_NodeId position_node_id = node_browser_helper().get_attribute_id(remote_robot_client, ROBOT_TYPE, POSITION);
-    if (UA_NodeId_equal(&position_node_id, &UA_NODEID_NULL)) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, POSITION);
-        UA_Client_delete(remote_robot_client);
-        return;
-    }
-    information_node_reader inr;
-    if (inr.read_information_node(remote_robot_client, position_node_id) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not read the %s attribute id", __FUNCTION__, POSITION);
-        UA_Client_delete(remote_robot_client);
-        return;
-    }
-    position_t remote_robot_position = *(position_t*)inr.get_variant()->data;
 
-    if (position_remote_robot_map_.find(remote_robot_position) != position_remote_robot_map_.end()) {
-        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Robot at position %d is already being monitored. Skipping ...", __FUNCTION__, remote_robot_position);
+    if (position_remote_robot_map_.find(_endpoint) != position_remote_robot_map_.end()) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Robot at endpoint %s is already being monitored. Skipping ...", __FUNCTION__, _endpoint.c_str());
         UA_Client_delete(remote_robot_client);
         return;
     }
-    position_remote_robot_map_[remote_robot_position] = std::make_unique<remote_robot>(_endpoint, remote_robot_position);
+    position_remote_robot_map_[_endpoint] = std::make_unique<remote_robot>(_endpoint);
+}
+
+void
+event_collector::remove_stopped_robots() {
+    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    for (auto it = position_remote_robot_map_.begin(); it != position_remote_robot_map_.end();) {
+        if (it->second->is_stopped()) {
+            std::string endpoint = it->first;
+            it = position_remote_robot_map_.erase(it);
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "Removed remote robot at endpoint %s", endpoint.c_str());
+        } else {
+            it++;
+        }
+    }
 }
 
 void
