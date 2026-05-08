@@ -131,7 +131,7 @@ struct remote_robot {
             running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
-            // timestamp_recorder_.write_timestamps();
+            timestamp_recorder_.write_timestamps();
             nv_subscriber_.reset();
             if (client_ != nullptr) {
                 {
