@@ -14,7 +14,7 @@
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 #define REDISCOVER_INTERVAL 1LL
 
-kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
+kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), stopped_(false), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
                                         robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
                                     #ifdef KITCHEN_SEED
                                         mersenne_twister_(KITCHEN_SEED),
@@ -817,6 +817,11 @@ kitchen::contribute_statistics_called(size_t _output_size, UA_Variant* _output) 
 void
 kitchen::stop() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (stopped_.load()) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Kitchen is already stopped", __FUNCTION__);
+        return;
+    }
+        
     {
         std::lock_guard<std::mutex> client_loop_lock(client_mutex_);
         running_.store(false);
@@ -826,5 +831,6 @@ kitchen::stop() {
     io_context_.stop();
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
+    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }

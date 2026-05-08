@@ -22,6 +22,7 @@ private:
     std::condition_variable discovery_cv_; /**< condition variable to wait for next registration interval. */
     std::mutex discovery_mutex_; /**< mutex for synchronizing state changes. */
     std::atomic<bool> running_; /**< indicates if the discovery thread should run. */
+    std::atomic<bool> stopped_; /**< indicates if the discovery has already called stopped. */
 public:
     /**
      * @brief Registers the server on the discovery server.

@@ -18,7 +18,7 @@
 
 robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_rearranging_(false), already_reconfiguring_(false),
-        is_dish_finished_(false), running_(true), recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
+        is_dish_finished_(false), running_(true), stopped_(false),recipe_parser_(), capability_parser_(_capabilities_file_name), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), controller_client_(nullptr),
         conveyor_client_(nullptr), conveyor_size_(_conveyor_size), pending_pickup_(false), robot_state_(robot_state::IDLING), robot_adaptivity_state_(robot_adaptivity_state::AVAILABLE), new_target_position_(0), new_capabilities_profile_(""),
     #ifdef ROBOT_SEED
         mersenne_twister_(ROBOT_SEED),
@@ -1300,6 +1300,10 @@ robot::start() {
 
 void
 robot::stop() {
+    if (stopped_.load()) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Robot is already stopped", __FUNCTION__);
+        return;
+    }
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         running_.store(false);
@@ -1309,5 +1313,6 @@ robot::stop() {
     io_context_.stop();
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
+    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }

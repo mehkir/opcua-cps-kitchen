@@ -11,7 +11,7 @@
 #define CONVEYOR_INSTANCE_NAME "KitchenConveyor"
 
 conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_uri_("urn:kitchen:conveyor"), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE),
-                                            running_(true), state_status_(conveyor::state::IDLING), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_),
+                                            running_(true), stopped_(false), state_status_(conveyor::state::IDLING), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_),
                                             controller_client_(nullptr), kitchen_client_(nullptr) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
@@ -791,10 +791,15 @@ conveyor::start() {
 void
 conveyor::stop() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
+    if (stopped_.load()) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Conveyor is already stopped", __FUNCTION__);
+        return;
+    }
     running_.store(false);
     work_guard_.reset();
     io_context_.stop();
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
+    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }

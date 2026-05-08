@@ -122,6 +122,7 @@ private:
     bool already_reconfiguring_; /**< flag to indicate whether the worker thread is already reconfiguring the robot. */
     bool is_dish_finished_; /**< flag to indicate whether the robot is holding a completed dish or partially finished dish. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
+    std::atomic<bool> stopped_; /**< flag to indicate whether the robot has already called stop(). */
     std::atomic<bool> pending_pickup_; /**< flag to indicate whether there is a pending pickup for an sucessfully sent notifcation to the conveyor. */
     robot_state robot_state_; /**< the current robot state. */
     robot_adaptivity_state robot_adaptivity_state_; /**< state to indicate if robot is either available or performing an adaptive action */
