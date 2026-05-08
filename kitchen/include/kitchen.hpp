@@ -577,7 +577,7 @@ private:
 
 public:
     /**
-     * @brief Constructs a new kitchen object
+     * @brief Constructs a new kitchen object.
      * 
      * @param _robot_count the total robot count in the kitchen.
      * @param _evaluate_orders_count determines after how many orders the evaluation is done.
