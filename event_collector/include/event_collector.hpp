@@ -17,6 +17,7 @@
 #include "node_value_subscriber.hpp"
 #include "client_connection_establisher.hpp"
 #include "browsenames.h"
+#include "robot_state.hpp"
 
 using namespace cps_kitchen;
 
@@ -32,6 +33,7 @@ struct remote_robot {
         std::atomic<position_t> position_; /**< the position on the conveyor belt. */
         std::unique_ptr<node_value_subscriber> nv_subscriber_; /**< the node value subscriber. */
         std::atomic<duration_t> overall_time_; /**< the total time the robot will be in use. */
+        std::atomic<robot_state> state_; /**< the robot's state. */
         std::atomic<bool> running_; /**< flag to indicate whether the client thread should run. */
         std::thread client_iterate_thread_; /**< the client iteration thread. */
         std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
@@ -42,9 +44,6 @@ struct remote_robot {
          * 
          * @param _endpoint the robot's endpoint url.
          * @param _position the position of the remote robot at the conveyor.
-         * @param _capabilities the capabilities.
-         * @param _position_swapped_callback the position swapped callback.
-         * @param _capabilities_reconfigured_callback the reconfigured callback.
          */
         remote_robot(std::string _endpoint, position_t _position) :
                     endpoint_(_endpoint), position_(_position), client_(nullptr),
@@ -77,6 +76,28 @@ struct remote_robot {
             UA_StatusCode status = nv_subscriber_->subscribe_node_value(position_id, position_changed, this);
             if (status != UA_STATUSCODE_GOOD) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, POSITION, position_.load());
+                return UA_STATUSCODE_BAD;
+            }
+
+            UA_NodeId overall_time_id = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, OVERALL_TIME);
+            if (UA_NodeId_equal(&overall_time_id, &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, OVERALL_TIME);
+                return UA_STATUSCODE_BAD;
+            }
+            status = nv_subscriber_->subscribe_node_value(overall_time_id, overall_time_changed, this);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, OVERALL_TIME, position_.load());
+                return UA_STATUSCODE_BAD;
+            }
+
+            UA_NodeId state_id = node_browser_helper().get_attribute_id(client_, ROBOT_TYPE, ROBOT_STATE);
+            if (UA_NodeId_equal(&state_id, &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, ROBOT_STATE);
+                return UA_STATUSCODE_BAD;
+            }
+            status = nv_subscriber_->subscribe_node_value(state_id, robot_state_changed, this);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote robot's %s at position %d", __FUNCTION__, ROBOT_STATE, position_.load());
                 return UA_STATUSCODE_BAD;
             }
             
@@ -207,6 +228,33 @@ struct remote_robot {
         }
 
         /**
+         * @brief The robot state changed callback for the subscription.
+         * 
+         * @param _client the client issuing the subscription.
+         * @param _sub_id server-assigned subscription id that delivered this notification.
+         * @param _sub_context user-defined context data passed when creating the subscription.
+         * @param _mon_id server-assigned MonitoredItemId that produced the data change.
+         * @param _mon_context user-defined context data passed when creating the monitored item.
+         * @param _value the reported UA_DataValue.
+         */
+        static void
+        robot_state_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
+            UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
+            if(_mon_context == NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
+                return;
+            }
+            remote_robot* self = static_cast<remote_robot*>(_mon_context);
+            if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                self->running_.store(false);
+                return;
+            }
+            self->state_.store(*(robot_state*) _value->value.data);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's state at position %d is %s", __FUNCTION__, self->position_.load(), robot_state_to_string(self->state_.load()).c_str());
+        }
+
+        /**
          * @brief Indicates whether the robot is stopped and not running anymore.
          * 
          * @return true if robot is stopped.
@@ -239,6 +287,13 @@ public:
      */
     void
     discover_robots();
+
+    /**
+     * @brief Join worker thread if joinable.
+     * 
+     */
+    void
+    join_worker_thread();
 
     /**
      * @brief Starts the event collector.
