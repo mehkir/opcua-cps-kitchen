@@ -131,9 +131,15 @@ struct remote_robot {
             running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
-            timestamp_recorder_.write_timestamps();
+            // timestamp_recorder_.write_timestamps();
             nv_subscriber_.reset();
-            UA_Client_delete(client_);
+            if (client_ != nullptr) {
+                {
+                    std::lock_guard<std::mutex> lock(client_mutex_);
+                    UA_Client_delete(client_);
+                    client_ = nullptr;
+                }
+            }
         }
 
         /**

@@ -62,7 +62,14 @@ event_collector::handle_discovered_robot(std::string _endpoint) {
         UA_Client_delete(remote_robot_client);
         return;
     }
-    position_remote_robot_map_[_endpoint] = std::make_unique<remote_robot>(_endpoint);
+
+    std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_endpoint);
+    if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
+        position_remote_robot_map_[_endpoint] = std::move(robot);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot client initialitation/start failed", __FUNCTION__);
+        return;
+    }
 }
 
 void
