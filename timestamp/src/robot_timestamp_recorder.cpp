@@ -18,10 +18,9 @@ robot_timestamp_recorder::robot_timestamp_recorder(std::string _robot_endpoint) 
 robot_timestamp_recorder::~robot_timestamp_recorder() {
 }
 
-void robot_timestamp_recorder::record_timestamp(position_t _position, robot_state _state) {
-    uint64_t timestamp = std::chrono::system_clock::now().time_since_epoch().count();
+void robot_timestamp_recorder::record_timestamp(uint64_t _timestamp, position_t _position, robot_state _state) {
     timestamp_entry_t entry = std::make_tuple(_position, _state);
-    robot_timestamps_[timestamp] = entry;
+    robot_timestamps_[_timestamp] = entry;
 }
 
 void robot_timestamp_recorder::write_timestamps() {

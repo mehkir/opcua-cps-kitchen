@@ -200,6 +200,14 @@ struct remote_robot {
             // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's position changed from %d to %d", __FUNCTION__, old_position, self->position_.load());
         }
 
+        static uint64_t
+        ua_date_time_to_unix_ns(UA_DateTime ua_ts) {
+            // UA_DateTime/Windows FILETIME epoch difference to Unix epoch in 100-ns units
+            constexpr uint64_t EPOCH_DIFF_100NS = 116444736000000000ULL;
+            if (ua_ts <= EPOCH_DIFF_100NS) return 0;
+                return (ua_ts - EPOCH_DIFF_100NS) * 100ULL; // convert 100-ns -> ns
+        }
+
         /**
          * @brief The robot state changed callback for the subscription.
          * 
@@ -224,7 +232,17 @@ struct remote_robot {
                 return;
             }
             self->state_.store(*(robot_state*) _value->value.data);
-            self->timestamp_recorder_.record_timestamp(self->position_.load(), self->state_.load());
+
+            uint64_t timestamp = 0;
+            if (_value->hasSourceTimestamp) {
+                timestamp = ua_date_time_to_unix_ns(_value->sourceTimestamp);
+            } else if (_value->hasServerTimestamp) {
+                timestamp = ua_date_time_to_unix_ns(_value->serverTimestamp);
+            } else {
+                timestamp = std::chrono::system_clock::now().time_since_epoch().count();
+            }
+
+            self->timestamp_recorder_.record_timestamp(timestamp, self->position_.load(), self->state_.load());
             // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote robot's state at position %d is %s", __FUNCTION__, self->position_.load(), robot_state_to_string(self->state_.load()).c_str());
         }
 };

@@ -29,11 +29,12 @@ public:
     /**
      * @brief Records a timestamp for the given robot position and state.
      * 
+     * @param _timestamp the timestamp.
      * @param _position the robot position.
      * @param _state the robot state.
      */
     void
-    record_timestamp(position_t _position, robot_state _state);
+    record_timestamp(uint64_t _timestamp, position_t _position, robot_state _state);
 
     /**
      * @brief Writes the recorded timestamps to a csv file.
