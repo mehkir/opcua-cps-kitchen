@@ -10,6 +10,7 @@
 #include <filesystem>
 
 #define HEADER "Timestamp,Position,State\n"
+#define SCHEME_DELIMITER "://"
 
 robot_timestamp_recorder::robot_timestamp_recorder(std::string _robot_endpoint) : robot_endpoint_(_robot_endpoint) {
 }
@@ -60,9 +61,9 @@ void robot_timestamp_recorder::write_timestamps() {
 
 std::string robot_timestamp_recorder::sanitize_endpoint(const std::string& _endpoint) {
     std::string sanitized = _endpoint;
-    auto pos = sanitized.find("://");
+    auto pos = sanitized.find(SCHEME_DELIMITER);
     if (pos != std::string::npos)
-        sanitized = sanitized.substr(pos + 3);
+        sanitized = sanitized.substr(pos + strlen(SCHEME_DELIMITER));
     
     for (char& c : sanitized) {
         if (c == '/' || c == '\\' || c == ':' || c == '*' || c == '?' || c == '"' || c == '<' || c == '>' || c == '|') {
