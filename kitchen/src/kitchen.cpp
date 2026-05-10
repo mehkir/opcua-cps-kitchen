@@ -7,14 +7,13 @@
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
 #include "agent_timing.hpp"
-#include "timestamp_recorder.hpp"
 
 #define INSTANCE_NAME "CpsKitchen"
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"
 #define REMOTE_CONVEYOR_INSTANCE_NAME "RemoteKitchenConveyor"
 #define REDISCOVER_INTERVAL 1LL
 
-kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), stopped_(false), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
+kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), stopped_(false), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
                                         robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
                                     #ifdef KITCHEN_SEED
                                         mersenne_twister_(KITCHEN_SEED),
@@ -22,8 +21,7 @@ kitchen::kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count) : serve
                                         mersenne_twister_(random_device_()),
                                     #endif
                                         uniform_int_distribution_(1,recipe_parser_.get_recipe_count()), controller_client_(nullptr), conveyor_client_(nullptr),
-                                        work_guard_(boost::asio::make_work_guard(io_context_)), placing_timer_(io_context_), placing_gate_open_(true),
-                                        evaluate_orders_count_(_evaluate_orders_count) {
+                                        work_guard_(boost::asio::make_work_guard(io_context_)), placing_timer_(io_context_), placing_gate_open_(true) {
     /* Setup kitchen environment */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -217,33 +215,6 @@ kitchen::receive_completed_order(UA_Server* _server,
     kitchen* self = static_cast<kitchen*>(_method_context);
     self->io_context_.post([self] {
         self->increment_orders_counter(COMPLETED_ORDERS);
-        /* Get completed orders count */
-        UA_StatusCode status = UA_STATUSCODE_GOOD;
-        UA_Variant value;
-        UA_Variant_init(&value);
-        if ((status = self->kitchen_type_inserter_.get_attribute(INSTANCE_NAME, COMPLETED_ORDERS, value)) != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error getting attribute (%s)", __FUNCTION__, UA_StatusCode_name(status));
-            UA_Variant_clear(&value);
-            return;
-        }
-        UA_UInt32 completed_orders = 0;
-        if (UA_Variant_hasScalarType(&value, &UA_TYPES[UA_TYPES_UINT32]) && value.data) {
-            completed_orders = *(UA_UInt32*) value.data;
-        } else {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Unexpected attribute type for %s", __FUNCTION__, COMPLETED_ORDERS);
-            UA_Variant_clear(&value);
-            return;
-        }
-        UA_Variant_clear(&value);
-        /* Check if evaluation is requested */
-        if (self->evaluate_orders_count_ > 0) {
-            timestamp_recorder::get_instance()->record_timestamp(completed_orders);
-            /* Check if orders count for evaluation is reached */
-            if (completed_orders != self->evaluate_orders_count_)
-                return;
-            timestamp_recorder::get_instance()->write_timestamps();
-            self->contribute_remote_robot_statistics();
-        }
     });
     UA_Boolean result = true;
     UA_Variant_setScalarCopy(_output, &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
@@ -278,7 +249,6 @@ kitchen::place_random_order(UA_Server* _server,
 void
 kitchen::handle_random_order_request() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (evaluate_orders_count_ > 0) timestamp_recorder::get_instance()->record_timestamp(0);
     remove_stopped_robots();
     increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
@@ -368,7 +338,6 @@ kitchen::handle_order_request(recipe_id_t _recipe_id) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "PLACE ORDER: Recipe id %d is out of range [1,%d] of known recipes", _recipe_id, recipe_parser_.get_recipe_count());
         return;
     }
-    if (evaluate_orders_count_ > 0) timestamp_recorder::get_instance()->record_timestamp(0);
     increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "PLACE ORDER: Order placed for recipe with the ID %d", _recipe_id);
@@ -744,74 +713,6 @@ kitchen::start() {
     }
     join_threads();
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
-}
-
-void
-kitchen::contribute_remote_robot_statistics() {
-    std::vector<std::string> endpoints;
-    if (discovery_util_.lookup_endpoints(endpoints) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to lookup endpoints.", __FUNCTION__);
-        return;
-    }
-    for (std::string endpoint : endpoints) {
-        if (node_browser_helper().has_instance(endpoint, ROBOT_TYPE)) {
-            /* Get remote robot's position */
-            UA_Client* remote_robot_client = nullptr;
-            client_connection_establisher cce;
-            bool connected = cce.establish_connection(remote_robot_client, endpoint);
-            if (!connected) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error establishing robot client session", __FUNCTION__);
-                if (remote_robot_client != nullptr)
-                    UA_Client_delete(remote_robot_client);
-                continue;
-            }
-            /* Get contribute statistics method id */
-            object_method_info omi;
-            if ((omi = node_browser_helper().get_method_id(remote_robot_client, ROBOT_TYPE, CONTRIBUTE_STATISTICS)) == OBJECT_METHOD_INFO_NULL) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CONTRIBUTE_STATISTICS);
-                UA_Client_delete(remote_robot_client);
-                continue;
-            }
-            /* Call contribute statistics method */
-            size_t output_size = 0;
-            UA_Variant* output = nullptr;
-            method_node_caller contribute_statistics_caller;
-            UA_StatusCode status = contribute_statistics_caller.call_method_node(remote_robot_client, omi.object_id_, omi.method_id_, &output_size, &output);
-            if(status != UA_STATUSCODE_GOOD) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, CONTRIBUTE_STATISTICS, UA_StatusCode_name(status));
-                if (output != nullptr)
-                    UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                UA_Client_delete(remote_robot_client);
-                continue;
-            }
-            bool result = contribute_statistics_called(output_size, output);
-            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Calling %s on robot returned %s", __FUNCTION__, CONTRIBUTE_STATISTICS, result ? "true" : "false");
-            UA_Client_delete(remote_robot_client);
-        }
-    }
-}
-
-bool
-kitchen::contribute_statistics_called(size_t _output_size, UA_Variant* _output) {
-    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_output_size != 1) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output size", __FUNCTION__);
-        if (_output != nullptr)
-            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        stop();
-        return false;
-    }
-    if(!UA_Variant_hasScalarType(&_output[0], &UA_TYPES[UA_TYPES_BOOLEAN])) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
-        if (_output != nullptr)
-            UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-        stop();
-        return false;
-    }
-    UA_Boolean result = *(UA_Boolean*) _output[0].data;
-    if (_output != nullptr)
-        UA_Array_delete(_output, _output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-    return result;
 }
 
 void
