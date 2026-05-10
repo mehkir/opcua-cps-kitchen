@@ -319,9 +319,6 @@ private:
     std::thread worker_thread_; /**< the worker thread for assigning placed orders to remote robots. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
-    boost::asio::steady_timer placing_timer_; /**< the placing timer. */
-    bool placing_gate_open_; /**< the placing gate. */
-    std::queue<std::function<void()>> placing_queue_; /**< the placing queue. */
     /* remote robot related member variables. */
     std::thread cyclic_remote_robot_discovery_thread_; /**< the thread updating the connectivity status of remote robots in the address space. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */

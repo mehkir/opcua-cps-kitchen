@@ -38,7 +38,7 @@ CONVEYOR_SIZE=$(( ROBOTS_COUNT + 1 ))
 kill_kitchen() {
     echo "Waiting 5 seconds for agents to shutdown. The rest will be killed after."
     sleep 5
-    for p in statist start_r start_c discov start_k; do
+    for p in start_r start_c discov start_k; do
         pkill -SIGKILL "$p"
     done
     exit 0
