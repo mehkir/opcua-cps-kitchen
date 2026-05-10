@@ -27,7 +27,7 @@ UA_StatusCode node_value_subscriber::subscribe_node_value(UA_NodeId _monitored_n
     UA_MonitoredItemCreateRequest monitor_request = UA_MonitoredItemCreateRequest_default(_monitored_node_id);
     monitor_request.monitoringMode = UA_MONITORINGMODE_REPORTING;
     monitor_request.requestedParameters.samplingInterval = 0.0;
-    monitor_request.requestedParameters.queueSize = 16;
+    monitor_request.requestedParameters.queueSize = 32;
     monitor_request.requestedParameters.discardOldest = true;
 
     UA_MonitoredItemCreateResult monitor_response = UA_Client_MonitoredItems_createDataChange(client_, subscription_id_,
