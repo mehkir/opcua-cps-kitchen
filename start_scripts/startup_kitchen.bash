@@ -1,13 +1,28 @@
 #!/usr/bin/bash
 
-# Validate argument
-if (( $# < 1 )); then
-  echo "Usage: $0 <robots_count> [<evaluate_orders_count>]"
+# Initialize variables
+robots_count=""
+evaluate_orders=0
+
+# Parse flags
+while getopts ":r:e" opt; do
+  case "$opt" in
+    r) robots_count="$OPTARG" ;;
+    e) evaluate_orders=1 ;;
+    *) echo "Usage: $0 -r <robots_count> [-e]" ; exit 1 ;;
+  esac
+done
+shift $((OPTIND - 1))
+
+# Validate robots_count was provided
+if [[ -z "$robots_count" ]]; then
+  echo "Usage: $0 -r <robots_count> [-e]"
   exit 1
 fi
 
-if (( $1 < 1)); then
+if (( robots_count < 1 )); then
     echo "robots count must be >= 1"
+    exit 1
 fi
 
 SCRIPT_PATH="$(realpath "$0")"
@@ -16,9 +31,8 @@ cd -- "$SCRIPT_DIR"
 cd ..
 PROJECT_DIRECTORY="$(pwd)"
 $PROJECT_DIRECTORY/build.bash
-ROBOTS_COUNT=$1
+ROBOTS_COUNT=$robots_count
 CONVEYOR_SIZE=$(( ROBOTS_COUNT + 1 ))
-EVALUATE_ORDERS_COUNT=$2
 
 # Define a cleanup function
 kill_kitchen() {
@@ -33,8 +47,8 @@ kill_kitchen() {
 # Trap SIGINT (Ctrl+C)
 trap kill_kitchen SIGINT
 
-if [[ -n "$EVALUATE_ORDERS_COUNT" && "$EVALUATE_ORDERS_COUNT" -gt 0 ]]; then
-    $PROJECT_DIRECTORY/start_scripts/start_statistics_writer.bash "$ROBOTS_COUNT" &
+if (( evaluate_orders > 0 )); then
+    $PROJECT_DIRECTORY/build/start_event_collector &
     sleep 1
 fi
 $PROJECT_DIRECTORY/build/discovery/discovery_server &
@@ -45,6 +59,6 @@ $PROJECT_DIRECTORY/start_scripts/start_conveyor.bash $ROBOTS_COUNT &
 sleep 1
 $PROJECT_DIRECTORY/start_scripts/start_robots.bash $ROBOTS_COUNT $CONVEYOR_SIZE &
 sleep 1
-$PROJECT_DIRECTORY/start_scripts/start_kitchen.bash $ROBOTS_COUNT $EVALUATE_ORDERS_COUNT &
+$PROJECT_DIRECTORY/start_scripts/start_kitchen.bash $ROBOTS_COUNT &
 # Wait for all background processes to finish
 wait
