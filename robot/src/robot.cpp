@@ -12,7 +12,6 @@
 #include "filtered_logger.hpp"
 #include "browsenames.h"
 #include "discovery_and_connection.hpp"
-#include "statistics_recorder.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
 
@@ -110,15 +109,6 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     status = robot_type_inserter_.add_method(ROBOT_TYPE, RECONFIGURE, reconfigure, reconfigure_method_arguments, this);
     if(status != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, RECONFIGURE);
-        running_.store(false);
-        return;
-    }
-    /* Add contribute statistics method node */
-    method_arguments contribute_statistics_method_arguments;
-    contribute_statistics_method_arguments.add_output_argument("the result", "result", UA_TYPES_BOOLEAN);
-    status = robot_type_inserter_.add_method(ROBOT_TYPE, CONTRIBUTE_STATISTICS, contribute_statistics, contribute_statistics_method_arguments, this);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error adding the %s method node", __FUNCTION__, CONTRIBUTE_STATISTICS);
         running_.store(false);
         return;
     }
@@ -386,7 +376,6 @@ robot::cook_next_order() {
         }
     }
     if (order_queue_.empty()) {
-        statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::IDLING);
         robot_state_ = robot_state::IDLING;
         robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
         preparing_dish_ = false;
@@ -592,7 +581,6 @@ robot::determine_next_action() {
         robot_tool required_tool = robot_act.get_required_tool();
         if (required_tool != current_tool_) {
             UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
-            statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RETOOLING);
             robot_state_ = robot_state::RETOOLING;
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
             if (RETOOLING_TIME > 0) {
@@ -621,7 +609,6 @@ robot::determine_next_action() {
             /* Schedule next action */
             duration_t action_duration = robot_act.get_action_duration();
             UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "COOK: Performing %s on recipe_id=%d with ingredients=%s for %ld ms", robot_act.get_name().c_str(), recipe_id_in_process, robot_act.get_ingredients().c_str(), action_duration);
-            statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::COOKING);
             robot_state_ = robot_state::COOKING;
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
             if (action_duration > 0) {
@@ -689,7 +676,6 @@ robot::notify_conveyor() {
         }
     }
     receive_finished_order_notification_called(output_size, output);
-    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::WAITING_FOR_PICKUP);
     robot_state_ = robot_state::WAITING_FOR_PICKUP;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
 }
@@ -872,7 +858,6 @@ robot::handle_switch_position() {
     uint32_t cw  = (new_target_position_ - position_ + conveyor_size_) % conveyor_size_;
     uint32_t ccw = (position_ - new_target_position_ + conveyor_size_) % conveyor_size_;
     uint32_t distance = std::min(cw, ccw);
-    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::REARRANGING);
     robot_state_ = robot_state::REARRANGING;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
     steady_timer_.expires_from_now(std::chrono::milliseconds(distance * ROBOT_MOVE_TIME));
@@ -1038,7 +1023,6 @@ robot::handle_reconfiguration() {
     if (already_reconfiguring_)
         return;
     already_reconfiguring_ = true;
-    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::RECONFIGURING);
     robot_state_ = robot_state::RECONFIGURING;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
     steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME));
@@ -1081,38 +1065,6 @@ robot::complete_reconfiguration() {
     }
     cook_next_order();
 
-}
-
-UA_StatusCode
-robot::contribute_statistics(UA_Server *_server,
-        const UA_NodeId *_session_id, void *_session_context,
-        const UA_NodeId *_method_id, void *_method_context,
-        const UA_NodeId *_object_id, void *_object_context,
-        size_t _input_size, const UA_Variant *_input,
-        size_t _output_size, UA_Variant *_output) {
-    // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if(_input_size != 0) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad input size", __FUNCTION__);
-        return UA_STATUSCODE_BAD;
-    }
-
-    if(_method_context == NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Method context is NULL", __FUNCTION__);
-        return UA_STATUSCODE_BAD;
-    }
-
-    robot* self = static_cast<robot*>(_method_context);
-    self->io_context_.post([self] {
-        statistics_recorder::get_instance()->contribute_statistics(self->position_);
-    });
-    bool result = true;
-    UA_StatusCode status = UA_Variant_setScalarCopy(&_output[0], &result, &UA_TYPES[UA_TYPES_BOOLEAN]);
-    if(status != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error setting output parameters", __FUNCTION__);
-        self->stop();
-        return status;
-    }
-    return UA_STATUSCODE_GOOD;
 }
 
 void
@@ -1291,7 +1243,6 @@ robot::start() {
         io_context_.run();
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited io_context", __FUNCTION__);
     });
-    statistics_recorder::get_instance()->record_timestamp(position_, state_key_t::IDLING);
     robot_state_ = robot_state::IDLING;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
     join_threads();
