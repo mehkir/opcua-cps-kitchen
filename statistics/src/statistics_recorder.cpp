@@ -5,6 +5,7 @@
 
 std::mutex statistics_recorder::mutex_;
 statistics_recorder* statistics_recorder::instance_;
+state_key_t statistics_recorder::previous_state_ = state_key_t::STATE_COUNT;
 
 statistics_recorder* statistics_recorder::get_instance() {
     std::lock_guard<std::mutex> lock_guard(mutex_);
@@ -22,6 +23,9 @@ statistics_recorder::~statistics_recorder() {
 
 void statistics_recorder::record_timestamp(position_key_t _position, state_key_t _state) {
     std::lock_guard<std::mutex> lock_guard(mutex_);
+    if (previous_state_ == _state)
+        return;
+    previous_state_ = _state;
     utilization_statistics_[_position][std::chrono::system_clock::now().time_since_epoch().count()] = _state;
 }
 

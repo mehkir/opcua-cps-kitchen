@@ -8,7 +8,7 @@
 #define DISCOVERY_SERVER_ENDPOINT "opc.tcp://localhost:4840"
 #define REGISTER_INTERVAL 300
 
-discovery_util::discovery_util() : running_(true) {
+discovery_util::discovery_util() : running_(true), stopped_(false) {
 }
 
 discovery_util::~discovery_util() {
@@ -123,6 +123,10 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
 
 void
 discovery_util::stop() {
+    if (stopped_.load()) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Discovery utility is already stopped", __FUNCTION__);
+        return;
+    }
     {
         std::lock_guard<std::mutex> lock(discovery_mutex_);
         running_.store(false);
@@ -130,4 +134,5 @@ discovery_util::stop() {
     }
     if (discovery_thread_.joinable())
         discovery_thread_.join();
+    stopped_.store(true);
 }

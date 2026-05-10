@@ -342,6 +342,7 @@ private:
     UA_String type_; /**< the kitchen's agent type. */
     object_type_node_inserter kitchen_type_inserter_; /**< the kitchen type inserter for adding the kitchen's attributes and methods to the address space. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
+    std::atomic<bool> stopped_; /**< flag to indicate whether the kitchen has already called stop(). */
     discovery_util discovery_util_; /**< the discovery utility. */
     std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
     std::thread server_iterate_thread_; /**< the server iteration thread. */
@@ -576,7 +577,7 @@ private:
 
 public:
     /**
-     * @brief Constructs a new kitchen object
+     * @brief Constructs a new kitchen object.
      * 
      * @param _robot_count the total robot count in the kitchen.
      * @param _evaluate_orders_count determines after how many orders the evaluation is done.

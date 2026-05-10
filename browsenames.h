@@ -34,6 +34,7 @@
 #define OVERALL_PROCESSING_STEPS "OverallProcessingSteps"
 #define AVAILABILITY "Availability"
 #define NEW_POSITION_COMMIT_IS_PENDING "NewPositionCommitIsPending"
+#define ROBOT_STATE "State"
 
 /* CONVEYOR */
 // object type node

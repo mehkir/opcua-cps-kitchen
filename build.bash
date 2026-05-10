@@ -13,4 +13,5 @@ $(which cmake) --build "${PROJECT_DIR}/build" --config Release --target \
     start_conveyor_instance \
     start_kitchen_instance \
     statistics-writer-main \
+    start_event_collector \
     -- -j$(nproc)

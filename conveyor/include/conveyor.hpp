@@ -527,6 +527,7 @@ private:
     object_type_node_inserter conveyor_type_inserter_; /**< the conveyor type inserter for adding the conveyor's attributes and methods to the address space. */
     object_type_node_inserter plate_type_inserter_; /**< the plate type inserter for adding the plate's attributes to the address space. */
     std::atomic<bool> running_; /**< flag to indicate whether the server and client threads should run. */
+    std::atomic<bool> stopped_; /**< flag to indicate whether the conveyor has already called stop(). */
     state state_status_; /**< the current state of the conveyor. */
     std::vector<plate> plates_; /**< the plates on the conveyor. */
     std::thread server_iterate_thread_; /**< the server iteration thread. */
