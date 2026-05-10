@@ -1,5 +1,5 @@
-#ifndef TIMESTAMP_RECORDER_HPP
-#define TIMESTAMP_RECORDER_HPP
+#ifndef ROBOT_TIMESTAMP_RECORDER_HPP
+#define ROBOT_TIMESTAMP_RECORDER_HPP
 
 #include <map>
 #include "types.hpp"
@@ -54,4 +54,4 @@ public:
     
 };
 
-#endif // TIMESTAMP_RECORDER_HPP
+#endif // ROBOT_TIMESTAMP_RECORDER_HPP
