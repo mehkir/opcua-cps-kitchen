@@ -1,6 +1,4 @@
 #include "../include/robot_timestamp_recorder.hpp"
-#include <chrono>
-#include <iostream>
 #include <fstream>
 #include <sstream>
 #include <sys/stat.h>
@@ -9,6 +7,7 @@
 #include <limits.h>
 #include <filesystem>
 
+#define FILENAME_INFIX "robot-states-#"
 #define HEADER "Timestamp,Position,State\n"
 #define SCHEME_DELIMITER "://"
 
@@ -40,12 +39,12 @@ void robot_timestamp_recorder::write_timestamps() {
     int filecount = 0;
     std::stringstream filename;
     std::string sanitized_endpoint = sanitize_endpoint(robot_endpoint_);
-    filename << sanitized_endpoint << "-robot-states-#" << filecount << ".csv";
+    filename << sanitized_endpoint << FILENAME_INFIX << filecount << ".csv";
     std::filesystem::path timestamp_path = timestamp_dir / filename.str();
     struct stat filename_buffer;
     for(filecount = 1; (stat(timestamp_path.c_str(), &filename_buffer) == 0); filecount++) {
         filename.str("");
-        filename << sanitized_endpoint << "-robot-states-#" << filecount << ".csv";
+        filename << sanitized_endpoint << FILENAME_INFIX << filecount << ".csv";
         timestamp_path = timestamp_dir / filename.str();
     }
     robot_states_file.open(timestamp_path);

@@ -1,3 +1,14 @@
+/**
+ * @file robot_timestamp_recorder.hpp
+ * @brief OPC UA based timestamp recorder for kitchen robots to track their state changes over time.
+ * 
+ * @details
+ * The robot timestamp recorder tracks the state changes of a kitchen robot over time by recording timestamps
+ * for each state change along with the robot's position at that time. The recorded timestamps are written to
+ * a csv file upon destruction of the recorder object. The filename is derived from the robot's endpoint.
+ * 
+ */
+
 #ifndef ROBOT_TIMESTAMP_RECORDER_HPP
 #define ROBOT_TIMESTAMP_RECORDER_HPP
 

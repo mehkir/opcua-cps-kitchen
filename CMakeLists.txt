@@ -32,7 +32,6 @@ add_compile_definitions(FILTERED_LOGGING)
 add_compile_definitions(ROBOT_SEED=5489u KITCHEN_SEED=5489u)
 
 add_subdirectory(timestamp)
-add_subdirectory(statistics)
 add_subdirectory(wrappers)
 add_subdirectory(discovery)
 add_subdirectory(tests)
@@ -62,10 +61,6 @@ target_include_directories(start_conveyor_instance PUBLIC ${PROJECT_BINARY_DIR} 
 add_executable(start_kitchen_instance start_kitchen_instance.cpp)
 target_link_libraries(start_kitchen_instance PUBLIC kitchen_lib open62541)
 target_include_directories(start_kitchen_instance PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/kitchen/include)
-
-add_executable(statistics-writer-main statistics-writer-main.cpp)
-target_link_libraries(statistics-writer-main PUBLIC statistics_lib)
-target_include_directories(statistics-writer-main PUBLIC ${PROJECT_BINARY_DIR} ${PROJECT_SOURCE_DIR}/statistics/include)
 
 add_executable(start_event_collector start_event_collector.cpp)
 target_link_libraries(start_event_collector PUBLIC event_collector_lib)

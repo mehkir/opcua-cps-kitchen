@@ -14,6 +14,7 @@ event_collector::~event_collector() {
 void
 event_collector::discover_agents() {
     remove_stopped_robots();
+    remove_stopped_kitchen();
     std::vector<std::string> endpoints;
     if (discovery_util_.lookup_endpoints(endpoints) != UA_STATUSCODE_GOOD) {
         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed to lookup endpoints.", __FUNCTION__);
@@ -26,6 +27,9 @@ event_collector::discover_agents() {
         if (node_browser_helper().has_instance(endpoint, ROBOT_TYPE)) {
             UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Discovered robot at endpoint: %s", __FUNCTION__, endpoint.c_str());
             handle_discovered_robot(endpoint);
+        } else if (node_browser_helper().has_instance(endpoint, KITCHEN_TYPE)) {
+            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Discovered kitchen at endpoint: %s", __FUNCTION__, endpoint.c_str());
+            handle_discovered_kitchen(endpoint);
         }
     }
     schedule_next_agents_discovery();
@@ -46,28 +50,32 @@ event_collector::schedule_next_agents_discovery() {
 
 void
 event_collector::handle_discovered_robot(std::string _endpoint) {
-    /* Get remote robot's position */
-    UA_Client* remote_robot_client = nullptr;
-    client_connection_establisher cce;
-    bool connected = cce.establish_connection(remote_robot_client, _endpoint);
-    if (!connected) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error establishing robot client session", __FUNCTION__);
-        if (remote_robot_client != nullptr)
-            UA_Client_delete(remote_robot_client);
-        return;
-    }
-
-    if (position_remote_robot_map_.find(_endpoint) != position_remote_robot_map_.end()) {
+    if (remote_robot_map_.find(_endpoint) != remote_robot_map_.end()) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Robot at endpoint %s is already being monitored. Skipping ...", __FUNCTION__, _endpoint.c_str());
-        UA_Client_delete(remote_robot_client);
         return;
     }
 
     std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_endpoint);
     if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
-        position_remote_robot_map_[_endpoint] = std::move(robot);
+        remote_robot_map_[_endpoint] = std::move(robot);
     } else {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot client initialitation/start failed", __FUNCTION__);
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Robot client initialization/start failed", __FUNCTION__);
+        return;
+    }
+}
+
+void
+event_collector::handle_discovered_kitchen(std::string _endpoint) {
+    if (remote_kitchen_) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Kitchen at endpoint %s is already being monitored. Skipping ...", __FUNCTION__, _endpoint.c_str());
+        return;
+    }
+
+    std::unique_ptr<remote_kitchen> kitchen = std::make_unique<remote_kitchen>(_endpoint);
+    if (kitchen->initialize_and_start() == UA_STATUSCODE_GOOD) {
+        remote_kitchen_ = std::move(kitchen);
+    } else {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Kitchen client initialization/start failed", __FUNCTION__);
         return;
     }
 }
@@ -75,14 +83,21 @@ event_collector::handle_discovered_robot(std::string _endpoint) {
 void
 event_collector::remove_stopped_robots() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    for (auto it = position_remote_robot_map_.begin(); it != position_remote_robot_map_.end();) {
+    for (auto it = remote_robot_map_.begin(); it != remote_robot_map_.end();) {
         if (it->second->is_stopped()) {
             std::string endpoint = it->first;
-            it = position_remote_robot_map_.erase(it);
+            it = remote_robot_map_.erase(it);
             UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "Removed remote robot at endpoint %s", endpoint.c_str());
         } else {
             it++;
         }
+    }
+}
+
+void
+event_collector::remove_stopped_kitchen() {
+    if (remote_kitchen_ && remote_kitchen_->is_stopped()) {
+        remote_kitchen_.reset();
     }
 }
 
