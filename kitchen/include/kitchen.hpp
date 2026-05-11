@@ -133,11 +133,6 @@ struct remote_robot {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_TASK);
                 return UA_STATUSCODE_BAD;
             }
-            /* Get contribute statistics method id. */
-            if ((method_id_map_[CONTRIBUTE_STATISTICS] = node_browser_helper().get_method_id(client_, ROBOT_TYPE, CONTRIBUTE_STATISTICS)) == OBJECT_METHOD_INFO_NULL) {
-                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CONTRIBUTE_STATISTICS);
-                return UA_STATUSCODE_BAD;
-            }
             try {
                 client_iterate_thread_ = std::thread([this]() {
                     while(running_.load()) {
@@ -193,33 +188,6 @@ struct remote_robot {
                 status = receive_robot_task_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
                 if(status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, RECEIVE_TASK, UA_StatusCode_name(status));
-                    running_.store(false);
-                    return UA_STATUSCODE_BAD;
-                }
-            }
-            return status;
-        }
-
-        /**
-         * @brief Makes the remote robot contribute its statistics.
-         * 
-         * @param _output_size the count of returned output values.
-         * @param _output the variant containing the output values.
-         * 
-         * @return UA_StatusCode the status whether the method call was successful.
-         */
-        UA_StatusCode
-        contribute_statistics(size_t* _output_size, UA_Variant** _output) {
-            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "remote robot %s called on port", __FUNCTION__, port_);
-            UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "CONTRIBUTE STATISTICS: Instruct robot on position %d to contribute its statistics", cached_position_.load());
-            method_node_caller contribute_statistics_caller;
-            object_method_info omi = method_id_map_[CONTRIBUTE_STATISTICS];
-            UA_StatusCode status = UA_STATUSCODE_GOOD;
-            {
-                std::lock_guard<std::mutex> lock(client_mutex_);
-                status = contribute_statistics_caller.call_method_node(client_, omi.object_id_, omi.method_id_, _output_size, _output);
-                if(status != UA_STATUSCODE_GOOD) {
-                    UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling %s method (%s)", __FUNCTION__, CONTRIBUTE_STATISTICS, UA_StatusCode_name(status));
                     running_.store(false);
                     return UA_STATUSCODE_BAD;
                 }
@@ -351,10 +319,6 @@ private:
     std::thread worker_thread_; /**< the worker thread for assigning placed orders to remote robots. */
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
-    boost::asio::steady_timer placing_timer_; /**< the placing timer. */
-    bool placing_gate_open_; /**< the placing gate. */
-    std::queue<std::function<void()>> placing_queue_; /**< the placing queue. */
-    uint32_t evaluate_orders_count_; /** determines after how many orders the evaluation is done. */
     /* remote robot related member variables. */
     std::thread cyclic_remote_robot_discovery_thread_; /**< the thread updating the connectivity status of remote robots in the address space. */
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map holding the remote robot instances. */
@@ -557,32 +521,13 @@ private:
     void
     join_threads();
 
-    /**
-     * @brief Instructs all remote robots to contribute their statistics.
-     * 
-     */
-    void
-    contribute_remote_robot_statistics();
-
-    /**
-     * @brief Extracts the returned remote robot parameters.
-     * 
-     * @param _output_size the count of returned output values.
-     * @param _output the variant containing the output values.
-     * @return true if call was successful.
-     * @return false if call failed.
-     */
-    bool
-    contribute_statistics_called(size_t _output_size, UA_Variant* _output);
-
 public:
     /**
      * @brief Constructs a new kitchen object.
      * 
      * @param _robot_count the total robot count in the kitchen.
-     * @param _evaluate_orders_count determines after how many orders the evaluation is done.
      */
-    kitchen(uint32_t _robot_count, uint32_t _evaluate_orders_count = 0);
+    kitchen(uint32_t _robot_count);
 
     /**
      * @brief Destroys the kitchen object.

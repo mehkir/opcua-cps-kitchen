@@ -17,7 +17,6 @@
 #define SWITCH_POSITION "SwitchPosition"
 #define RECONFIGURE "Reconfigure"
 #define COMMIT_NEW_POSITION "CommitNewPosition"
-#define CONTRIBUTE_STATISTICS "ContributeStatistics"
 // attribute nodes
 #define POSITION "Position"
 #define RECIPE_ID "RecipeId"
