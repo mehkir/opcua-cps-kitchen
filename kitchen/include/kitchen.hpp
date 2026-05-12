@@ -394,7 +394,7 @@ private:
     handle_random_order_request();
 
     /**
-     * @brief Calls the conveyor's choose next robot.
+     * @brief Calls the controller's choose next robot.
      * 
      * @param _recipe_id the recipe id.
      */
