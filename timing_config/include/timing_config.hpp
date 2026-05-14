@@ -1,3 +1,13 @@
+/**
+ * @file timing_config.hpp
+ * @brief Singleton class for managing timing configurations of CPS Kitchen agents.
+ * 
+ * @details
+ * timing_config provides centralized, thread-safe access to timing parameters for 
+ * robots and the conveyor in the CPS Kitchen system. It loads timing data 
+ * from an external configuration source and exposes values through a hierarchical 
+ * key-value mapping system.
+ */
 #ifndef TIMING_CONFIG_HPP
 #define TIMING_CONFIG_HPP
 
