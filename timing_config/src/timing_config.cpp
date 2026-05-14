@@ -20,7 +20,7 @@ timing_config::get_instance() {
     return instance_;
 }
 
-timing_config::timing_config(/* args */) {
+timing_config::timing_config() {
     load_timing_config();
 }
 
