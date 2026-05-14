@@ -2,7 +2,7 @@
 #define TIMING_CONFIG_HPP
 
 #include <mutex>
-#include <memory>
+#include <string>
 #include <unordered_map>
 #include "types.hpp"
 /* Agent time key names */
@@ -50,6 +50,13 @@ class timing_config {
          * 
          */
         std::unordered_map<std::string, std::unordered_map<std::string, duration_t>> timing_map_;
+
+        /**
+         * @brief Loads the timing configuration data from the source file.
+         * 
+         */
+        void
+        load_timing_config();
     public:
         /**
          * @brief Returns the singleton timing_config instance.
@@ -65,7 +72,8 @@ class timing_config {
          * @param _timing_name the timing name.
          * @return duration_t the timing value.
          */
-        duration_t get_timing(const std::string _agent_name, const std::string _timing_name) const;
+        duration_t
+        get_timing(const std::string _agent_name, const std::string _timing_name) const;
 
     };
 
