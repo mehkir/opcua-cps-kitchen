@@ -8,12 +8,12 @@
 #include <chrono>
 #include <set>
 #include "client_connection_establisher.hpp"
-#include "agent_timing.hpp"
 #include "filtered_logger.hpp"
 #include "browsenames.h"
 #include "discovery_and_connection.hpp"
 
 #define INSTANCE_NAME "KitchenRobot"
+#define NODE_UPDATE_INTERVAL_MS 1
 
 robot::robot(position_t _position, std::string _capabilities_file_name, position_t _conveyor_size) :
         server_(UA_Server_new()), position_(_position), robot_uri_("urn:kitchen:robot:" + std::to_string(position_)), robot_type_inserter_(server_, ROBOT_TYPE), preparing_dish_(false), already_rearranging_(false), already_reconfiguring_(false),
@@ -24,7 +24,7 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
     #else
         mersenne_twister_(random_device_()),
     #endif
-        uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1) {
+        uniform_int_distribution_(0, capability_parser_.get_capabilities().size()-1), timing_config_(timing_config::get_instance()), move_time_ms_(timing_config_->get_timing(ROBOT_TIMES, ROBOT_MOVE)), reconfiguration_time_ms_(timing_config_->get_timing(ROBOT_TIMES, RECONFIGURATION)), retool_time_ms_(timing_config_->get_timing(ROBOT_TIMES, RETOOL)), action_factor_(timing_config_->get_timing(ROBOT_TIMES, ACTION_FACTOR)) {
     /* Setup robot */
     UA_StatusCode status = UA_STATUSCODE_GOOD;
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -435,7 +435,7 @@ robot::compute_overall_time_and_determine_last_tool(std::queue<robot_action> _ac
     UA_Variant_clear(&last_equipped_tool_var);
     UA_UInt32 processable_steps = 0;
     while (!_action_queue.empty() && capability_parser_.is_capable_to(_action_queue.front().get_name())) {
-        overall_time += last_equipped_tool != _action_queue.front().get_required_tool() ? RETOOLING_TIME : 0;
+        overall_time += last_equipped_tool != _action_queue.front().get_required_tool() ? retool_time_ms_ : 0;
         overall_time += _action_queue.front().get_action_duration();
         last_equipped_tool = _action_queue.front().get_required_tool();
         _action_queue.pop();
@@ -583,15 +583,15 @@ robot::determine_next_action() {
             UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "RETOOL: Retooling current tool %s to %s", robot_tool_to_string(current_tool_), robot_tool_to_string(required_tool));
             robot_state_ = robot_state::RETOOLING;
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
-            if (RETOOLING_TIME > 0) {
-                steady_timer_.expires_from_now(std::chrono::milliseconds(1));
+            if (retool_time_ms_ > 0) {
+                steady_timer_.expires_from_now(std::chrono::milliseconds(NODE_UPDATE_INTERVAL_MS));
                 steady_timer_.async_wait([this](const boost::system::error_code& _error) {
                     if (_error) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling retooling", __FUNCTION__);
                         stop();
                         return;
                     }
-                    pass_time(RETOOLING_TIME, std::bind(&robot::retool, this));
+                    pass_time(retool_time_ms_, std::bind(&robot::retool, this));
                 });
             } else {
                 retool();
@@ -612,7 +612,7 @@ robot::determine_next_action() {
             robot_state_ = robot_state::COOKING;
             robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
             if (action_duration > 0) {
-                steady_timer_.expires_from_now(std::chrono::milliseconds(1));
+                steady_timer_.expires_from_now(std::chrono::milliseconds(NODE_UPDATE_INTERVAL_MS));
                 steady_timer_.async_wait([this, action_duration](const boost::system::error_code& _error) {
                     if (_error) {
                         UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
@@ -729,7 +729,7 @@ robot::pass_time(duration_t _duration, std::function<void ()> _to_be_performed) 
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, OVERALL_TIME, &overall_time, UA_TYPES_UINT32);
     _duration--;
     if (_duration != 0) {
-        steady_timer_.expires_from_now(std::chrono::milliseconds(1));
+        steady_timer_.expires_from_now(std::chrono::milliseconds(NODE_UPDATE_INTERVAL_MS));
         steady_timer_.async_wait([this, _duration, _to_be_performed](const boost::system::error_code& _error) {
             if (_error) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling pass time (%s)", __FUNCTION__, _error.what().c_str());
@@ -860,7 +860,7 @@ robot::handle_switch_position() {
     uint32_t distance = std::min(cw, ccw);
     robot_state_ = robot_state::REARRANGING;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
-    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * ROBOT_MOVE_TIME));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(distance * move_time_ms_));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling switch position (%s)", __FUNCTION__, _error.what().c_str());
@@ -1025,7 +1025,7 @@ robot::handle_reconfiguration() {
     already_reconfiguring_ = true;
     robot_state_ = robot_state::RECONFIGURING;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
-    steady_timer_.expires_from_now(std::chrono::milliseconds(RECONFIGURATION_TIME));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(reconfiguration_time_ms_));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling reconfiguration (%s)", __FUNCTION__, _error.what().c_str());

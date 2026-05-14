@@ -1,0 +1,24 @@
+{
+    "robot_times": {
+        "move": 100,
+        "reconfiguration": 100,
+        "retool": 50,
+        "action_factor": 10,
+        "peel": 5,
+        "cut": 3,
+        "braise": 8,
+        "mash": 5,
+        "stir": 3,
+        "sprinkle": 1,
+        "pour": 1,
+        "whip": 3,
+        "mix": 3,
+        "crush": 2,
+        "layer": 2,
+        "fry": 3
+    },
+    "conveyor_times": {
+        "move": 100,
+        "debounce": 100
+    }
+}

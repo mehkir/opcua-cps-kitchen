@@ -1,34 +1,9 @@
 #include "../include/robot_actions.hpp"
+#include "../include/robot_action_names.hpp"
 
-#define PEEL "peel"
-#define CUT "cut"
-#define BRAISE "braise"
-#define MASH "mash"
-#define STIR "stir"
-#define SPRINKLE "sprinkle"
-#define POUR "pour"
-#define WHIP "whip"
-#define MIX "mix"
-#define CRUSH "crush"
-#define LAYER "layer"
-#define BOIL "boil"
-#define BAKE "bake"
-#define FRY "fry"
-/* Action times given in milliseconds */
-#define PEELING_TIME 5LL
-#define CUTTING_TIME 3LL
-#define BRAISING_TIME 8LL
-#define MASHING_TIME 5LL
-#define STIRRING_TIME 3LL
-#define SPRINKLING_TIME 1LL
-#define POURING_TIME 1LL
-#define WHIPPING_TIME 3LL
-#define MIXING_TIME 3LL
-#define CRUSHING_TIME 2LL
-#define LAYERING_TIME 2LL
-#define FRYING_TIME 3LL
+#include "timing_config.hpp"
 
-robot_actions* robot_actions::instance_;
+robot_actions* robot_actions::instance_ = nullptr;
 std::mutex robot_actions::mutex_;
 
 robot_actions* robot_actions::get_instance() {
@@ -41,18 +16,18 @@ robot_actions* robot_actions::get_instance() {
 
 robot_actions::robot_actions() {
     // autonomous timed actions
-    action_map_[PEEL] = std::make_shared<autonomous_action>(PEEL, robot_tool::PEELER, PEELING_TIME);
-    action_map_[CUT] = std::make_shared<autonomous_action>(CUT, robot_tool::CUTTER, CUTTING_TIME);
-    action_map_[BRAISE] = std::make_shared<autonomous_action>(BRAISE, robot_tool::PAN, BRAISING_TIME);
-    action_map_[MASH] = std::make_shared<autonomous_action>(MASH, robot_tool::MASHER, MASHING_TIME);
-    action_map_[STIR] = std::make_shared<autonomous_action>(STIR, robot_tool::STIRRER, STIRRING_TIME);
-    action_map_[SPRINKLE] = std::make_shared<autonomous_action>(SPRINKLE, robot_tool::INGREDIENT_DISPENSER, SPRINKLING_TIME);
-    action_map_[POUR] = std::make_shared<autonomous_action>(POUR, robot_tool::INGREDIENT_DISPENSER, POURING_TIME);
-    action_map_[WHIP] = std::make_shared<autonomous_action>(WHIP, robot_tool::WHISK, WHIPPING_TIME);
-    action_map_[MIX] = std::make_shared<autonomous_action>(MIX, robot_tool::MIXER, MIXING_TIME);
-    action_map_[CRUSH] = std::make_shared<autonomous_action>(CRUSH, robot_tool::CRUSHER, CRUSHING_TIME);
-    action_map_[LAYER] = std::make_shared<autonomous_action>(LAYER, robot_tool::LAYERING_DISPENSER, LAYERING_TIME);
-    action_map_[FRY] = std::make_shared<autonomous_action>(FRY, robot_tool::FRYER, FRYING_TIME);
+    action_map_[PEEL] = std::make_shared<autonomous_action>(PEEL, robot_tool::PEELER, timing_config::get_instance()->get_timing(ROBOT_TIMES, PEEL));
+    action_map_[CUT] = std::make_shared<autonomous_action>(CUT, robot_tool::CUTTER, timing_config::get_instance()->get_timing(ROBOT_TIMES, CUT));
+    action_map_[BRAISE] = std::make_shared<autonomous_action>(BRAISE, robot_tool::PAN, timing_config::get_instance()->get_timing(ROBOT_TIMES, BRAISE));
+    action_map_[MASH] = std::make_shared<autonomous_action>(MASH, robot_tool::MASHER, timing_config::get_instance()->get_timing(ROBOT_TIMES, MASH));
+    action_map_[STIR] = std::make_shared<autonomous_action>(STIR, robot_tool::STIRRER, timing_config::get_instance()->get_timing(ROBOT_TIMES, STIR));
+    action_map_[SPRINKLE] = std::make_shared<autonomous_action>(SPRINKLE, robot_tool::INGREDIENT_DISPENSER, timing_config::get_instance()->get_timing(ROBOT_TIMES, SPRINKLE));
+    action_map_[POUR] = std::make_shared<autonomous_action>(POUR, robot_tool::INGREDIENT_DISPENSER, timing_config::get_instance()->get_timing(ROBOT_TIMES, POUR));
+    action_map_[WHIP] = std::make_shared<autonomous_action>(WHIP, robot_tool::WHISK, timing_config::get_instance()->get_timing(ROBOT_TIMES, WHIP));
+    action_map_[MIX] = std::make_shared<autonomous_action>(MIX, robot_tool::MIXER, timing_config::get_instance()->get_timing(ROBOT_TIMES, MIX));
+    action_map_[CRUSH] = std::make_shared<autonomous_action>(CRUSH, robot_tool::CRUSHER, timing_config::get_instance()->get_timing(ROBOT_TIMES, CRUSH));
+    action_map_[LAYER] = std::make_shared<autonomous_action>(LAYER, robot_tool::LAYERING_DISPENSER, timing_config::get_instance()->get_timing(ROBOT_TIMES, LAYER));
+    action_map_[FRY] = std::make_shared<autonomous_action>(FRY, robot_tool::FRYER, timing_config::get_instance()->get_timing(ROBOT_TIMES, FRY));
     // recipe timed actions
     action_map_[BOIL] = std::make_shared<recipe_timed_action>(BOIL, robot_tool::POT);
     action_map_[BAKE] = std::make_shared<recipe_timed_action>(BAKE, robot_tool::OVEN);

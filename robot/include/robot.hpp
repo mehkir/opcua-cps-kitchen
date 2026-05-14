@@ -31,6 +31,7 @@
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
 #include "robot_state.hpp"
+#include "timing_config.hpp"
 
 using namespace cps_kitchen;
 
@@ -140,6 +141,11 @@ private:
     boost::asio::steady_timer steady_timer_; /**< the steady timer for action time simulation. */
     std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
     std::thread client_iterate_thread_; /**< the client iteration thread. */
+    timing_config* timing_config_; /**< the timing configuration singleton instance pointer. */
+    duration_t move_time_ms_; /**< the time in milliseconds for moving one position along the conveyor belt. */
+    duration_t reconfiguration_time_ms_; /**< the time in milliseconds for reconfiguring to a new capabilities profile. */
+    duration_t retool_time_ms_; /**< the time in milliseconds to retool. */
+    duration_t action_factor_; /**< the factor to scale action durations. */
     /* controller related member variables. */
     UA_Client* controller_client_; /**< the OPC UA controller client pointer. */
     /* conveyor related member variables. */

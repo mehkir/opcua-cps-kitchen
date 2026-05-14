@@ -4,7 +4,6 @@
 #include <string>
 #include <memory>
 #include "callback_scheduler.hpp"
-#include "agent_timing.hpp"
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
 
@@ -12,6 +11,7 @@
 
 conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_uri_("urn:kitchen:conveyor"), conveyor_type_inserter_(server_, CONVEYOR_TYPE), plate_type_inserter_(server_, PLATE_TYPE),
                                             running_(true), stopped_(false), state_status_(conveyor::state::IDLING), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_),
+                                            timing_config_(timing_config::get_instance()), move_time_ms_(timing_config_->get_timing(CONVEYOR_TIMES, CONVEYOR_MOVE)), debounce_time_ms_(timing_config_->get_timing(CONVEYOR_TIMES, DEBOUNCE)),
                                             controller_client_(nullptr), kitchen_client_(nullptr) {
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
     UA_StatusCode status = UA_ServerConfig_setMinimal(server_config, 0, NULL);
@@ -198,7 +198,7 @@ conveyor::handle_finished_order_notification(std::string _robot_endpoint, positi
     notifications_map_[_robot_position] = _robot_endpoint;
     if (state_status_ == conveyor::state::IDLING) {
         state_status_ = conveyor::state::MOVING;
-        steady_timer_.expires_from_now(std::chrono::milliseconds(DEBOUNCE_TIME));
+        steady_timer_.expires_from_now(std::chrono::milliseconds(debounce_time_ms_));
         steady_timer_.async_wait([this](const boost::system::error_code& _error) {
             if (_error) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling finished orders retrieval", __FUNCTION__);
@@ -250,7 +250,7 @@ conveyor::request_next_robots() {
     }
     if (next_robot_request_queue_.empty()) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: No next robots requested. ");
-        steady_timer_.expires_from_now(std::chrono::milliseconds(CONVEYOR_MOVE_TIME));
+        steady_timer_.expires_from_now(std::chrono::milliseconds(move_time_ms_));
         steady_timer_.async_wait([this](const boost::system::error_code& _error) {
             if (_error) {
                 UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling conveyor movement", __FUNCTION__);
@@ -448,7 +448,7 @@ conveyor::handle_receive_next_robot(position_t _robot_position, std::string _rob
         return;
     }
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "NEXT ROBOT: Received all next robot responses");
-    steady_timer_.expires_from_now(std::chrono::milliseconds(CONVEYOR_MOVE_TIME));
+    steady_timer_.expires_from_now(std::chrono::milliseconds(move_time_ms_));
     steady_timer_.async_wait([this](const boost::system::error_code& _error) {
         if (_error) {
             UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Failed scheduling conveyor movement", __FUNCTION__);

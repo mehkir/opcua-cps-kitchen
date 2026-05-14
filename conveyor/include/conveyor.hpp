@@ -42,6 +42,7 @@
 #include "node_browser_helper.hpp"
 #include "discovery_util.hpp"
 #include "information_node_reader.hpp"
+#include "timing_config.hpp"
 
 using namespace cps_kitchen;
 
@@ -542,6 +543,9 @@ private:
     std::unordered_map<position_t, std::unique_ptr<remote_robot>> position_remote_robot_map_; /**< the map tracking the current positions of robots. */
     std::unordered_map<std::string, object_method_info> method_id_map_; /**< the map holding the node ids of client methods. */
     std::queue<position_t> next_robot_request_queue_; /**< the queue holding the order of next robot requests. */
+    timing_config* timing_config_; /**< the timing configuration singleton instance pointer. */
+    duration_t move_time_ms_; /**< the time it takes to move the conveyor for one step in milliseconds. */
+    duration_t debounce_time_ms_; /**< the wait time in milliseconds while idling to group closely spaced finished-order notifications before moving. */
     /* controller related member variables. */
     std::mutex client_mutex_; /**< the mutex to synchronize client method calls. */
     std::thread client_iterate_thread_; /**< the client iteration thread. */

@@ -31,6 +31,7 @@ add_compile_definitions(APP_LOGGER=NULL)
 add_compile_definitions(FILTERED_LOGGING)
 add_compile_definitions(ROBOT_SEED=5489u KITCHEN_SEED=5489u)
 
+add_subdirectory(timing_config)
 add_subdirectory(timestamp)
 add_subdirectory(wrappers)
 add_subdirectory(discovery)
