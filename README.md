@@ -122,10 +122,10 @@ If you already cloned the project without the `--recurse-submodules` parameter, 
 ```bash
 git submodule update --init --recursive
 ```
-The kitchen environment is started with the [startup_kitchen.bash](start_scripts/startup_kitchen.bash) script and expects the robot count as a parameter.
+The kitchen environment is started with the [startup_kitchen.bash](start_scripts/startup_kitchen.bash) script and expects the robot count as a parameter and optionally an evaluation flag.
 For example, when you are in the project root directory:
 ```bash
-start_scripts/startup_kitchen.bash 4
+start_scripts/startup_kitchen.bash -r 4 -e
 ```
 The dashboard is started with the [start_dashboard.bash](start_scripts/start_dashboard.bash) script and expects the robot count as a parameter as well.
 For example, when you are in the project root directory:
@@ -141,10 +141,10 @@ The Robot-Agents and Conveyor-Agent should now prepare and transport orders.
 
 ## Define and Set Capabilities
 Capability profiles are set in separate JSON files in the capabilites folder.
-Valid actions with their duration are defined in the [robot_actions.cpp](actions/src/robot_actions.cpp) file.
-Further actions with durations can be defined there and must be add in the *action_map_* in the constructor.
-There are the two types *autonomous_action* and *recipe_timed_action*.
-The latter has no duration but must be defined in the recipe.
+Valid actions are named in the [robot_actions.cpp](actions/src/robot_action_names.hpp) file.
+There are the two types *recipe_timed_action* and *autonomous_action* whose types are defined in the [robot_actions.cpp](actions/src/robot_actions.cpp) file.
+The duration of *recipe_timed_action* must be defined in the recipe.
+*autonomous_action* durations are configured via [timing_config.json](timing_config.json) and must be add in the *action_map_*(see [robot_actions.cpp](actions/src/robot_actions.cpp)) in the constructor.
 Further tools can be defined in [robot_tool.hpp](robot/include/robot_tool.hpp) in the *robot_tool* enum class and need a string representation in the *robot_tool_to_string* method to be displayed correctly in the dashboard.
 A tool is then tied to an action in the [robot_actions.cpp](actions/src/robot_actions.cpp) constructor.
 A capability profile for a Robot-Agent at a certain position can be set in the *position_capabilities* map in [start_robots.bash](start_scripts/start_robots.bash).
@@ -156,7 +156,7 @@ Only recipe timed actions must define a duration; other actions do not (see also
 
 ## Timing
 Action execution, tool changes (retooling), and conveyor movement are time-simulated.
-Global agent timing parameters are defined in [agent_timing.hpp](agent_timing.hpp).
+Global agent timing parameters are defined in [timing_config.json](timing_config.json).
 Per-action durations for Robot-Agents are configured in [robot_actions.cpp](actions/src/robot_actions.cpp).
 Update these files to adjust simulation speed and action-specific timings.
 
