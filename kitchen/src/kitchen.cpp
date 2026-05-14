@@ -6,7 +6,6 @@
 #include <set>
 #include "filtered_logger.hpp"
 #include "discovery_and_connection.hpp"
-#include "agent_timing.hpp"
 
 #define INSTANCE_NAME "CpsKitchen"
 #define REMOTE_CONTROLLER_INSTANCE_NAME "RemoteKitchenController"

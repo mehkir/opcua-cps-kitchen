@@ -1,4 +1,4 @@
 file(GLOB MY_SOURCES "./src/*.cpp")
 add_library(recipe_lib ${MY_SOURCES})
-target_include_directories(recipe_lib PUBLIC ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/actions/include)
-target_link_libraries(recipe_lib PUBLIC jsoncpp actions_lib)
+target_include_directories(recipe_lib PUBLIC ${PROJECT_SOURCE_DIR} ${PROJECT_SOURCE_DIR}/actions/include ${PROJECT_SOURCE_DIR}/timing_config/include)
+target_link_libraries(recipe_lib PUBLIC jsoncpp actions_lib timing_config_lib)

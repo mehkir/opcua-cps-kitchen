@@ -10,7 +10,7 @@
 #include <iostream>
 
 #include "types.hpp"
-#include "agent_timing.hpp"
+#include "timing_config.hpp"
 
 #define DISH_NAME_KEY "name"
 #define INSTRUCTIONS_KEY "instructions"
@@ -20,6 +20,8 @@
 
 
 recipe_parser::recipe_parser() {
+    uint32_t action_factor = timing_config::get_instance()->get_timing(ROBOT_TIMES, ACTION_FACTOR);
+    duration_t retool_time_ms = timing_config::get_instance()->get_timing(ROBOT_TIMES, RETOOL);
     robot_actions* actions = robot_actions::get_instance();
     char buffer[PATH_MAX + 1];  // +1 for the null terminator
     ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
@@ -72,15 +74,15 @@ recipe_parser::recipe_parser() {
             duration_t action_time;
             robot_tool required_tool;
             if (autonomous_act != nullptr) {
-                action_time = autonomous_act->get_action_duration() * ACTION_FACTOR;
+                action_time = autonomous_act->get_action_duration() * action_factor;
                 required_tool = autonomous_act->get_required_tool();
             } else {
-                action_time = instruction[DURATION_KEY].asUInt() * ACTION_FACTOR;
+                action_time = instruction[DURATION_KEY].asUInt() * action_factor;
                 required_tool = recipe_timed_act->get_required_tool();
             }
             cooking_time += action_time;
             if (!action_queue.empty()) {
-                retooling_time += required_tool != action_queue.back().get_required_tool() ? RETOOLING_TIME : 0;
+                retooling_time += required_tool != action_queue.back().get_required_tool() ? retool_time_ms : 0;
             }
             action_queue.push(robot_action(action_name, required_tool, instruction[INGREDIENTS_KEY].asString(), action_time));
         }

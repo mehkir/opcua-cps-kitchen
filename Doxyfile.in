@@ -16,6 +16,7 @@ INPUT                  = \
                         "@CMAKE_SOURCE_DIR@/recipe" \
                         "@CMAKE_SOURCE_DIR@/robot" \
                         "@CMAKE_SOURCE_DIR@/timestamp" \
+                        "@CMAKE_SOURCE_DIR@/timing_config" \
                         "@CMAKE_SOURCE_DIR@/wrappers" \
                         "@CMAKE_SOURCE_DIR@/browsenames.h" \
                         "@CMAKE_SOURCE_DIR@/start_controller_instance.cpp" \
@@ -23,7 +24,6 @@ INPUT                  = \
                         "@CMAKE_SOURCE_DIR@/start_event_collector.cpp" \
                         "@CMAKE_SOURCE_DIR@/start_kitchen_instance.cpp" \
                         "@CMAKE_SOURCE_DIR@/start_robot_instance.cpp" \
-                        "@CMAKE_SOURCE_DIR@/agent_timing.hpp" \
                         "@CMAKE_SOURCE_DIR@/types.hpp" \
                         "@CMAKE_SOURCE_DIR@/README.md"
 EXCLUDE                = "@CMAKE_SOURCE_DIR@/build" "@CMAKE_SOURCE_DIR@/build_debug" "@CMAKE_SOURCE_DIR@/build_sanitized"
