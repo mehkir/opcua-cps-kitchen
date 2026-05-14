@@ -21,6 +21,7 @@ timing_config::get_instance() {
 }
 
 timing_config::timing_config(/* args */) {
+    load_timing_config();
 }
 
 
