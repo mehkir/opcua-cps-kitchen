@@ -8,6 +8,11 @@
  * - A singleton registry to query actions by name
  *
  * Duration values use cps_kitchen::duration_t (see types.hpp).
+ * 
+ * @details
+ * The robot_actions class maintains a mapping of action names to their corresponding action objects,
+ * allowing for easy retrieval and execution of actions based on their string identifiers.
+ * This design supports both autonomous actions with fixed durations and recipe-timed actions where the duration is determined at runtime.
  */
 #ifndef ROBOT_ACTIONS_HPP
 #define ROBOT_ACTIONS_HPP
