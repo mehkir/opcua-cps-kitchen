@@ -13,10 +13,15 @@
 
 #include <map>
 #include <cstdint>
+#include <string>
 
 class kitchen_timestamp_recorder {
     private:
-        std::map<uint64_t, uint32_t> kitchen_timestamps_; /**< the map tracking kitchen state timestamps. */
+        std::map<uint64_t, uint32_t> completed_orders_timestamps_; /**< the map tracking completed orders timestamps. */
+        std::map<uint64_t, uint32_t> received_orders_timestamps_; /**< the map tracking received orders timestamps. */
+
+        void
+        write_timestamps(std::string _filename_prefix, std::map<uint64_t, uint32_t> _timestamps_map, std::string _header);
     public:
         /**
          * @brief Constructs a new kitchen timestamp recorder object.
@@ -31,13 +36,22 @@ class kitchen_timestamp_recorder {
         ~kitchen_timestamp_recorder() = default;
 
         /**
-         * @brief Records a timestamp for the given kitchen state.
+         * @brief Records timestamps for completed orders count changes in the kitchen.
          * 
          * @param _timestamp the timestamp.
          * @param _completed_orders_count the completed orders count.
          */
         void
-        record_timestamp(uint64_t _timestamp, uint32_t _completed_orders_count);
+        record_completed_orders_timestamp(uint64_t _timestamp, uint32_t _completed_orders_count);
+
+        /**
+         * @brief Records timestamps for received orders count changes in the kitchen.
+         * 
+         * @param _timestamp the timestamp.
+         * @param _received_orders_count the received orders count.
+         */
+        void
+        record_received_orders_timestamp(uint64_t _timestamp, uint32_t _received_orders_count);
 
         /**
          * @brief Writes the recorded timestamps to a csv file.

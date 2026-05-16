@@ -39,12 +39,12 @@ void robot_timestamp_recorder::write_timestamps() {
     int filecount = 0;
     std::stringstream filename;
     std::string sanitized_endpoint = sanitize_endpoint(robot_endpoint_);
-    filename << sanitized_endpoint << FILENAME_INFIX << filecount << ".csv";
+    filename << sanitized_endpoint << "-" << FILENAME_INFIX << filecount << ".csv";
     std::filesystem::path timestamp_path = timestamp_dir / filename.str();
     struct stat filename_buffer;
     for(filecount = 1; (stat(timestamp_path.c_str(), &filename_buffer) == 0); filecount++) {
         filename.str("");
-        filename << sanitized_endpoint << FILENAME_INFIX << filecount << ".csv";
+        filename << sanitized_endpoint << "-" << FILENAME_INFIX << filecount << ".csv";
         timestamp_path = timestamp_dir / filename.str();
     }
     robot_states_file.open(timestamp_path);
