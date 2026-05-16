@@ -26,6 +26,12 @@
 
 using namespace cps_kitchen;
 
+/**
+ * @brief Converts a UA_DateTime to a Unix timestamp in nanoseconds.
+ * 
+ * @param ua_ts the OPC UA date time.
+ * @return uint64_t the Unix timestamp in nanoseconds.
+ */
 static uint64_t
 ua_date_time_to_unix_ns(UA_DateTime ua_ts) {
     // UA_DateTime/Windows FILETIME epoch difference to Unix epoch in 100-ns units
@@ -298,6 +304,17 @@ struct remote_kitchen {
                 return UA_STATUSCODE_BAD;
             }
             
+            UA_NodeId received_orders_count_id = node_browser_helper().get_attribute_id(client_, KITCHEN_TYPE, RECEIVED_ORDERS);
+            if (UA_NodeId_equal(&received_orders_count_id, &UA_NODEID_NULL)) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s attribute id", __FUNCTION__, RECEIVED_ORDERS);
+                return UA_STATUSCODE_BAD;
+            }
+            status = nv_subscriber_->subscribe_node_value(received_orders_count_id, received_orders_count_changed, this);
+            if (status != UA_STATUSCODE_GOOD) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error subscribing to remote kitchen's %s", __FUNCTION__, RECEIVED_ORDERS);
+                return UA_STATUSCODE_BAD;
+            }
+
             try {
                 client_iterate_thread_ = std::thread([this]() {
                     while(running_) {
@@ -390,8 +407,45 @@ struct remote_kitchen {
             } else {
                 timestamp = std::chrono::system_clock::now().time_since_epoch().count();
             }
-            self->timestamp_recorder_.record_timestamp(timestamp, completed_orders_count);
+            self->timestamp_recorder_.record_completed_orders_timestamp(timestamp, completed_orders_count);
             // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote kitchen's completed orders count is %d", __FUNCTION__, completed_orders_count);
+        }
+
+        /**
+         * @brief The received orders count changed callback for the subscription.
+         * 
+         * @param _client the client issuing the subscription.
+         * @param _sub_id server-assigned subscription id that delivered this notification.
+         * @param _sub_context user-defined context data passed when creating the subscription.
+         * @param _mon_id server-assigned MonitoredItemId that produced the data change.
+         * @param _mon_context user-defined context data passed when creating the monitored item.
+         * @param _value the reported UA_DataValue.
+         */
+        static void
+        received_orders_count_changed(UA_Client* _client, UA_UInt32 _sub_id, void* _sub_context,
+            UA_UInt32 _mon_id, void* _mon_context, UA_DataValue* _value) {
+            if(_mon_context == NULL) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Monitor context is NULL", __FUNCTION__);
+                return;
+            }
+            remote_kitchen* self = static_cast<remote_kitchen*>(_mon_context);
+            if (!UA_Variant_hasScalarType(&_value->value, &UA_TYPES[UA_TYPES_UINT32])) {
+                UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Bad output argument type", __FUNCTION__);
+                self->running_.store(false);
+                return;
+            }
+            uint32_t received_orders_count = *(UA_UInt32*) _value->value.data;
+
+            uint64_t timestamp = 0;
+            if (_value->hasSourceTimestamp) {
+                timestamp = ua_date_time_to_unix_ns(_value->sourceTimestamp);
+            } else if (_value->hasServerTimestamp) {
+                timestamp = ua_date_time_to_unix_ns(_value->serverTimestamp);
+            } else {
+                timestamp = std::chrono::system_clock::now().time_since_epoch().count();
+            }
+            self->timestamp_recorder_.record_received_orders_timestamp(timestamp, received_orders_count);
+            // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Remote kitchen's received orders count is %d", __FUNCTION__, received_orders_count);
         }
 
 };
