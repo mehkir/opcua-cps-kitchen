@@ -337,6 +337,7 @@ kitchen::handle_order_request(recipe_id_t _recipe_id) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "PLACE ORDER: Recipe id %d is out of range [1,%d] of known recipes", _recipe_id, recipe_parser_.get_recipe_count());
         return;
     }
+    remove_stopped_robots();
     increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "PLACE ORDER: Order placed for recipe with the ID %d", _recipe_id);
