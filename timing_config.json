@@ -1,9 +1,9 @@
 {
     "robot_times": {
-        "move": 100,
-        "reconfiguration": 100,
-        "retool": 50,
-        "action_factor": 10,
+        "move": 250,
+        "reconfiguration": 500,
+        "retool": 150,
+        "action_factor": 50,
         "peel": 5,
         "cut": 3,
         "braise": 8,
@@ -18,7 +18,7 @@
         "fry": 3
     },
     "conveyor_times": {
-        "move": 100,
+        "move": 250,
         "debounce": 100
     }
 }

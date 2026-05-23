@@ -13,7 +13,7 @@
 #define REDISCOVER_INTERVAL 1LL
 
 kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_("urn:kitchen:env"), kitchen_type_inserter_(server_, KITCHEN_TYPE), running_(true), stopped_(false), remote_robot_type_inserter_(server_, REMOTE_ROBOT_TYPE),
-                                        robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE), recipe_parser_(),
+                                        robot_count_(_robot_count), remote_controller_type_inserter_(server_, REMOTE_CONTROLLER_TYPE), remote_conveyor_type_inserter_(server_, REMOTE_CONVEYOR_TYPE),
                                     #ifdef KITCHEN_SEED
                                         mersenne_twister_(KITCHEN_SEED),
                                     #else
@@ -337,6 +337,7 @@ kitchen::handle_order_request(recipe_id_t _recipe_id) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "PLACE ORDER: Recipe id %d is out of range [1,%d] of known recipes", _recipe_id, recipe_parser_.get_recipe_count());
         return;
     }
+    remove_stopped_robots();
     increment_orders_counter(RECEIVED_ORDERS);
     bool instructed = false;
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "PLACE ORDER: Order placed for recipe with the ID %d", _recipe_id);
