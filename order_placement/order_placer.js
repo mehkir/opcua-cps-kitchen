@@ -12,12 +12,29 @@ function initWebSocket() {
         console.log("✅ WebSocket connected");
     };
     ws.onmessage = (event) => {
-        console.log("📨 Received from server:", event.data);
+        // console.log("📨 Received from server:", event.data);
         const data = JSON.parse(event.data);
-        console.log("📨 Parsed data:", data);
+        // console.log("📨 Parsed data:", data);
+        handle_received_data(data.value_dto);
     };
     ws.onclose = () => console.log("❌ WebSocket closed");
     ws.onerror = (err) => console.error("WebSocket error:", err);
+}
+
+let completed_orders = 0;
+function handle_received_data(data) {
+    // console.log("Handling received data:", data);
+    if (data.type === "KitchenType" && data.attribute_name === "CompletedOrders") {
+        completed_orders = data.value;
+        console.log("✅ Completed orders:", completed_orders);
+        if (completed_orders === order_count) {
+            console.log("🎉 All orders completed!");
+            if (ws) {
+                ws.close();
+            }
+            process.exit(0);
+        }
+    }
 }
 
 function placeRandomOrder(order_count) {
@@ -34,16 +51,12 @@ function placeRandomOrder(order_count) {
 
         if (ws.readyState !== WebSocket.OPEN) {
             ws.addEventListener("open", () => {
-                ws.send(JSON.stringify(dto), () => {
-                    ws.close();
-                });
-            }, { once: true });
+                ws.send(JSON.stringify(dto));
+            });
             return;
         }
 
-        ws.send(JSON.stringify(dto), () => {
-            ws.close();
-        });
+        ws.send(JSON.stringify(dto));
     } else {
         console.error('Please enter a positive integer.');
     }
