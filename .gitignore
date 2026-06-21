@@ -5,3 +5,4 @@ build_sanitized/
 logs/*
 *.csv
 .venv
+node_modules/
