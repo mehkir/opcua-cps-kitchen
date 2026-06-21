@@ -14,26 +14,16 @@ if (( $2 < 2 )); then
 fi
 CONVEYOR_SIZE=$2
 
-# best-case
-# declare -A position_capabilities=(
-#     [1]="r1.json"
-#     [2]="r2.json"
-#     [3]="r3.json"
-#     [4]="r4.json"
-# )
-# worst-case
-declare -A position_capabilities=(
-    [1]="r4.json"
-    [2]="r3.json"
-    [3]="r2.json"
-    [4]="r1.json"
-)
+declare -A position_capabilities
 
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-cd -- "$SCRIPT_DIR"
-cd ..
-PROJECT_DIRECTORY="$(pwd)"
+PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+
+while IFS=$'\t' read -r key value; do
+    position_capabilities["$key"]="$value"
+done < <(jq -r 'to_entries[] | [.key, .value] | @tsv' "$PROJECT_DIRECTORY/robot_config_mapping.json")
+
 for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
     robot_position=$(( $robot_count + 1 ))
     echo "Starting robot at position $robot_position"

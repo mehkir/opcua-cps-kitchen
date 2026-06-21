@@ -11,9 +11,7 @@ ROBOTS=$1
 
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-cd -- "$SCRIPT_DIR"
-cd ..
-PROJECT_DIRECTORY="$(pwd)"
+PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 $PROJECT_DIRECTORY/build/start_conveyor_instance $ROBOTS &
 # "$PROJECT_DIRECTORY/build/start_conveyor_instance" "$ROBOTS" >./logs/conveyor_${ROBOTS}_$(date +%Y%m%d%H%M%S) &
 exit_code=$?

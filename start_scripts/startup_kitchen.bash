@@ -27,17 +27,16 @@ fi
 
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-cd -- "$SCRIPT_DIR"
-cd ..
-PROJECT_DIRECTORY="$(pwd)"
+PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 $PROJECT_DIRECTORY/build.bash
 ROBOTS_COUNT=$robots_count
 CONVEYOR_SIZE=$(( ROBOTS_COUNT + 1 ))
 
 # Define a cleanup function
 kill_kitchen() {
-    echo "Waiting 5 seconds for agents to shutdown. The rest will be killed after."
-    sleep 5
+    local KILL_TIMEOUT=5
+    echo "$KILL_TIMEOUT seconds timeout for agents to shutdown. Still running processes after timeout will be killed."
+    sleep "$KILL_TIMEOUT"
     for p in start_r start_c discov start_k; do
         pkill -SIGKILL "$p"
     done
