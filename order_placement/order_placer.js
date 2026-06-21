@@ -1,5 +1,8 @@
-const PLACE_RANDOM_ORDER = "PlaceRandomOrder";
+const WebSocket = require('ws');
+const {program} = require("commander");
 
+const PLACE_RANDOM_ORDER = "PlaceRandomOrder";
+let ws;
 function initWebSocket() {
     if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
         return; // avoid duplicate connections
@@ -24,13 +27,23 @@ function placeRandomOrder(order_count) {
             order_count: order_count
         };
         console.log("Placing random order with count:", order_count);
-        if (!ws || ws.readyState !== WebSocket.OPEN) {
-            console.warn("WebSocket not open. Cannot send order.");
-        } else {
-            ws.send(JSON.stringify(dto), () => {
-                ws.close();
-            });
+        if (!ws) {
+            console.warn("WebSocket not initialized.");
+            return;
         }
+
+        if (ws.readyState !== WebSocket.OPEN) {
+            ws.addEventListener("open", () => {
+                ws.send(JSON.stringify(dto), () => {
+                    ws.close();
+                });
+            }, { once: true });
+            return;
+        }
+
+        ws.send(JSON.stringify(dto), () => {
+            ws.close();
+        });
     } else {
         console.error('Please enter a positive integer.');
     }
@@ -38,7 +51,7 @@ function placeRandomOrder(order_count) {
 
 initWebSocket();
 
-program.option("-oc, --order-count <number>", "Number of orders to place");
+program.option("-o, --order-count <number>", "Number of orders to place");
 program.parse(process.argv);
 const options = program.opts();
 const order_count = Number(options.orderCount);
