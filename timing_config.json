@@ -1,4 +1,5 @@
 {
+    "placing_rate": 100,
     "robot_times": {
         "move": 250,
         "reconfiguration": 500,
