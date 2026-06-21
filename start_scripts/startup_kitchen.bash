@@ -34,8 +34,9 @@ CONVEYOR_SIZE=$(( ROBOTS_COUNT + 1 ))
 
 # Define a cleanup function
 kill_kitchen() {
-    echo "5 seconds timeout for agents to shutdown. Still running processes after timeout will be killed."
-    sleep 5
+    local KILL_TIMEOUT=5
+    echo "$KILL_TIMEOUT seconds timeout for agents to shutdown. Still running processes after timeout will be killed."
+    sleep "$KILL_TIMEOUT"
     for p in start_r start_c discov start_k; do
         pkill -SIGKILL "$p"
     done
