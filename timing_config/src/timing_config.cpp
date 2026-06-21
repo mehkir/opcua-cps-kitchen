@@ -46,12 +46,16 @@ timing_config::load_timing_config() {
     if (!reader.parse(ifs_timing_config, agent_times)) {
         std::cerr << reader.getFormattedErrorMessages() << std::endl;
     }
-    for (auto agent_name : agent_times.getMemberNames()) {
-        std::unordered_map<std::string, duration_t> agent_timing_map;
-        for (auto timing_name : agent_times[agent_name].getMemberNames()) {
-            agent_timing_map.emplace(timing_name, agent_times[agent_name][timing_name].asUInt64());
+    const std::array<const char*, 2> sections = {ROBOT_TIMES, CONVEYOR_TIMES};
+    for (const char* section : sections) {
+        if (!agent_times.isMember(section) || !agent_times[section].isObject()) {
+            continue;
         }
-        timing_map_.emplace(agent_name, agent_timing_map);
+        std::unordered_map<std::string, duration_t> section_map;
+        for (auto timing_name : agent_times[section].getMemberNames()) {
+            section_map.emplace(timing_name, agent_times[section][timing_name].asUInt64());
+        }
+        timing_map_.emplace(section, std::move(section_map));
     }
 }
 
