@@ -31,9 +31,7 @@ declare -A position_capabilities=(
 
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-cd -- "$SCRIPT_DIR"
-cd ..
-PROJECT_DIRECTORY="$(pwd)"
+PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIR/.." && pwd)"
 for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
     robot_position=$(( $robot_count + 1 ))
     echo "Starting robot at position $robot_position"
