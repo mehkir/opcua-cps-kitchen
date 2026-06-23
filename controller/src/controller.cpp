@@ -6,7 +6,7 @@
 
 #define INSTANCE_NAME "KitchenController"
 
-controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true),
+controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_new()), controller_type_inserter_(server_, CONTROLLER_TYPE), running_(true), stopped_(false),
                                                             work_guard_(boost::asio::make_work_guard(io_context_)), recipe_parser_(), kitchen_mape_(std::move(_kitchen_mape)) {
     /* Setup controller */
     UA_ServerConfig* server_config = UA_Server_getConfig(server_);
@@ -626,10 +626,15 @@ controller::start() {
 
 void
 controller::stop() {
+    if (stopped_.load()) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Controller is already stopped", __FUNCTION__);
+        return;
+    }
     running_.store(false);
     work_guard_.reset();
     io_context_.stop();
     discovery_util_.stop();
     discovery_util_.deregister_server(server_);
+    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }
