@@ -1,9 +1,19 @@
 #include "../include/event_collector.hpp"
 #include <iostream>
 #include "information_node_reader.hpp"
+#include <limits.h>
+#include <system_error>
 
-event_collector::event_collector() : stopped_(false), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_) {
+#define TIMESTAMP_DIR "timestamp_results"
 
+event_collector::event_collector() : stopped_(false), work_guard_(boost::asio::make_work_guard(io_context_)), steady_timer_(io_context_), timestamp_dir_(get_project_dir() / TIMESTAMP_DIR / get_timestamp_dir_name().str()) {
+    std::error_code ec;
+    if (!std::filesystem::exists(timestamp_dir_, ec)) {
+        std::filesystem::create_directories(timestamp_dir_);
+    }
+    if (ec) {
+        std::cerr << "Error creating timestamp directory: " << ec.message() << std::endl;
+    }
 }
 
 event_collector::~event_collector() {
@@ -55,7 +65,7 @@ event_collector::handle_discovered_robot(std::string _endpoint) {
         return;
     }
 
-    std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_endpoint);
+    std::unique_ptr<remote_robot> robot = std::make_unique<remote_robot>(_endpoint, timestamp_dir_);
     if (robot->initialize_and_start() == UA_STATUSCODE_GOOD) {
         remote_robot_map_[_endpoint] = std::move(robot);
     } else {
@@ -71,7 +81,7 @@ event_collector::handle_discovered_kitchen(std::string _endpoint) {
         return;
     }
 
-    std::unique_ptr<remote_kitchen> kitchen = std::make_unique<remote_kitchen>(_endpoint);
+    std::unique_ptr<remote_kitchen> kitchen = std::make_unique<remote_kitchen>(_endpoint, timestamp_dir_);
     if (kitchen->initialize_and_start() == UA_STATUSCODE_GOOD) {
         remote_kitchen_ = std::move(kitchen);
     } else {
@@ -105,6 +115,34 @@ void
 event_collector::join_worker_thread() {
     if (worker_thread_.joinable())
         worker_thread_.join();
+}
+
+std::filesystem::path
+event_collector::get_project_dir() const {
+    char directory_buffer[PATH_MAX + 1];  // +1 for the null terminator
+    ssize_t len = readlink("/proc/self/exe", directory_buffer, sizeof(directory_buffer) - 1);
+    if (len == -1) {
+        perror("readlink");
+        return std::filesystem::path();
+    }
+    directory_buffer[len] = '\0';  // null terminate
+    std::filesystem::path exe_path(directory_buffer);
+    std::filesystem::path build_dir = exe_path.parent_path();
+    std::filesystem::path project_dir = build_dir.parent_path();
+    return project_dir;
+}
+
+std::ostringstream
+event_collector::get_timestamp_dir_name() const {
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_time = std::chrono::system_clock::to_time_t(now);
+
+    std::tm local_tm{};
+    localtime_r(&now_time, &local_tm);   // Linux/POSIX thread-safe localtime
+
+    std::ostringstream date_stream;
+    date_stream << std::put_time(&local_tm, "%Y-%m-%d");
+    return date_stream;
 }
 
 void

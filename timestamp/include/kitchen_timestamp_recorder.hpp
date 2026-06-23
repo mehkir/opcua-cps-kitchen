@@ -14,11 +14,13 @@
 #include <map>
 #include <cstdint>
 #include <string>
+#include <filesystem>
 
 class kitchen_timestamp_recorder {
     private:
         std::map<uint64_t, uint32_t> completed_orders_timestamps_; /**< the map tracking completed orders timestamps. */
         std::map<uint64_t, uint32_t> received_orders_timestamps_; /**< the map tracking received orders timestamps. */
+        std::filesystem::path timestamp_dir_; /**< the directory to store timestamp files. */
 
         void
         write_timestamps(std::string _filename_prefix, std::map<uint64_t, uint32_t> _timestamps_map, std::string _header);
@@ -27,7 +29,8 @@ class kitchen_timestamp_recorder {
          * @brief Constructs a new kitchen timestamp recorder object.
          * 
          */
-        kitchen_timestamp_recorder() = default;
+        kitchen_timestamp_recorder(std::filesystem::path _timestamp_dir) : timestamp_dir_(_timestamp_dir) {
+        };
 
         /**
          * @brief Destroys the kitchen timestamp recorder object.
