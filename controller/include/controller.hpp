@@ -17,7 +17,6 @@
 #include <map>
 #include <unordered_set>
 #include <memory>
-#include <condition_variable>
 #include <atomic>
 #include <functional>
 #include <unistd.h>
@@ -732,6 +731,7 @@ private:
     UA_Server* server_; /**< the OPC UA controller server pointer. */
     object_type_node_inserter controller_type_inserter_; /**< the controller type insert for adding the controller's methods and attributes to the address space. */
     std::atomic<bool> running_; /**< flag to indicate whether the server thread should run. */
+    std::atomic<bool> stopped_; /**< flag to indicate whether the controller has already called stop(). */
     std::thread server_iterate_thread_; /**< the server iteration thread. */
     discovery_util discovery_util_; /**< the discovery utility. */
     std::thread worker_thread_; /**< the worker thread. */
