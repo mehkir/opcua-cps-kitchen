@@ -14,6 +14,7 @@
 #include <open62541/plugin/log_stdout.h>
 #include <boost/asio.hpp>
 #include <map>
+#include <filesystem>
 #include "discovery_util.hpp"
 #include "types.hpp"
 #include "node_browser_helper.hpp"
@@ -61,10 +62,11 @@ struct remote_robot {
          * @brief Constructs a new remote robot object.
          * 
          * @param _endpoint the robot's endpoint url.
+         * @param _timestamp_dir the directory to store timestamp files.
          */
-        remote_robot(std::string _endpoint) :
+        remote_robot(std::string _endpoint, std::filesystem::path _timestamp_dir) :
                     endpoint_(_endpoint), position_(0), client_(nullptr),
-                    running_(true), timestamp_recorder_(_endpoint) {
+                    running_(true), timestamp_recorder_(_endpoint, _timestamp_dir) {
         }
 
         /**
@@ -269,10 +271,11 @@ struct remote_kitchen {
          * @brief Constructs a new remote kitchen object.
          * 
          * @param _endpoint the kitchen's endpoint url.
+         * @param _timestamp_dir the directory to store timestamp files.
          */
-        remote_kitchen(std::string _endpoint) :
+        remote_kitchen(std::string _endpoint, std::filesystem::path _timestamp_dir) :
                     endpoint_(_endpoint), client_(nullptr),
-                    running_(true), timestamp_recorder_() {
+                    running_(true), timestamp_recorder_(_timestamp_dir) {
         }
 
         /**
@@ -459,6 +462,7 @@ private:
     boost::asio::io_context io_context_; /**< the io context managing the worker thread. */
     boost::asio::executor_work_guard<boost::asio::io_context::executor_type, void, void> work_guard_; /**< the work guard for the io_context_. */
     boost::asio::steady_timer steady_timer_; /**< the steady timer for action time simulation. */
+    std::filesystem::path timestamp_dir_; /**< the path to the directory where timestamp files will be saved. */
     /* robot related member variables */
     std::map<std::string, std::unique_ptr<remote_robot>> remote_robot_map_; /**< the map holding the remote robot instances. */
     /* kitchen related member variables */
@@ -518,6 +522,22 @@ public:
      */
     void
     join_worker_thread();
+
+    /**
+     * @brief Returns the project directory path.
+     * 
+     * @return std::filesystem::path the project directory path.
+     */
+    std::filesystem::path
+    get_project_dir() const;
+
+    /**
+     * @brief Returns the timestamp directory name.
+     * 
+     * @return std::ostringstream the timestamp directory name.
+     */
+    std::ostringstream
+    get_timestamp_dir_name() const;
 
     /**
      * @brief Starts the event collector.

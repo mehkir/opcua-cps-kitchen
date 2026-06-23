@@ -14,6 +14,9 @@
 #define RECEIVED_ORDERS_FILENAME_PREFIX "kitchen-received-orders-#"
 #define RECEIVED_ORDERS_HEADER "Timestamp,ReceivedOrdersCount\n"
 
+kitchen_timestamp_recorder::kitchen_timestamp_recorder(std::filesystem::path _timestamp_dir) : timestamp_dir_(_timestamp_dir) {
+}
+
 void
 kitchen_timestamp_recorder::record_completed_orders_timestamp(uint64_t _timestamp, uint32_t _completed_orders_count) {
     completed_orders_timestamps_[_timestamp] = _completed_orders_count;
@@ -32,28 +35,17 @@ kitchen_timestamp_recorder::write_timestamps() {
 
 void
 kitchen_timestamp_recorder::write_timestamps(std::string _filename_prefix, std::map<uint64_t, uint32_t> _timestamps_map, std::string _header) {
-    /* Get timestamp results directory */
-    char directory_buffer[PATH_MAX + 1];  // +1 for the null terminator
-    ssize_t len = readlink("/proc/self/exe", directory_buffer, sizeof(directory_buffer) - 1);
-    if (len == -1) {
-        perror("readlink");
-        return;
-    }
-    directory_buffer[len] = '\0';  // null terminate
-    std::filesystem::path exe_path(directory_buffer);
-    std::filesystem::path build_dir = exe_path.parent_path();
-    std::filesystem::path timestamp_dir = build_dir.parent_path() / "timestamp_results";
     /* Find free filename */
     std::ofstream timestamp_file;
     int filecount = 0;
     std::stringstream filename;
     filename << _filename_prefix << filecount << ".csv";
-    std::filesystem::path timestamp_path = timestamp_dir / filename.str();
+    std::filesystem::path timestamp_path = timestamp_dir_ / filename.str();
     struct stat filename_buffer;
     for(filecount = 1; (stat(timestamp_path.c_str(), &filename_buffer) == 0); filecount++) {
         filename.str("");
         filename << _filename_prefix << filecount << ".csv";
-        timestamp_path = timestamp_dir / filename.str();
+        timestamp_path = timestamp_dir_ / filename.str();
     }
     timestamp_file.open(timestamp_path);
     //Write header
