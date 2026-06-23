@@ -30,8 +30,7 @@ class kitchen_timestamp_recorder {
          * 
          * @param _timestamp_dir the directory to store timestamp files.
          */
-        kitchen_timestamp_recorder(std::filesystem::path _timestamp_dir) : timestamp_dir_(_timestamp_dir) {
-        };
+        kitchen_timestamp_recorder(std::filesystem::path _timestamp_dir);
 
         /**
          * @brief Destroys the kitchen timestamp recorder object.
