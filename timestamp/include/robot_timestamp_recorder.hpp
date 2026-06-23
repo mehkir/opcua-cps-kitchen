@@ -13,6 +13,7 @@
 #define ROBOT_TIMESTAMP_RECORDER_HPP
 
 #include <map>
+#include <filesystem>
 #include "types.hpp"
 #include "robot_state.hpp"
 
@@ -29,6 +30,8 @@ public:
     /**
      * @brief Constructs a new robot timestamp recorder object.
      * 
+     * @param _robot_endpoint the robot endpoint for which the timestamps are recorded.
+     * @param _timestamp_dir the directory to store timestamp files.
      */
     robot_timestamp_recorder(std::string _robot_endpoint, std::filesystem::path _timestamp_dir);
 

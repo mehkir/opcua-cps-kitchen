@@ -28,6 +28,7 @@ class kitchen_timestamp_recorder {
         /**
          * @brief Constructs a new kitchen timestamp recorder object.
          * 
+         * @param _timestamp_dir the directory to store timestamp files.
          */
         kitchen_timestamp_recorder(std::filesystem::path _timestamp_dir) : timestamp_dir_(_timestamp_dir) {
         };
