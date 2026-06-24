@@ -1,5 +1,7 @@
 #!/usr/bin/bash
 
+set -Eeuo pipefail
+
 # Initialize variables
 robots_count=""
 evaluate_orders=0
@@ -25,39 +27,55 @@ if (( robots_count < 1 )); then
     exit 1
 fi
 
+pids=()
+
+start_bg() {
+    "$@" &
+    pids+=("$!")
+}
+
+cleanup() {
+    trap - INT TERM EXIT
+
+    echo "Stopping ${#pids[@]} processes..."
+
+    for pid in "${pids[@]}"; do
+        kill -TERM "$pid" 2>/dev/null || true
+    done
+
+    local deadline=$((SECONDS + 5))
+    for pid in "${pids[@]}"; do
+        while kill -0 "$pid" 2>/dev/null && (( SECONDS < deadline )); do
+            sleep 0.1
+        done
+    done
+
+    for pid in "${pids[@]}"; do
+        if kill -0 "$pid" 2>/dev/null; then
+            echo "Force killing $pid"
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
+
+    wait 2>/dev/null || true
+}
+
+trap cleanup INT TERM EXIT
+
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-$PROJECT_DIRECTORY/build.bash
+"$PROJECT_DIRECTORY/build.bash"
 ROBOTS_COUNT=$robots_count
 CONVEYOR_SIZE=$(( ROBOTS_COUNT + 1 ))
 
-# Define a cleanup function
-kill_kitchen() {
-    local KILL_TIMEOUT=5
-    echo "$KILL_TIMEOUT seconds timeout for agents to shutdown. Still running processes after timeout will be killed."
-    sleep "$KILL_TIMEOUT"
-    for p in start_r start_c discov start_k; do
-        pkill -SIGKILL "$p"
-    done
-    exit 0
-}
-
-# Trap SIGINT (Ctrl+C)
-trap kill_kitchen SIGINT
-
 if (( evaluate_orders > 0 )); then
-    $PROJECT_DIRECTORY/build/start_event_collector &
-    sleep 1
+    start_bg "$PROJECT_DIRECTORY/build/start_event_collector"
 fi
-$PROJECT_DIRECTORY/build/discovery/discovery_server &
-sleep 1
-$PROJECT_DIRECTORY/start_scripts/start_controller.bash &
-sleep 1
-$PROJECT_DIRECTORY/start_scripts/start_conveyor.bash $ROBOTS_COUNT &
-sleep 1
-$PROJECT_DIRECTORY/start_scripts/start_robots.bash $ROBOTS_COUNT $CONVEYOR_SIZE &
-sleep 1
-$PROJECT_DIRECTORY/start_scripts/start_kitchen.bash $ROBOTS_COUNT &
-# Wait for all background processes to finish
+start_bg "$PROJECT_DIRECTORY/build/discovery/discovery_server"
+start_bg "$PROJECT_DIRECTORY/start_scripts/start_controller.bash"
+start_bg "$PROJECT_DIRECTORY/start_scripts/start_conveyor.bash" "$ROBOTS_COUNT"
+start_bg "$PROJECT_DIRECTORY/start_scripts/start_robots.bash" "$ROBOTS_COUNT" "$CONVEYOR_SIZE"
+start_bg "$PROJECT_DIRECTORY/start_scripts/start_kitchen.bash" "$ROBOTS_COUNT"
+
 wait
