@@ -24,6 +24,18 @@ while IFS=$'\t' read -r key value; do
     position_capabilities["$key"]="$value"
 done < <(jq -r 'to_entries[] | [.key, .value] | @tsv' "$PROJECT_DIRECTORY/robot_config_mapping.json")
 
+pids=()
+
+cleanup() {
+    trap - INT TERM EXIT
+    kill -TERM "${pids[@]}" 2>/dev/null || true
+    sleep 5
+    kill -KILL "${pids[@]}" 2>/dev/null || true
+    wait 2>/dev/null || true
+}
+
+trap cleanup INT TERM EXIT
+
 for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
     robot_position=$(( $robot_count + 1 ))
     echo "Starting robot at position $robot_position"
@@ -34,12 +46,8 @@ for ((robot_count = 0; robot_count < ROBOTS; robot_count++)); do
     "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" &
     # "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" 1>/dev/null &
     # "$PROJECT_DIRECTORY/build/start_robot_instance" "$robot_position" "${position_capabilities[$robot_position]}" "$CONVEYOR_SIZE" >"$PROJECT_DIRECTORY/logs/robot_${robot_position}_${ROBOTS}_$(date +%Y%m%d%H%M%S)" &
-    exit_code=$?
-    if [ $exit_code -ne 0 ]; then
-        echo "Error: Non-zero exit code detected during robot startup. Exiting."
-        exit $exit_code
-    fi
+    pids+=("$!")
 done
 echo "All robots started"
-wait
+wait "${pids[@]}"
 echo "All robots terminated"

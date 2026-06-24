@@ -12,10 +12,5 @@ ROBOTS=$1
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
 PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-$PROJECT_DIRECTORY/build/start_kitchen_instance $ROBOTS &
-# "$PROJECT_DIRECTORY/build/start_kitchen_instance" "$ROBOTS" >./logs/kitchen_${ROBOTS}_$(date +%Y%m%d%H%M%S) &
-exit_code=$?
-if [ $exit_code -ne 0 ]; then
-    echo "Error: Non-zero exit code detected during kitchen startup. Exiting."
-    exit $exit_code
-fi      
+exec "$PROJECT_DIRECTORY/build/start_kitchen_instance" "$ROBOTS"
+# exec "$PROJECT_DIRECTORY/build/start_kitchen_instance" "$ROBOTS" >./logs/kitchen_${ROBOTS}_$(date +%Y%m%d%H%M%S)
