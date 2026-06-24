@@ -12,13 +12,7 @@ discovery_util::discovery_util() : running_(true), stopped_(false) {
 }
 
 discovery_util::~discovery_util() {
-    {
-        std::lock_guard<std::mutex> lock(discovery_mutex_);
-        running_.store(false);
-        discovery_cv_.notify_all();
-    }
-    if (discovery_thread_.joinable())
-        discovery_thread_.join();
+    stop();
 }
 
 UA_StatusCode
@@ -102,16 +96,18 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
                 UA_StatusCode status = register_server(_server);
                 if (status != UA_STATUSCODE_GOOD) {
                     UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Failed to register server. Is the discovery server started? (%s)", UA_StatusCode_name(status));
-                    std::this_thread::sleep_for(std::chrono::seconds(1));
-                    continue;
-                } else {
-                    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Server registered successfully. Registering will be renewed in %d seconds", REGISTER_INTERVAL);
-                }
-                {
+
                     std::unique_lock<std::mutex> lock(discovery_mutex_);
-                    if (running_.load())
-                        discovery_cv_.wait_for(lock, std::chrono::seconds(REGISTER_INTERVAL));
+                    discovery_cv_.wait_for(lock, std::chrono::seconds(REGISTER_INTERVAL), [this]() {
+                        return !running_.load();
+                    });
+                    continue;
                 }
+                UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "REGISTER_SERVER: Server registered successfully. Registering will be renewed in %d seconds", REGISTER_INTERVAL);
+                std::unique_lock<std::mutex> lock(discovery_mutex_);
+                discovery_cv_.wait_for(lock, std::chrono::seconds(REGISTER_INTERVAL), [this]() {
+                    return !running_.load();
+                });
             }
         });
     } catch (...) {
@@ -123,16 +119,14 @@ discovery_util::register_server_repeatedly(UA_Server* _server) {
 
 void
 discovery_util::stop() {
-    if (stopped_.load()) {
+    if (stopped_.exchange(true)) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Discovery utility is already stopped", __FUNCTION__);
         return;
     }
-    {
-        std::lock_guard<std::mutex> lock(discovery_mutex_);
-        running_.store(false);
-        discovery_cv_.notify_all();
-    }
+
+    running_.store(false);
+    discovery_cv_.notify_all();
+
     if (discovery_thread_.joinable())
         discovery_thread_.join();
-    stopped_.store(true);
 }
