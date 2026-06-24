@@ -541,6 +541,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
 robot::~robot() {
     running_.store(false);
     join_threads();
+    discovery_util_.deregister_server(server_);
     UA_String_clear(&server_endpoint_);
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
@@ -663,7 +664,9 @@ robot::notify_conveyor() {
                 }
                 UA_Client_delete(conveyor_client_);
                 conveyor_client_ = nullptr;
-                conveyor_connected_condition_.wait(lock);
+                conveyor_connected_condition_.wait(lock, [this]() {
+                    return !running_.load() || conveyor_client_ != nullptr;
+                });
                 continue;
             }
             if(!running_.load()) {
@@ -1251,19 +1254,14 @@ robot::start() {
 
 void
 robot::stop() {
-    if (stopped_.load()) {
+    if (stopped_.exchange(true)) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Robot is already stopped", __FUNCTION__);
         return;
     }
-    {
-        std::lock_guard<std::mutex> lock(client_mutex_);
-        running_.store(false);
-        conveyor_connected_condition_.notify_all();
-    }
+    running_.store(false);
+    conveyor_connected_condition_.notify_all();
     work_guard_.reset();
     io_context_.stop();
     discovery_util_.stop();
-    discovery_util_.deregister_server(server_);
-    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }
