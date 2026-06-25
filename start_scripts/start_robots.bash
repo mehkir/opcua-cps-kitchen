@@ -1,14 +1,18 @@
 #!/usr/bin/bash
-if (( $# < 1 )); then
-    echo "Usage: $0 <number_of_robots>"
+if (( $# < 2 )); then
+    echo "Usage: $0 <number_of_robots> <conveyor_size>"
     exit 1
 fi
 if ! [[ "$1" =~ ^[0-9]+$ ]] || (( $1 < 1 )); then
         echo "robots count must be >= 1"
         exit 1
 fi
+if ! [[ "$2" =~ ^[0-9]+$ ]] || (( $2 < 2 )); then
+        echo "conveyor size must be >= 2"
+        exit 1
+fi
 ROBOTS=$1
-CONVEYOR_SIZE=$(( $1 + 1 )) # the additional 1 is for the output position of the conveyor, which is not occupied by a robot
+CONVEYOR_SIZE=$2
 
 declare -A position_capabilities
 
