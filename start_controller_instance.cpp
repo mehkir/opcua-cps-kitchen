@@ -32,7 +32,7 @@ int main(int argc, char* argv[]) {
             }
 
             if (!finishing.exchange(true)) {
-                std::cout << "received signal " << sig << ", stopping robot"
+                std::cout << "received signal " << sig << ", stopping controller"
                           << std::endl;
                 controller_instance.stop();
             }
