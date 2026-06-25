@@ -19,6 +19,11 @@ event_collector::event_collector() : stopped_(false), work_guard_(boost::asio::m
 event_collector::~event_collector() {
     stop();
     join_worker_thread();
+
+    remote_robot_map_.clear();
+    remote_kitchen_.reset();
+
+    UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
 }
 
 void
