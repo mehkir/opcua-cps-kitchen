@@ -44,28 +44,25 @@ fi
 ROBOTS_COUNT=$robots_count
 PLACING_RATE=$placing_rate
 
-# Define a cleanup function
-kill_http_server_and_backend() {
-    for port in 8000; do
-        pids="$(lsof -t -iTCP:$port -sTCP:LISTEN)"
-        if [ -n "$pids" ]; then
-            kill $pids 2>/dev/null || true
-        else
-            echo "No process found using port $port"
-        fi
-    done
-    exit 0
-}
-
-# Trap SIGINT (Ctrl+C)
-trap kill_http_server_and_backend SIGINT
-
 cd "$PROJECT_DIRECTORY/cps-kitchen-dashboard"
 # Preserve existing LD_LIBRARY_PATH while prepending our library dir
 LIB_DIR="$(pwd)/my-addons/open62541/lib"
 export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+
 npm start -- --robot-count $ROBOTS_COUNT --placing-rate $PLACING_RATE &
-sleep 1
+backend_pid=$!
+
 python3 -m http.server 8000 &
-# Wait for all background processes to finish
-wait
+http_pid=$!
+
+cleanup() {
+    trap - INT TERM EXIT
+    kill -TERM "$backend_pid" "$http_pid" 2>/dev/null || true
+    sleep 3
+    kill -KILL "$backend_pid" "$http_pid" 2>/dev/null || true
+    wait 2>/dev/null || true
+}
+
+trap cleanup INT TERM EXIT
+wait -n "$backend_pid" "$http_pid"
+cleanup
