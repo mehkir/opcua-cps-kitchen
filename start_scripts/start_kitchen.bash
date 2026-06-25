@@ -3,9 +3,9 @@ if (( $# < 1 )); then
   echo "Usage: $0 <robots_count>"
   exit 1
 fi
-if (( $1 < 1)); then
-    echo "robots count must be >= 1"
-    exit 1
+if ! [[ "$1" =~ ^[0-9]+$ ]] || (( $1 < 1 )); then
+        echo "robots count must be >= 1"
+        exit 1
 fi
 ROBOTS=$1
 
