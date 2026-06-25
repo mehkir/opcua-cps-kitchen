@@ -128,10 +128,15 @@ conveyor::~conveyor() {
     join_threads();
     discovery_util_.deregister_server(server_);
     position_remote_robot_map_.clear();
-    if (controller_client_ != nullptr)
-        UA_Client_delete(controller_client_);
-    if (kitchen_client_ != nullptr)
-        UA_Client_delete(kitchen_client_);
+    {
+        std::lock_guard<std::mutex> lock(client_mutex_);
+        if (controller_client_ != nullptr)
+            UA_Client_delete(controller_client_);
+        if (kitchen_client_ != nullptr)
+            UA_Client_delete(kitchen_client_);
+        controller_client_ = nullptr;
+        kitchen_client_ = nullptr;
+    }
     UA_String_clear(&server_endpoint_);
     UA_String_clear(&type_);
     UA_Server_run_shutdown(server_);
