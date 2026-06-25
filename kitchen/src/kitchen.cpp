@@ -175,12 +175,15 @@ kitchen::~kitchen() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     stop();
     join_threads();
+    discovery_util_.deregister_server(server_);
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         if (controller_client_ != nullptr)
             UA_Client_delete(controller_client_);
         if (conveyor_client_ != nullptr)
             UA_Client_delete(conveyor_client_);
+        controller_client_ = nullptr;
+        conveyor_client_ = nullptr;
     }
     UA_String_clear(&server_endpoint_);
     UA_String_clear(&type_);
@@ -718,20 +721,14 @@ kitchen::start() {
 void
 kitchen::stop() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (stopped_.load()) {
+    if (stopped_.exchange(true)) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Kitchen is already stopped", __FUNCTION__);
         return;
     }
-        
-    {
-        std::lock_guard<std::mutex> client_loop_lock(client_mutex_);
-        running_.store(false);
-        remote_controller_connected_cv_.notify_all();
-    }
+    running_.store(false);
+    remote_controller_connected_cv_.notify_all();
     work_guard_.reset();
     io_context_.stop();
     discovery_util_.stop();
-    discovery_util_.deregister_server(server_);
-    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }
