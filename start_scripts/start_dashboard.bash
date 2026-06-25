@@ -44,22 +44,6 @@ fi
 ROBOTS_COUNT=$robots_count
 PLACING_RATE=$placing_rate
 
-# Define a cleanup function
-kill_http_server_and_backend() {
-    for port in 8000; do
-        pids="$(lsof -t -iTCP:$port -sTCP:LISTEN)"
-        if [ -n "$pids" ]; then
-            kill $pids 2>/dev/null || true
-        else
-            echo "No process found using port $port"
-        fi
-    done
-    exit 0
-}
-
-# Trap SIGINT (Ctrl+C)
-trap kill_http_server_and_backend SIGINT
-
 cd "$PROJECT_DIRECTORY/cps-kitchen-dashboard"
 # Preserve existing LD_LIBRARY_PATH while prepending our library dir
 LIB_DIR="$(pwd)/my-addons/open62541/lib"
