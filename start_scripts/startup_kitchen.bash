@@ -28,6 +28,7 @@ if (( robots_count < 1 )); then
 fi
 
 pids=()
+event_collector_pid=""
 
 start_bg() {
     "$@" &
@@ -37,13 +38,18 @@ start_bg() {
 cleanup() {
     trap - INT TERM EXIT
 
-    echo "Stopping ${#pids[@]} processes..."
+    echo "Stopping ${#pids[@]} regular processes..."
+
+    if [[ -n "${event_collector_pid:-}" ]]; then
+        echo "Stopping event collector $event_collector_pid..."
+        kill -TERM "$event_collector_pid" 2>/dev/null || true
+    fi
 
     for pid in "${pids[@]}"; do
         kill -TERM "$pid" 2>/dev/null || true
     done
 
-    local deadline=$((SECONDS + 5))
+    local deadline=$((SECONDS + 10))
     for pid in "${pids[@]}"; do
         while kill -0 "$pid" 2>/dev/null && (( SECONDS < deadline )); do
             sleep 0.1
@@ -56,6 +62,20 @@ cleanup() {
             kill -KILL "$pid" 2>/dev/null || true
         fi
     done
+
+
+    if [[ -n "${event_collector_pid:-}" ]]; then
+        echo "Waiting for event collector $event_collector_pid to write evaluation CSV files..."
+
+        local event_deadline=$((SECONDS + 120))
+        while kill -0 "$event_collector_pid" 2>/dev/null && (( SECONDS < event_deadline )); do
+            sleep 0.5
+        done
+
+        if kill -0 "$event_collector_pid" 2>/dev/null; then
+            echo "Warning: event collector $event_collector_pid is still running after timeout. Not force killing it."
+        fi
+    fi
 
     wait 2>/dev/null || true
 }
@@ -70,7 +90,8 @@ ROBOTS_COUNT=$robots_count
 CONVEYOR_SIZE=$(( ROBOTS_COUNT + 1 ))
 
 if (( evaluate_orders > 0 )); then
-    start_bg "$PROJECT_DIRECTORY/build/start_event_collector"
+    "$PROJECT_DIRECTORY/build/start_event_collector" &
+    event_collector_pid="$!"
 fi
 start_bg "$PROJECT_DIRECTORY/build/discovery/discovery_server"
 start_bg "$PROJECT_DIRECTORY/start_scripts/start_controller.bash"
