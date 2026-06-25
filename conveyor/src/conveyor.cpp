@@ -125,16 +125,17 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
 conveyor::~conveyor() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     stop();
-    io_context_.post([this] {
-        position_remote_robot_map_.clear();
-    });
     join_threads();
+    discovery_util_.deregister_server(server_);
+    position_remote_robot_map_.clear();
     {
         std::lock_guard<std::mutex> lock(client_mutex_);
         if (controller_client_ != nullptr)
             UA_Client_delete(controller_client_);
         if (kitchen_client_ != nullptr)
             UA_Client_delete(kitchen_client_);
+        controller_client_ = nullptr;
+        kitchen_client_ = nullptr;
     }
     UA_String_clear(&server_endpoint_);
     UA_String_clear(&type_);
@@ -791,7 +792,7 @@ conveyor::start() {
 void
 conveyor::stop() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
-    if (stopped_.load()) {
+    if (stopped_.exchange(true)) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Conveyor is already stopped", __FUNCTION__);
         return;
     }
@@ -799,7 +800,5 @@ conveyor::stop() {
     work_guard_.reset();
     io_context_.stop();
     discovery_util_.stop();
-    discovery_util_.deregister_server(server_);
-    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }

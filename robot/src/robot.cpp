@@ -539,7 +539,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
 }
 
 robot::~robot() {
-    running_.store(false);
+    stop();
     join_threads();
     discovery_util_.deregister_server(server_);
     UA_String_clear(&server_endpoint_);
@@ -549,6 +549,8 @@ robot::~robot() {
         UA_Client_delete(controller_client_);
     if (conveyor_client_ != nullptr)
         UA_Client_delete(conveyor_client_);
+    controller_client_ = nullptr;
+    conveyor_client_ = nullptr;
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Destructor finished successfully", __FUNCTION__);
 }
 

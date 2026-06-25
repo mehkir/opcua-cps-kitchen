@@ -1,25 +1,58 @@
-#include <signal.h>
+#include <atomic>
+#include <cstdlib>
+#include <csignal>
 #include <iostream>
+#include <pthread.h>
+#include <thread>
 
 #include "kitchen.hpp"
 
-kitchen* kitchen_instance_;
-
-static void stop_handler(int sig) {
-    std::cout << "received ctrl-c" << std::endl;
-    kitchen_instance_->stop();
-}
-
 int main(int argc, char* argv[]) {
-    signal(SIGINT, stop_handler);
-    signal(SIGTERM, stop_handler);
-    
     if (argc < 2) {
         std::cout << "Usage: " << argv[0] << "<robots_count>" << std::endl;
-        return 0;
+        return 1;
     }
-    kitchen kitchen_instance(atoi(argv[1]));
-    kitchen_instance_ = &kitchen_instance;
+
+    sigset_t signals;
+    sigemptyset(&signals);
+    sigaddset(&signals, SIGINT);
+    sigaddset(&signals, SIGTERM);
+    sigaddset(&signals, SIGUSR1); // nur zum internen Aufwecken beim normalen Ende
+
+    // Wichtig: vor Konstruktion von kitchen blocken,
+    // weil der kitchen-Konstruktor bereits Threads startet.
+    pthread_sigmask(SIG_BLOCK, &signals, nullptr);
+
+    kitchen kitchen_instance(std::atoi(argv[1]));
+
+    std::atomic_bool finishing{false};
+
+    std::thread signal_thread([&]() {
+        int sig = 0;
+
+        while (sigwait(&signals, &sig) == 0) {
+            if (sig == SIGUSR1) {
+                break;
+            }
+
+            if (!finishing.exchange(true)) {
+                std::cout << "received signal " << sig << ", stopping kitchen"
+                          << std::endl;
+                kitchen_instance.stop();
+            }
+
+            break;
+        }
+    });
+
     kitchen_instance.start();
+
+    finishing.store(true);
+
+    // Falls kitchen_instance.start() normal zurückkehrt, hängt signal_thread
+    // noch in sigwait(). SIGUSR1 weckt ihn nur zum Beenden.
+    pthread_kill(signal_thread.native_handle(), SIGUSR1);
+    signal_thread.join();
+
     return 0;
 }
