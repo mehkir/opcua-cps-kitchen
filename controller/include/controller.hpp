@@ -206,7 +206,8 @@ struct remote_robot {
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
             nv_subscriber_.reset();
-            UA_Client_delete(client_);
+            if (client_ != nullptr)
+                UA_Client_delete(client_);
         }
 
         /**
@@ -698,7 +699,8 @@ struct next_robot_receiver {
             running_.store(false);
             if (client_iterate_thread_.joinable())
                 client_iterate_thread_.join();
-            UA_Client_delete(client_);
+            if (client_ != nullptr)
+                UA_Client_delete(client_);
         }
 };
 

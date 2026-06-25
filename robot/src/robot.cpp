@@ -539,7 +539,7 @@ robot::handle_handover_finished_order(UA_Variant* _output) {
 }
 
 robot::~robot() {
-    running_.store(false);
+    stop();
     join_threads();
     discovery_util_.deregister_server(server_);
     UA_String_clear(&server_endpoint_);

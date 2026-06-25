@@ -90,6 +90,7 @@ controller::controller(std::unique_ptr<mape> _kitchen_mape) : server_(UA_Server_
 controller::~controller() {
     stop();
     join_threads();
+    discovery_util_.deregister_server(server_);
     position_remote_robot_map_.clear();
     UA_Server_run_shutdown(server_);
     UA_Server_delete(server_);
@@ -626,7 +627,7 @@ controller::start() {
 
 void
 controller::stop() {
-    if (stopped_.load()) {
+    if (stopped_.exchange(true)) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Controller is already stopped", __FUNCTION__);
         return;
     }
@@ -634,7 +635,5 @@ controller::stop() {
     work_guard_.reset();
     io_context_.stop();
     discovery_util_.stop();
-    discovery_util_.deregister_server(server_);
-    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stop finished successfully", __FUNCTION__);
 }
