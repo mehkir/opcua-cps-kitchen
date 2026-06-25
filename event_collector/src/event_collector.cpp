@@ -160,13 +160,12 @@ event_collector::start() {
 
 void
 event_collector::stop() {
-    if (stopped_.load()) {
+    if (stopped_.exchange(true)) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Event collector is already stopped", __FUNCTION__);
         return;
     }
     work_guard_.reset();
     io_context_.stop();
     discovery_util_.stop();
-    stopped_.store(true);
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Stopped successfully", __FUNCTION__);
 }
