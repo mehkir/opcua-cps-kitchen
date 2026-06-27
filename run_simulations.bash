@@ -97,7 +97,7 @@ for run in $(seq 1 "$runs_count"); do
 
     export CPS_KITCHEN_RUN_ID="robots_${robots_count}_orders_${orders_count}_run_${run}"
 
-    "$PROJECT_DIRECTORY/start_scripts/startup_kitchen.bash" -r "$robots_count" -e &
+    "$PROJECT_DIRECTORY/start_scripts/startup_kitchen.bash" -r "$robots_count" -e -n &
     startup_pid="$!"
 
     "$PROJECT_DIRECTORY/start_scripts/start_dashboard.bash" -r "$robots_count" &
