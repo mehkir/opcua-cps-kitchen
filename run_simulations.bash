@@ -42,7 +42,7 @@ fi
 
 SCRIPT_PATH="$(realpath "$0")"
 SCRIPT_DIR="$(dirname "$SCRIPT_PATH")"
-PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIR/.." && pwd)"
+PROJECT_DIRECTORY="$(cd -- "$SCRIPT_DIR" && pwd)"
 
 wait_for_port() {
     local port="$1"
@@ -96,11 +96,15 @@ for run in $(seq 1 "$runs_count"); do
     echo "============================================================"
 
     export CPS_KITCHEN_RUN_ID="robots_${robots_count}_orders_${orders_count}_run_${run}"
+    log_dir="$PROJECT_DIRECTORY/logs/simulation_runs/${CPS_KITCHEN_RUN_ID}"
+    mkdir -p "$log_dir"
 
-    "$PROJECT_DIRECTORY/start_scripts/startup_kitchen.bash" -r "$robots_count" -e -n &
+    "$PROJECT_DIRECTORY/start_scripts/startup_kitchen.bash" -r "$robots_count" -e -n \
+        >"$log_dir/startup_kitchen.log" 2>&1 &
     startup_pid="$!"
 
-    "$PROJECT_DIRECTORY/start_scripts/start_dashboard.bash" -r "$robots_count" &
+    "$PROJECT_DIRECTORY/start_scripts/start_dashboard.bash" -r "$robots_count" \
+        >"$log_dir/dashboard.log" 2>&1 &
     dashboard_pid="$!"
 
     wait_for_port 8000 30
@@ -108,9 +112,10 @@ for run in $(seq 1 "$runs_count"); do
 
     echo "System appears ready. Placing orders..."
 
-    "$PROJECT_DIRECTORY/order_placement/place_orders.bash" -o "$orders_count"
+    "$PROJECT_DIRECTORY/order_placement/place_orders.bash" -o "$orders_count" \
+        >"$log_dir/place_orders.log" 2>&1
 
-    echo "Orders placed. Stopping run $run..."
+    echo "Orders completed. Stopping run $run..."
 
     stop_run
 

@@ -52,7 +52,7 @@ cleanup() {
         kill -TERM "$pid" 2>/dev/null || true
     done
 
-    local deadline=$((SECONDS + 10))
+    local deadline=$((SECONDS + 120))
     for pid in "${pids[@]}"; do
         while kill -0 "$pid" 2>/dev/null && (( SECONDS < deadline )); do
             sleep 0.1
