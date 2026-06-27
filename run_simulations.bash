@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+assert_no_leftovers() {
+    if pgrep -af 'start_controller_instance|start_conveyor_instance|start_kitchen_instance|start_robot_instance|discovery_server|start_event_collector|backend.js|http.server' >/dev/null; then
+        echo "Error: leftover processes detected:"
+        pgrep -af 'start_controller_instance|start_conveyor_instance|start_kitchen_instance|start_robot_instance|discovery_server|start_event_collector|backend.js|http.server'
+        exit 1
+    fi
+}
+
 robots_count=""
 orders_count=""
 runs_count=""
@@ -90,6 +98,7 @@ trap stop_run INT TERM EXIT
 "$PROJECT_DIRECTORY/build.bash"
 
 for run in $(seq 1 "$runs_count"); do
+    assert_no_leftovers
     echo "============================================================"
     echo "Starting simulation run $run/$runs_count"
     echo "robots=$robots_count orders=$orders_count"
@@ -114,6 +123,8 @@ for run in $(seq 1 "$runs_count"); do
 
     "$PROJECT_DIRECTORY/order_placement/place_orders.bash" -o "$orders_count" \
         >"$log_dir/place_orders.log" 2>&1
+    echo "Orders completed. Waiting for final events..."
+    sleep 2
 
     echo "Orders completed. Stopping run $run..."
 

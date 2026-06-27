@@ -42,7 +42,7 @@ function handle_received_data(data) {
         console.log("✅ All agents discovered, ready to place orders.");
         if (!orders_placed) {
             orders_placed = true;
-            placeRandomOrder();
+            setTimeout(placeRandomOrder, 5000);
         }
     }
 }
