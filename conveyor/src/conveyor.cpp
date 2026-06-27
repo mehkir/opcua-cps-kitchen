@@ -89,37 +89,6 @@ conveyor::conveyor(UA_UInt32 _robot_count) : server_(UA_Server_new()), conveyor_
         stop();
         return;
     }
-    /* Setup controller client */
-    std::string controller_endpoint;
-    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
-        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-        if (!running_.load()) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
-            stop();
-            return;
-        }
-    }
-    /* Gather controller method ids */
-    if ((method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
-        stop();
-        return;        
-    }
-    /* Setup kitchen client */
-    std::string kitchen_endpoint;
-    while((status = discover_and_connect(kitchen_client_, discovery_util_, kitchen_endpoint, KITCHEN_TYPE)) != UA_STATUSCODE_GOOD) {
-        if (!running_.load()) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to kitchen", __FUNCTION__);
-            stop();
-            return;
-        }
-    }
-    /* Gather kitchen method ids */
-    if ((method_id_map_[RECEIVE_COMPLETED_ORDER] = node_browser_helper().get_method_id(kitchen_endpoint, KITCHEN_TYPE, RECEIVE_COMPLETED_ORDER)) == OBJECT_METHOD_INFO_NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_COMPLETED_ORDER);
-        stop();
-        return;        
-    }
 }
 
 conveyor::~conveyor() {
@@ -707,6 +676,40 @@ conveyor::start() {
     // UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s called", __FUNCTION__);
     if (!running_.load())
         stop();
+    
+    UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+    /* Setup controller client */
+    std::string controller_endpoint;
+    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
+        if (!running_.load()) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
+            stop();
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+    }
+    /* Gather controller method ids */
+    if ((method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
+        stop();
+        return;        
+    }
+    /* Setup kitchen client */
+    std::string kitchen_endpoint;
+    while((status = discover_and_connect(kitchen_client_, discovery_util_, kitchen_endpoint, KITCHEN_TYPE)) != UA_STATUSCODE_GOOD) {
+        if (!running_.load()) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to kitchen", __FUNCTION__);
+            stop();
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+    }
+    /* Gather kitchen method ids */
+    if ((method_id_map_[RECEIVE_COMPLETED_ORDER] = node_browser_helper().get_method_id(kitchen_endpoint, KITCHEN_TYPE, RECEIVE_COMPLETED_ORDER)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, RECEIVE_COMPLETED_ORDER);
+        stop();
+        return;        
+    }
     /* Lookup own endpoint */
     std::vector<std::string> endpoints;
     while (endpoints.empty()) {

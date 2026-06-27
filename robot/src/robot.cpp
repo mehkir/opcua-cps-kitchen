@@ -180,38 +180,6 @@ robot::robot(position_t _position, std::string _capabilities_file_name, position
         stop();
         return;
     }
-    /* Setup controller client */
-    std::string controller_endpoint;
-    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
-        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-        if (!running_.load()) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
-            stop();
-            return;
-        }
-    }
-    /* Gather method ids */
-    if ((method_id_map_[REGISTER_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, REGISTER_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, REGISTER_ROBOT);
-        stop();
-        return;        
-    }
-    /* Setup conveyor client */
-    std::string conveyor_endpoint;
-    while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
-        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-        if (!running_.load()) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
-            stop();
-            return;
-        }
-    }
-    /* Gather method ids */
-    if ((method_id_map_[FINISHED_ORDER_NOTIFICATION] = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION)) == OBJECT_METHOD_INFO_NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
-        stop();
-        return;        
-    }
 }
 
 void
@@ -1087,6 +1055,40 @@ robot::start() {
     if (!running_.load()) {
         stop();
         return;
+    }
+
+    UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+    /* Setup controller client */
+    std::string controller_endpoint;
+    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
+        if (!running_.load()) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
+            stop();
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+    }
+    /* Gather method ids */
+    if ((method_id_map_[REGISTER_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, REGISTER_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, REGISTER_ROBOT);
+        stop();
+        return;        
+    }
+    /* Setup conveyor client */
+    std::string conveyor_endpoint;
+    while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
+        if (!running_.load()) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
+            stop();
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+    }
+    /* Gather method ids */
+    if ((method_id_map_[FINISHED_ORDER_NOTIFICATION] = node_browser_helper().get_method_id(conveyor_endpoint, CONVEYOR_TYPE, FINISHED_ORDER_NOTIFICATION)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, FINISHED_ORDER_NOTIFICATION);
+        stop();
+        return;        
     }
     /* Lookup own endpoint */
     std::vector<std::string> endpoints;
