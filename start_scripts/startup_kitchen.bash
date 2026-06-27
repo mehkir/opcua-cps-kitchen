@@ -31,7 +31,9 @@ if (( robots_count < 1 )); then
 fi
 
 pids=()
+discovery_pid=""
 event_collector_pid=""
+
 
 start_bg() {
     "$@" &
@@ -66,6 +68,10 @@ cleanup() {
         fi
     done
 
+    if [[ -n "${discovery_pid:-}" ]]; then
+        echo "Stopping discovery server $discovery_pid..."
+        kill -TERM "$discovery_pid" 2>/dev/null || true
+    fi
 
     if [[ -n "${event_collector_pid:-}" ]]; then
         echo "Waiting for event collector $event_collector_pid to write evaluation CSV files..."
@@ -101,7 +107,10 @@ if (( evaluate_orders > 0 )); then
     "$PROJECT_DIRECTORY/build/start_event_collector" &
     event_collector_pid="$!"
 fi
-start_bg "$PROJECT_DIRECTORY/build/discovery/discovery_server"
+
+"$PROJECT_DIRECTORY/build/discovery/discovery_server" &
+discovery_pid="$!"
+
 start_bg "$PROJECT_DIRECTORY/start_scripts/start_controller.bash"
 start_bg "$PROJECT_DIRECTORY/start_scripts/start_conveyor.bash" "$ROBOTS_COUNT"
 start_bg "$PROJECT_DIRECTORY/start_scripts/start_robots.bash" "$ROBOTS_COUNT" "$CONVEYOR_SIZE"
