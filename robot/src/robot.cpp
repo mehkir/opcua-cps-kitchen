@@ -1227,6 +1227,7 @@ robot::start() {
     object_method_info omi = method_id_map_[REGISTER_ROBOT];
     size_t output_size = 0;
     UA_Variant* output = nullptr;
+    status = UA_STATUSCODE_UNCERTAIN;
     while (status != UA_STATUSCODE_GOOD) {
         UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Registering at the controller", __FUNCTION__);
         if ((controller_client_ != nullptr) && (status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output)) != UA_STATUSCODE_GOOD) {
