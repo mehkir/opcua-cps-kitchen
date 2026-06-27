@@ -3,6 +3,7 @@
 #include "information_node_reader.hpp"
 #include <limits.h>
 #include <system_error>
+#include <cstdlib>
 
 #define TIMESTAMP_DIR "timestamp_results"
 
@@ -146,7 +147,13 @@ event_collector::get_timestamp_dir_name() const {
     localtime_r(&now_time, &local_tm);   // Linux/POSIX thread-safe localtime
 
     std::ostringstream date_stream;
-    date_stream << std::put_time(&local_tm, "%Y-%m-%d");
+    date_stream << std::put_time(&local_tm, "%Y-%m-%d_%H-%M-%S");
+
+    const char* run_id = std::getenv("CPS_KITCHEN_RUN_ID");
+    if (run_id != nullptr && run_id[0] != '\0') {
+        date_stream << "_" << run_id;
+    }
+
     return date_stream;
 }
 
