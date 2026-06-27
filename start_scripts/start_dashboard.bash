@@ -1,8 +1,11 @@
-#!/usr/bin/bash
+#!/usr/bin/env bash
+set -Eeuo pipefail
 
 # Initialize variables
 robots_count=""
 placing_rate=""
+backend_pid=""
+http_pid=""
 
 # Parse flags
 while getopts ":r:" opt; do
@@ -49,7 +52,7 @@ cd "$PROJECT_DIRECTORY/cps-kitchen-dashboard"
 LIB_DIR="$(pwd)/my-addons/open62541/lib"
 export LD_LIBRARY_PATH="$LIB_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
-npm start -- --robot-count $ROBOTS_COUNT --placing-rate $PLACING_RATE &
+node backend.js --robot-count "$ROBOTS_COUNT" --placing-rate "$PLACING_RATE" &
 backend_pid=$!
 
 python3 -m http.server 8000 &
@@ -57,12 +60,36 @@ http_pid=$!
 
 cleanup() {
     trap - INT TERM EXIT
-    kill -TERM "$backend_pid" "$http_pid" 2>/dev/null || true
-    sleep 3
-    kill -KILL "$backend_pid" "$http_pid" 2>/dev/null || true
+
+    echo "Stopping dashboard..."
+
+    for pid in "${backend_pid:-}" "${http_pid:-}"; do
+        if [[ -n "$pid" ]]; then
+            kill -TERM "$pid" 2>/dev/null || true
+        fi
+    done
+
+    local deadline=$((SECONDS + 3))
+    for pid in "${backend_pid:-}" "${http_pid:-}"; do
+        if [[ -z "$pid" ]]; then
+            continue
+        fi
+
+        while kill -0 "$pid" 2>/dev/null && (( SECONDS < deadline )); do
+            sleep 0.1
+        done
+    done
+
+    for pid in "${backend_pid:-}" "${http_pid:-}"; do
+        if [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null; then
+            echo "Force killing dashboard process $pid"
+            kill -KILL "$pid" 2>/dev/null || true
+        fi
+    done
+
     wait 2>/dev/null || true
 }
 
 trap cleanup INT TERM EXIT
-wait -n "$backend_pid" "$http_pid"
+wait -n "$backend_pid" "$http_pid" || true
 cleanup
