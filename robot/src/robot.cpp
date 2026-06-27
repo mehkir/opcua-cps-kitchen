@@ -1104,45 +1104,6 @@ robot::start() {
             return;
         }
     }
-    UA_String_init(&server_endpoint_);
-    server_endpoint_ = UA_STRING_ALLOC(const_cast<char*>(endpoints[0].c_str()));
-    /* Register robot at controller */
-    method_node_caller register_robot_caller;
-    register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
-    register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
-    UA_Variant capabilities;
-    UA_Variant_init(&capabilities);
-    robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
-    register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
-    UA_Variant_clear(&capabilities);
-    object_method_info omi = method_id_map_[REGISTER_ROBOT];
-    size_t output_size = 0;
-    UA_Variant* output = nullptr;
-    while (status != UA_STATUSCODE_GOOD) {
-        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Registering at the controller", __FUNCTION__);
-        if ((controller_client_ != nullptr) && (status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output)) != UA_STATUSCODE_GOOD) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
-            if (output != nullptr) {
-                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-                output_size = 0;
-                output = nullptr;
-            }
-            std::string controller_endpoint;
-            UA_Client_delete(controller_client_);
-            controller_client_ = nullptr;
-            discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE);
-            std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-
-        }
-        if (!running_.load()) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering at the controller", __FUNCTION__);
-            if (output != nullptr)
-                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
-            stop();
-            return;
-        }
-    }
-    register_robot_called(output_size, output);
     /* Run the client iterate thread */
     try {
         client_iterate_thread_ = std::thread([this]() {
@@ -1251,6 +1212,47 @@ robot::start() {
     });
     robot_state_ = robot_state::IDLING;
     robot_type_inserter_.set_scalar_attribute(INSTANCE_NAME, ROBOT_STATE, &robot_state_, UA_TYPES_UINT32);
+
+    UA_String_init(&server_endpoint_);
+    server_endpoint_ = UA_STRING_ALLOC(const_cast<char*>(endpoints[0].c_str()));
+    /* Register robot at controller */
+    method_node_caller register_robot_caller;
+    register_robot_caller.add_scalar_input_argument(&server_endpoint_, UA_TYPES_STRING);
+    register_robot_caller.add_scalar_input_argument(&position_, UA_TYPES_UINT32);
+    UA_Variant capabilities;
+    UA_Variant_init(&capabilities);
+    robot_type_inserter_.get_attribute(INSTANCE_NAME, CAPABILITIES, capabilities);
+    register_robot_caller.add_array_input_argument(capabilities.data, capabilities.arrayLength, UA_TYPES_STRING);
+    UA_Variant_clear(&capabilities);
+    object_method_info omi = method_id_map_[REGISTER_ROBOT];
+    size_t output_size = 0;
+    UA_Variant* output = nullptr;
+    while (status != UA_STATUSCODE_GOOD) {
+        UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Registering at the controller", __FUNCTION__);
+        if ((controller_client_ != nullptr) && (status = register_robot_caller.call_method_node(controller_client_, omi.object_id_, omi.method_id_, &output_size, &output)) != UA_STATUSCODE_GOOD) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error calling the register robot method node", __FUNCTION__);
+            if (output != nullptr) {
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+                output_size = 0;
+                output = nullptr;
+            }
+            std::string controller_endpoint;
+            UA_Client_delete(controller_client_);
+            controller_client_ = nullptr;
+            discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE);
+            std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+
+        }
+        if (!running_.load()) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error registering at the controller", __FUNCTION__);
+            if (output != nullptr)
+                UA_Array_delete(output, output_size, &UA_TYPES[UA_TYPES_VARIANT]);
+            stop();
+            return;
+        }
+    }
+    register_robot_called(output_size, output);
+
     join_threads();
     UA_LOG_INFO(APP_LOGGER, UA_LOGCATEGORY_USERLAND, "%s: Exited start method", __FUNCTION__);
 }
