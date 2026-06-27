@@ -138,37 +138,6 @@ kitchen::kitchen(uint32_t _robot_count) : server_(UA_Server_new()), kitchen_uri_
         running_.store(false);
         return;
     }
-    /* Setup controller client */
-    std::string controller_endpoint;
-    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller, retrying in %d seconds (%s)", __FUNCTION__, LOOKUP_INTERVAL, UA_StatusCode_name(status));
-        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-        if (!running_.load()) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
-            stop();
-            return;
-        }
-    }
-    UA_Boolean connectivity_state = true;
-    remote_controller_type_inserter_.set_scalar_attribute(REMOTE_CONTROLLER_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
-    /* Gather method ids */
-    if ((method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
-        stop();
-        return;        
-    }
-    /* Setup conveyor client */
-    std::string conveyor_endpoint;
-    while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
-        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor, retrying in %d seconds (%s)", __FUNCTION__, LOOKUP_INTERVAL, UA_StatusCode_name(status));
-        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
-        if (!running_.load()) {
-            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
-            stop();
-            return;
-        }
-    }
-    remote_conveyor_type_inserter_.set_scalar_attribute(REMOTE_CONVEYOR_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
 }
 
 kitchen::~kitchen() {
@@ -576,6 +545,40 @@ kitchen::start() {
         stop();
         return;
     }
+
+    UA_StatusCode status = UA_STATUSCODE_UNCERTAIN;
+    /* Setup controller client */
+    std::string controller_endpoint;
+    while((status = discover_and_connect(controller_client_, discovery_util_, controller_endpoint, CONTROLLER_TYPE)) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller, retrying in %d seconds (%s)", __FUNCTION__, LOOKUP_INTERVAL, UA_StatusCode_name(status));
+        if (!running_.load()) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to controller", __FUNCTION__);
+            stop();
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+    }
+    UA_Boolean connectivity_state = true;
+    remote_controller_type_inserter_.set_scalar_attribute(REMOTE_CONTROLLER_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
+    /* Gather method ids */
+    if ((method_id_map_[CHOOSE_NEXT_ROBOT] = node_browser_helper().get_method_id(controller_endpoint, CONTROLLER_TYPE, CHOOSE_NEXT_ROBOT)) == OBJECT_METHOD_INFO_NULL) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Could not find the %s method id", __FUNCTION__, CHOOSE_NEXT_ROBOT);
+        stop();
+        return;        
+    }
+    /* Setup conveyor client */
+    std::string conveyor_endpoint;
+    while((status = discover_and_connect(conveyor_client_, discovery_util_, conveyor_endpoint, CONVEYOR_TYPE)) != UA_STATUSCODE_GOOD) {
+        UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor, retrying in %d seconds (%s)", __FUNCTION__, LOOKUP_INTERVAL, UA_StatusCode_name(status));
+        if (!running_.load()) {
+            UA_LOG_ERROR(UA_Log_Stdout, UA_LOGCATEGORY_USERLAND, "%s: Error discovering and connecting to conveyor", __FUNCTION__);
+            stop();
+            return;
+        }
+        std::this_thread::sleep_for(std::chrono::seconds(LOOKUP_INTERVAL));
+    }
+    remote_conveyor_type_inserter_.set_scalar_attribute(REMOTE_CONVEYOR_INSTANCE_NAME, CONNECTIVITY, &connectivity_state, UA_TYPES_BOOLEAN);
+
     /* Lookup own endpoint */
     std::vector<std::string> endpoints;
     while (endpoints.empty()) {
