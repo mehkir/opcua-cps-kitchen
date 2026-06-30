@@ -22,9 +22,9 @@ kitchen_mape::simple_capability_check(const std::map<position_t, std::unique_ptr
     return suitable_robot;
 }
 
-// Simple rearranging if suitable robot after next is positioned before next suitable robot
+// Simple rearrangement if suitable robot after next is positioned before next suitable robot
 remote_robot*
-kitchen_mape::simple_rearranging(const std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) {
+kitchen_mape::simple_rearrangement(const std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) {
     if (_recipe_action_queue.empty()) {
         return nullptr;
     }
@@ -69,7 +69,7 @@ kitchen_mape::simple_rearranging(const std::map<position_t, std::unique_ptr<remo
     return suitable_robot;
 }
 
-// Simple reconfiguring by swaping capability profiles if suitable robot after next is positioned before next suitable robot
+// Simple reconfiguration by swaping capability profiles if suitable robot after next is positioned before next suitable robot
 remote_robot*
 kitchen_mape::simple_reconfiguration(const std::map<position_t, std::unique_ptr<remote_robot>, std::greater<position_t>>& _position_remote_robot_map, std::queue<robot_action> _recipe_action_queue) {
     if (_recipe_action_queue.empty()) {
