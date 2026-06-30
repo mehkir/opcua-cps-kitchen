@@ -83,20 +83,19 @@ The latter expects to put in any positive number to place random orders.
 
 ## Dependencies
 The specified versions are currently used for development and are recommended for a more comfortable start.
-It may also work with older versions.
+JavaScript dependencies are setup per project and are recommended to be installed via npm in the cps-kitchen-dashboard and order_placement directory.
 - OS: Ubuntu 22.04.5 LTS
-- gcc/g++ 15.1.0
-- cmake 4.1.2
+- Toolchain: gcc/g++ 15.1.0, cmake 4.1.2
 - open62541 1.4.7, which may not need to be installed as precompiled dependencies are already included in the repository. If the precompiled dependencies don't work, note the following for your manual build or installation:
     - When building from source, pull git submodules.
     - Build options: UA_MULTITHREADING>=100, UA_ENABLE_DISCOVERY=ON, UA_ENABLE_DISCOVERY_MULTICAST=ON.
     - Set -DUSE_CUSTOM_VERSION=OFF in [build.bash](build.bash), [build_debug.bash](build_debug.bash) or [build_for_sanitizer.bash](build_for_sanitizer.bash) for a system-wide installation.
 
     For additional help see also chapter 3 in the [manual](https://www.open62541.org/doc/open62541-v1.4.7.pdf).
-- boost 1.83
-- jsoncpp 1.9.5
+- C++-Libraries: boost 1.83, jsoncpp 1.9.5
 - python 3.10
 - JavaScript Dashboard: justgage 1.7.0, node-opcua 2.156.0, ws 8.18.2, commander 2.20.3, raphael 2.3.0
+- CLI-Tools: jq 1.6
 - Code Documentation (optional): doxygen 1.9.1, graphviz 2.42.2
 
 ## Relevant Directories
@@ -140,14 +139,13 @@ Then type any positive number in the input field *PLACE RANDOM ORDER/S* and pres
 The Robot-Agents and Conveyor-Agent should now prepare and transport orders.
 
 ## Define and Set Capabilities
-Capability profiles are set in separate JSON files in the capabilites folder.
-Valid actions are named in the [robot_actions.cpp](actions/src/robot_action_names.hpp) file.
-There are the two types *recipe_timed_action* and *autonomous_action* whose types are defined in the [robot_actions.cpp](actions/src/robot_actions.cpp) file.
+Capability profiles are defined in separate JSON files in the [capabilites](capabilites/) folder and are bound to specific robot positions via the [robot_config_mapping.json](robot_config_mapping.json) file.
+Valid actions are named in the [robot_action_names.hpp](actions/include/robot_action_names.hpp) file.
+There are the two types *recipe_timed_action* and *autonomous_action* whose types are set in the [robot_actions.cpp](actions/src/robot_actions.cpp) file.
 The duration of *recipe_timed_action* must be defined in the recipe.
 *autonomous_action* durations are configured via [timing_config.json](timing_config.json) and must be add in the *action_map_*(see [robot_actions.cpp](actions/src/robot_actions.cpp)) in the constructor.
 Further tools can be defined in [robot_tool.hpp](robot/include/robot_tool.hpp) in the *robot_tool* enum class and need a string representation in the *robot_tool_to_string* method to be displayed correctly in the dashboard.
 A tool is then tied to an action in the [robot_actions.cpp](actions/src/robot_actions.cpp) constructor.
-A capability profile for a Robot-Agent at a certain position can be set in the *position_capabilities* map in [start_robots.bash](start_scripts/start_robots.bash).
 
 ## Define Recipes
 Recipes are defined in the [recipes.json](recipes.json) file in the root folder.
@@ -155,10 +153,9 @@ Recipe IDs must be consecutive starting at 1 with no gaps (e.g. 1,2,3,4,5 is val
 Only recipe timed actions must define a duration; other actions do not (see also [Define and Set Capabilities](#define-and-set-capabilities)).
 
 ## Timing
-Action execution, tool changes (retooling), and conveyor movement are time-simulated.
-Global agent timing parameters are defined in [timing_config.json](timing_config.json).
-Per-action durations for Robot-Agents are configured in [robot_actions.cpp](actions/src/robot_actions.cpp).
-Update these files to adjust simulation speed and action-specific timings.
+Action execution, tool changes (retooling), and robot as well as conveyor movement are time-simulated.
+Global agent and per-action timing parameters are defined in [timing_config.json](timing_config.json).
+The action_factor parameter is a multiplier for the duration of robot actions and does not affect the duration of tool changes or robot/conveyor movement.
 
 ## Implement Your Own Scheduling Algorithm
 The Controller-Agent responds to "choose_next_robot" requests with a suitable robot for the next preparation steps of a recipe.
@@ -173,4 +170,4 @@ To rearrange or reconfigure robots use the callbacks:
 - *swap_robot_positions_callback_(position_t from, position_t to)*
 - *reconfigure_robot_callback_(position_t position, string new_capabilites_profile)*
 
-Note: When a robot performs a rearrangement or reconfiguration, its adaptation flag is set. Use *is_adaptivity_pending()* in your mape_implementation to exclude unavailable robots early on.
+Note: When a robot performs a rearrangement or reconfiguration, it becomes unavailable. Use *is_adaptivity_pending()* in your mape_implementation to exclude unavailable robots early on.
